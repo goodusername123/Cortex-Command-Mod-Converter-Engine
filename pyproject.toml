@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cortex_command_mod_converter_engine"
-version = "1.0.2"
+name = "cortex-command-mod-converter-engine"
+version = "1.0.3"
 authors = [
   { name="MyNameIsTrez", email="welfje@gmail.com" },
 ]
