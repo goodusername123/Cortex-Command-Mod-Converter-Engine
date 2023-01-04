@@ -1,4 +1,5 @@
-import os, subprocess
+import os
+import subprocess
 from pathlib import Path
 
 import cortex_command_mod_converter_engine

@@ -2,8 +2,7 @@ import os
 from pathlib import Path
 
 from cortex_command_mod_converter_engine import utils
-from cortex_command_mod_converter_engine.ini_converting import ini_tokenizer
-from cortex_command_mod_converter_engine.ini_converting import ini_cst
+from cortex_command_mod_converter_engine.ini_converting import ini_cst, ini_tokenizer
 
 
 def get_full_cst(input_folder_path, output_folder_path, subfolder_path):

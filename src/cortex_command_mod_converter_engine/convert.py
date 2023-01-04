@@ -1,19 +1,23 @@
-import os, time, shutil, math, platform, json
-from pathlib import Path
-from playsound import playsound
-from subprocess import Popen
+import json
 import math
+import os
+import platform
+import shutil
+import time
+from pathlib import Path
+from subprocess import Popen
+
 import PySimpleGUI as sg
+from playsound import playsound
 
 from cortex_command_mod_converter_engine import (
-    regex_rules,
-    zips,
     bmp_to_png,
-    utils,
+    regex_rules,
     stylua,
+    utils,
+    zips,
 )
 from cortex_command_mod_converter_engine.case_check import case_check
-
 from cortex_command_mod_converter_engine.ini_converting import (
     ini_cst_builder,
     ini_rules,

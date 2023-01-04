@@ -1,4 +1,6 @@
-import os, shutil, zipfile
+import os
+import shutil
+import zipfile
 
 import cortex_command_mod_converter_engine.cfg as cfg
 

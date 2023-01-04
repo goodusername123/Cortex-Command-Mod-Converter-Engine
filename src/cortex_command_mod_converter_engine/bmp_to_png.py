@@ -1,6 +1,7 @@
-from PIL import Image
 from pathlib import Path
+
 import numpy as np
+from PIL import Image
 
 
 def is_bmp(full_filename):

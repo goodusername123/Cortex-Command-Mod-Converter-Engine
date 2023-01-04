@@ -1,11 +1,10 @@
-from pathlib import Path
 import re
+from pathlib import Path
 
 from cortex_command_mod_converter_engine.case_check.case_check_errors import (
     error_could_not_locate,
     error_failed_to_find_module,
 )
-
 
 _path_glob = []
 _path_glob_lowercase = []

@@ -1,7 +1,9 @@
-from cortex_command_mod_converter_engine.ini_converting import ini_rules_utils
-
 from cortex_command_mod_converter_engine import thumbnail_generator
-from cortex_command_mod_converter_engine.ini_converting import ini_cst, ini_tokenizer
+from cortex_command_mod_converter_engine.ini_converting import (
+    ini_cst,
+    ini_rules_utils,
+    ini_tokenizer,
+)
 
 
 def apply_rules_on_ini_cst(ini_cst, output_folder_path):
