@@ -6,7 +6,9 @@ Automatically converts mods to the latest version of the Cortex Command Communit
 
 ## Locally testing your changes
 
-1. Generate distribution archives and overwrite the old distribution archive with `py -m build && pip install dist/*.tar.gz`
+This builds the project and overwrites any older pip version of it:
+
+`py -m build && pip install dist/*.tar.gz`
 
 ## Running the tests
 `py -m unittest`
@@ -14,4 +16,4 @@ Automatically converts mods to the latest version of the Cortex Command Communit
 ## Updating this project on PyPI
 
 1. Generate distribution archives with `py -m build`
-2. Update this package on PyPI with `twine upload dist/*`. You'll have to enter your PyPI username and password.
+2. Update this package on PyPI with `twine upload dist/*`
