@@ -11,7 +11,10 @@ This builds the project and overwrites any older pip version of it:
 `py -m build && pip install dist/*.tar.gz`
 
 ## Running the tests
-`py -m unittest`
+
+The unit tests are executed on the built files, so that's why the `build` command should be ran first:
+
+`py -m build && py -m unittest`
 
 ## Updating this project on PyPI
 
