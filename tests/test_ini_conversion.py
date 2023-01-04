@@ -41,6 +41,6 @@ class TestINIConversion(unittest.TestCase):
     def get_in_filepaths(self):
         return (
             entry_path
-            for entry_path in self.OUTPUT_TESTS_PATH.iterdir()
-            if entry_path.is_file() and entry_path.stem.endswith(self.IN_STEM)
+            for entry_path in self.OUTPUT_TESTS_PATH.rglob("*" + self.IN_STEM + ".ini")
+            if entry_path.is_file()
         )
