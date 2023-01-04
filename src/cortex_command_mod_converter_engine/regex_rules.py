@@ -13,7 +13,7 @@ def playsound_warning(line, file_path, line_number):
         len(matches) > 0 and matches[0].count(",") > 2
     ):  # If there's a match and the PlaySound call has more than 3 arguments.
         # Print a warning.
-        pass # TODO: Log warning with "'{}' line {}: {} -> {}".format(file_path, line_number, pattern, message)
+        pass  # TODO: Log warning with "'{}' line {}: {} -> {}".format(file_path, line_number, pattern, message)
 
 
 def regex_replace(all_lines):

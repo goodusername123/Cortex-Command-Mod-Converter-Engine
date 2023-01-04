@@ -198,7 +198,7 @@ def replace_property_names_of_children_shallowly(section, old_property, new_prop
             if token["type"] == "property":
                 if token["content"] == old_property:
                     child[i]["content"] = new_property
-                break
+                break  # Since every line only has one property, stop looking at this line
 
 
 def append(foo, depth):

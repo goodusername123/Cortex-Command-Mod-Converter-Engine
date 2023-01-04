@@ -10,12 +10,16 @@ def write_converted_ini_cst(parsed_portion, output_folder_path):
         else:  # Else dict_or_list contains a list of the sections of a file.
             p = str(Path(output_folder_path) / name)
             with open(p, mode="w") as f:
-                lines = []
-                for section in dict_or_list:
-                    write_recursively(section, lines)
-                f.write("".join(lines))
+                f.write(get_ini_cst_string(dict_or_list))
                 # cfg.progress_bar.inc()
                 # cfg.progress_bar.setSubtext(f"writing file {p}")
+
+
+def get_ini_cst_string(cst):
+    lines = []
+    for section in cst:
+        write_recursively(section, lines)
+    return "".join(lines)
 
 
 def write_recursively(line_tokens, lines):

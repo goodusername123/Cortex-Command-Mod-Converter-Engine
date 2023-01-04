@@ -1,77 +1,46 @@
-import os, unittest
+import unittest
+from pathlib import Path
 
 from cortex_command_mod_converter_engine.ini_converting import (
-    ini_writer,
     ini_cst,
-    ini_tokenizer,
     ini_rules,
+    ini_tokenizer,
+    ini_writer,
 )
 
 
 class TestINIConversion(unittest.TestCase):
-    INPUT_FILE_SUFFIX = "_in.ini"
-    EXPECTED_FILE_SUFFIX = "_out.ini"
-    RESULT_FILE_SUFFIX = "_result.ini"
+    IN_STEM = "_in"
+    OUT_STEM = "_out"
 
-    TEST_DIR = "tests/ini_test_files/output_tests/"
-
-    class MissingInputTestFile(Exception):
-        pass
-
-    class MissingOutputTestFile(Exception):
-        pass
+    OUTPUT_TESTS_PATH = Path("tests/ini_test_files/output_tests")
 
     def test_conversions(self):
-        in_files = {}
-        out_files = {}
+        for in_filepath, out_filepath in self.get_filepaths():
+            in_str = in_filepath.read_text()
+            out_str = out_filepath.read_text()
 
-        # Get all tests, raise an exception if one is missing.
-        for filepath in os.listdir(self.TEST_DIR):
-            if filepath.endswith(self.INPUT_FILE_SUFFIX):
-                in_files[filepath] = True
-            elif filepath.endswith(self.EXPECTED_FILE_SUFFIX):
-                out_files[filepath] = True
+            tokens = ini_tokenizer.get_tokens_from_str(in_str, in_filepath)
+            cst = ini_cst.get_cst(tokens)
+            ini_rules.apply_rules_on_sections([cst[0]], None)
 
-        if len(out_files) < len(in_files):
-            raise self.MissingOutputTestFile(
-                "Missing output test file(s):" + str(in_files - out_files)
-            )
-        elif len(out_files) > len(in_files):
-            raise self.MissingInputTestFile(
-                "Missing input test file(s): " + str(out_files - in_files)
-            )
+            result = ini_writer.get_ini_cst_string(cst)
+            self.assertEqual(result, out_str)
 
-        # Run all tests.
-        for in_file in in_files:
-            # test_name = in_file.replace(self.INPUT_FILE_SUFFIX, "")
-            out_file = in_file.replace(
-                self.INPUT_FILE_SUFFIX, self.EXPECTED_FILE_SUFFIX
-            )
-            if not os.path.isfile(self.TEST_DIR + out_file):
-                raise self.MissingOutputTestFile(
-                    "Missing output test file: " + out_file
-                )
-            else:
-                with open(self.TEST_DIR + in_file, "r") as f:
-                    # We don't care about spaces at the end of a file
-                    in_str = f.read().rstrip()
-                with open(self.TEST_DIR + out_file, "r") as f:
-                    # We don't care about spaces at the end of a file
-                    out_str = f.read().rstrip()
+    def get_filepaths(self):
+        return (
+            (in_filepath, self.get_out_filepath(in_filepath))
+            for in_filepath in self.get_in_filepaths()
+        )
 
-                # tokenize the file contents, generate CST for applying rules
-                tokens = ini_tokenizer.get_tokens_from_str(in_str, in_file)
-                cst = ini_cst.get_cst(tokens)
-                ini_rules.apply_rules_on_sections([cst[0]], None)
-                tokens = []
-                for section in cst:
-                    ini_writer.write_recursively(section, tokens)
+    def get_out_filepath(self, in_filepath):
+        return in_filepath.with_stem(
+            in_filepath.stem.replace(self.IN_STEM, self.OUT_STEM)
+        )
 
-                result = "".join(tokens).rstrip()
-                result_file = self.TEST_DIR + in_file.replace(
-                    self.INPUT_FILE_SUFFIX, self.RESULT_FILE_SUFFIX
-                )
-                with (open(result_file, "w")) as f:
-                    f.write(result)
-
-                self.assertEqual(result, out_str)
+    def get_in_filepaths(self):
+        return (
+            entry_path
+            for entry_path in self.OUTPUT_TESTS_PATH.iterdir()
+            if entry_path.is_file() and entry_path.stem.endswith(self.IN_STEM)
+        )

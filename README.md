@@ -2,19 +2,17 @@
 
 Automatically converts mods to the latest version of the Cortex Command Community Project.
 
-# Contributing
-
 ## Locally testing your changes
 
-This builds the project and overwrites any older pip version of it:
+This builds the project and overwrites any older pip build of it:
 
 `py -m build && pip install dist/*.tar.gz`
 
 ## Running the tests
 
-The unit tests are executed on the built files, so that's why the `build` command should be ran first:
+The unit tests are only executed on the pip build, so the pip build has to be updated first:
 
-`py -m build && py -m unittest`
+`py -m build && pip install dist/*.tar.gz && py -m unittest`
 
 ## Updating this project on PyPI
 
