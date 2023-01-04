@@ -22,11 +22,6 @@ def is_mod_folder_or_subfolder(path):
     return len(path_parts) >= 1 and path_parts[0].endswith(".rte")
 
 
-def get_output_path_from_input_path(input_folder_path, output_folder_path, input_path):
-    relative = input_path.relative_to(input_folder_path)
-    return str(output_folder_path / relative)
-
-
 def get_ini_files_in_dir_deep(path):
     count = 0
     for name in os.listdir(path):
