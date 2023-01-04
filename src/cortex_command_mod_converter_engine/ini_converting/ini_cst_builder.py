@@ -4,7 +4,6 @@ from pathlib import Path
 from cortex_command_mod_converter_engine import utils
 from cortex_command_mod_converter_engine.ini_converting import ini_tokenizer
 from cortex_command_mod_converter_engine.ini_converting import ini_cst
-import cortex_command_mod_converter_engine.shared_globals as cfg
 
 
 def get_full_cst(input_folder_path, output_folder_path, subfolder_path):

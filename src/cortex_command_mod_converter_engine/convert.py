@@ -5,7 +5,6 @@ from subprocess import Popen
 import math
 import PySimpleGUI as sg
 
-import cortex_command_mod_converter_engine.shared_globals as cfg
 from cortex_command_mod_converter_engine import (
     regex_rules,
     zips,

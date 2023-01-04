@@ -2,8 +2,6 @@ from PIL import Image
 from pathlib import Path
 import numpy as np
 
-import cortex_command_mod_converter_engine.shared_globals as cfg
-
 
 def is_bmp(full_filename):
     return Path(full_filename).suffix.lower() == ".bmp"

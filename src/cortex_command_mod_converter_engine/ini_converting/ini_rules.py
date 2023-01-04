@@ -2,19 +2,6 @@ from cortex_command_mod_converter_engine.ini_converting import ini_rules_utils
 
 from cortex_command_mod_converter_engine import thumbnail_generator
 from cortex_command_mod_converter_engine.ini_converting import ini_cst, ini_tokenizer
-import cortex_command_mod_converter_engine.shared_globals as cfg
-
-
-"""
-{
-	"foo.rte": {
-		"Foo.ini": ini_cst,
-		"FolderName": {
-			"Bar.ini": ini_cst,
-		}
-	}
-}
-"""
 
 
 def apply_rules_on_ini_cst(ini_cst, output_folder_path):
@@ -462,6 +449,8 @@ def add_grip_strength_if_missing(section):
     In response, pre4.1 made JointStrength a non-optional property, with the idea being that this function could then fix old mods by adding GripStrength = <high_value> to them.
     """
 
+    arbitrarily_high_default_grip_strength = 424242
+
     # TODO: Make this recursive somehow.
     if ini_rules_utils.line_contains_property_and_value(section, "AddActor", "Arm"):
         for token in section:
@@ -484,9 +473,7 @@ def add_grip_strength_if_missing(section):
                             {"type": "extra", "content": " "},
                             {
                                 "type": "value",
-                                "content": str(
-                                    cfg.ARBITRARILY_HIGH_DEFAULT_GRIP_STRENGTH
-                                ),
+                                "content": str(arbitrarily_high_default_grip_strength),
                             },
                             {"type": "extra", "content": "\n"},
                         ]

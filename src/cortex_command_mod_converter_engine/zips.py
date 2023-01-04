@@ -1,6 +1,6 @@
 import os, shutil, zipfile
 
-import cortex_command_mod_converter_engine.shared_globals as cfg
+import cortex_command_mod_converter_engine.cfg as cfg
 
 
 def unzip(input_mod_path, input_folder_path):

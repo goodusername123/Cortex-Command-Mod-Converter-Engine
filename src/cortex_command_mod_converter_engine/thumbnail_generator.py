@@ -3,8 +3,6 @@ from pathlib import Path
 
 from PIL import Image
 
-import cortex_command_mod_converter_engine.shared_globals as cfg
-
 
 def generate_thumbnail(iconfile_relative_path_str, output_folder_path):
     """

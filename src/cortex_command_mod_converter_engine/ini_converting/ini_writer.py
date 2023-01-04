@@ -1,5 +1,4 @@
 from pathlib import Path
-import cortex_command_mod_converter_engine.shared_globals as cfg
 
 
 def write_converted_ini_cst(parsed_portion, output_folder_path):
