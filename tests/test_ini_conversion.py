@@ -13,7 +13,7 @@ class TestINIConversion(unittest.TestCase):
     IN_STEM = "_in"
     OUT_STEM = "_out"
 
-    OUTPUT_TESTS_PATH = Path("tests/ini_test_files/output_tests")
+    CONVERSION_TESTS_PATH = Path("tests/ini_test_files/conversion")
 
     def test_conversions(self):
         for in_filepath, out_filepath in self.get_filepaths():
@@ -41,6 +41,8 @@ class TestINIConversion(unittest.TestCase):
     def get_in_filepaths(self):
         return (
             entry_path
-            for entry_path in self.OUTPUT_TESTS_PATH.rglob("*" + self.IN_STEM + ".ini")
+            for entry_path in self.CONVERSION_TESTS_PATH.rglob(
+                "*" + self.IN_STEM + ".ini"
+            )
             if entry_path.is_file()
         )

@@ -1,3 +1,2 @@
 dist
 __pycache__
-tests/ini_test_files/output_tests/*_result.ini
