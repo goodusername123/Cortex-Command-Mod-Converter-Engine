@@ -1,4 +1,10 @@
-def get_cst(tokens, parsed=None, token_idx=None, depth=0):
+def get_cst(tokens, depth=0):
+    cst = get_cst_recursively(tokens, depth)
+    # strip_indentation_tabs(cst)
+    return cst
+
+
+def get_cst_recursively(tokens, depth, parsed=None, token_idx=None):
     """
     newline -> start -> property -> equals -> value
     ^                                         v
@@ -18,7 +24,7 @@ def get_cst(tokens, parsed=None, token_idx=None, depth=0):
         if state == "newline" and is_deeper(depth, token, tokens, token_idx[0] + 1):
             children = {"type": "children", "content": []}
             append(children, parsed)
-            get_cst(tokens, children["content"], token_idx, depth + 1)
+            get_cst_recursively(tokens, depth + 1, children["content"], token_idx)
             # "state" is deliberately not being changed here.
         elif state == "newline" and is_same_depth(
             depth, token, tokens, token_idx[0] + 1
@@ -112,3 +118,25 @@ def is_same_depth(depth, token, tokens, next_token_idx):
 def is_shallower(depth, token, tokens, next_token_idx):
     new_depth = get_depth(token, tokens, next_token_idx)
     return new_depth != -1 and new_depth < depth
+
+
+# def strip_indentation_tabs(cst):
+#     """
+#     Also removes any heretical multiline comments within the indentation tabs.
+#     """
+#     for tokens_index, tokens in enumerate(cst):
+#         token_index = 0
+#         if tokens_contain_type(tokens, "WORD"):
+#             while tokens[tokens_index] != "WORD":
+#                 token_index += 1
+#         cst[tokens_index] = tokens[tokens_index:]
+
+#         if token["type"] == "children":
+#             strip_indentation_tabs(token["content"])
+
+
+# def tokens_contain_type(tokens, property):
+#     for token in tokens:
+#         if token["type"] == property:
+#             return True
+#     return False

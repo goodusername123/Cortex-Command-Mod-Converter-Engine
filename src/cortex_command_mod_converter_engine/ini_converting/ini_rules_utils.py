@@ -44,27 +44,27 @@ def get_lines_with_property_and_value(children, property, value) -> list:
 
 
 def get_section_property_value(section, property):
-    for x in section:
-        val = get_line_property_value(x, property)
-        if val:
-            return val
+    for line_tokens in section:
+        value = get_line_property_value(line_tokens, property)
+        if value:
+            return (value, line_tokens)
     return None
 
 
-def get_line_property(line):
-    for token in line:
+def get_line_property(line_tokens):
+    for token in line_tokens:
         if token["type"] == "property":
             return token["content"]
 
 
-def get_line_property_value(line, property):
-    for x in line:
-        type_ = x["type"]
-        content = x["content"]
+def get_line_property_value(line_tokens, property):
+    for token in line_tokens:
+        type_ = token["type"]
+        content = token["content"]
         if type_ == "property" and content != property:
             return None
         if type_ == "value":
-            return (content, line)
+            return content
     return None
 
 
@@ -94,10 +94,10 @@ def get_values_of_properties_of_children_shallowly(section, property):
     return matches
 
 
-def set_line_value(line, val):
-    for i, x in enumerate(line):
-        if x["type"] == "value":
-            line[i]["content"] = str(val)
+def set_line_value(line_tokens, val):
+    for i, token in enumerate(line_tokens):
+        if token["type"] == "value":
+            line_tokens[i]["content"] = str(val)
 
 
 # Indent lines or sections
@@ -109,6 +109,7 @@ def indent(section: list, count=1, recursive=True):
     else:
         section.insert(0, {"type": "extra", "content": ("\t" * count)})
 
+    # TODO: Why have the option to disable recursion?
     if not recursive:
         return
 
@@ -118,12 +119,10 @@ def indent(section: list, count=1, recursive=True):
             indent(x, count)
 
 
-def get_indent(line):
-    if len(line) == 0:
-        return
-    content = line[0]["content"]
-    if line[0]["type"] == "extra" and "\t" in content:
-        return len(content)
+def get_indent(line_tokens):
+    first_token = line_tokens[0]
+    if first_token["type"] == "extra" and "\t" in first_token["content"]:
+        return len(first_token["content"])
     return 0
 
 
@@ -155,26 +154,26 @@ def children_contain_property_shallowly(children, property):
     return False
 
 
-def change_line_property(line, property):
-    for i, token in enumerate(line):
+def change_line_property(line_tokens, property):
+    for i, token in enumerate(line_tokens):
         if token["type"] == "property":
-            line[i]["content"] = property
+            line_tokens[i]["content"] = property
             return
     raise ValueError("Property doesn't exist in the line!")
 
 
-def change_line_value(line, value):
-    for i, token in enumerate(line):
+def change_line_value(line_tokens, value):
+    for i, token in enumerate(line_tokens):
         if token["type"] == "value":
-            line[i]["content"] = value
+            line_tokens[i]["content"] = value
             return
     raise ValueError("Value doesn't exist in the line!")
 
 
 # replace the value of line if property (and value) matches, ignores children
-def replace_value_of_property(line, property, value, old_value=None):
+def replace_value_of_property(line_tokens, property, value, old_value=None):
     hasProp = False
-    for i, token in enumerate(line):
+    for i, token in enumerate(line_tokens):
         type_ = token["type"]
         content = token["content"]
         if not hasProp:
@@ -188,7 +187,7 @@ def replace_value_of_property(line, property, value, old_value=None):
                 and (old_value and old_value == content)
                 or not old_value
             ):
-                line[i][type_] = value
+                line_tokens[i][type_] = value
 
 
 def replace_property_names_of_children_shallowly(section, old_property, new_property):

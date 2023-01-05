@@ -56,6 +56,8 @@ def apply_rules_on_sections(parsed_subset, output_folder_path):
 
                     max_length_to_offsets(children)
 
+        # max_length_to_offsets(section)
+
         add_grip_strength_if_missing(section)
 
         pie_menu_fix(section)
@@ -170,108 +172,135 @@ def shovel_flash_fix_change_frame_count(children):
                                 token3["content"] = "1"
 
 
-def max_length_to_offsets(section):
-    pass
-    # if not section:
-    #     return
-    # if not ini_rules_utils.line_contains_property(section, "MaxLength"):
-    #     return
+# def max_length_to_offsets(section):
+#     if not section:
+#         return
+#     if not ini_rules_utils.line_contains_property_and_value(section, "AddActor", "Leg"):
+#         return
+
+#     for line_tokens in section:
+#         max_length = ini_rules_utils.get_line_property_value(line_tokens, "MaxLength")
+#         if not max_length:
+#             continue
+
+#         ini_rules_utils.change_line_property(line_tokens, "ContractedOffset")
+#         ini_rules_utils.change_line_value(line_tokens, "Vector")
+
+#         indentation = ini_rules_utils.get_indent(line_tokens)
+
+#         indentation_string = indentation * "\t"
+#         child_indentation_string = indentation_string + "\t"
+
+#         appended_line_tokens = ini_tokenizer.get_tokens_from_str(
+#             child_indentation_string
+#             + f"X = {max_length / 2}\n"
+#             + child_indentation_string
+#             + "Y = 0\n"
+#             + indentation_string
+#             + "ExtendedOffset = Vector\n"
+#             + child_indentation_string
+#             + f"X = {max_length}\n"
+#             + child_indentation_string
+#             + "Y = 0\n"
+#         )
+#         appended_line_cst = ini_cst.get_cst(appended_line_tokens, depth=indentation)[0]
+# TODO: Finish
 
 
-# def max_length_to_offsets(children):
-#     for index, line_tokens in enumerate(children):
-#         old_value = max_length_to_offsets_2(line_tokens)
+def max_length_to_offsets(children):
+    for index, line_tokens in enumerate(children):
+        old_value = max_length_to_offsets_2(line_tokens)
 
-#         if old_value != None:
-#             # print(index, old_value)
+        if old_value != None:
+            # print(index, old_value)
 
-#             # TODO: Can this be done with .append() instead of .insert() ?
-#             children.insert(
-#                 index + 1,
-#                 [
-#                     {"type": "extra", "content": "\t"},
-#                     {"type": "property", "content": "ExtendedOffset"},
-#                     {"type": "extra", "content": " "},
-#                     {"type": "extra", "content": "="},
-#                     {"type": "extra", "content": " "},
-#                     {"type": "value", "content": "Vector"},
-#                     {"type": "extra", "content": "\n"},
-#                     {
-#                         "type": "children",
-#                         "content": [
-#                             [
-#                                 {"type": "extra", "content": "\t\t"},
-#                                 {"type": "property", "content": "X"},
-#                                 {"type": "extra", "content": " "},
-#                                 {"type": "extra", "content": "="},
-#                                 {"type": "extra", "content": " "},
-#                                 {
-#                                     "type": "value",
-#                                     "content": remove_excess_zeros(old_value),
-#                                 },
-#                                 {"type": "extra", "content": "\n"},
-#                             ],
-#                             [
-#                                 {"type": "extra", "content": "\t\t"},
-#                                 {"type": "property", "content": "Y"},
-#                                 {"type": "extra", "content": " "},
-#                                 {"type": "extra", "content": "="},
-#                                 {"type": "extra", "content": " "},
-#                                 {"type": "value", "content": remove_excess_zeros(0)},
-#                                 {"type": "extra", "content": "\n"},
-#                             ],
-#                         ],
-#                     },
-#                 ],
-#             )
+            # TODO: Can this be done with .append() instead of .insert() ?
+            children.insert(
+                index + 1,
+                [
+                    {"type": "extra", "content": "\t"},
+                    {"type": "property", "content": "ExtendedOffset"},
+                    {"type": "extra", "content": " "},
+                    {"type": "extra", "content": "="},
+                    {"type": "extra", "content": " "},
+                    {"type": "value", "content": "Vector"},
+                    {"type": "extra", "content": "\n"},
+                    {
+                        "type": "children",
+                        "content": [
+                            [
+                                {"type": "extra", "content": "\t\t"},
+                                {"type": "property", "content": "X"},
+                                {"type": "extra", "content": " "},
+                                {"type": "extra", "content": "="},
+                                {"type": "extra", "content": " "},
+                                {
+                                    "type": "value",
+                                    "content": remove_excess_zeros(old_value),
+                                },
+                                {"type": "extra", "content": "\n"},
+                            ],
+                            [
+                                {"type": "extra", "content": "\t\t"},
+                                {"type": "property", "content": "Y"},
+                                {"type": "extra", "content": " "},
+                                {"type": "extra", "content": "="},
+                                {"type": "extra", "content": " "},
+                                {"type": "value", "content": remove_excess_zeros(0)},
+                                {"type": "extra", "content": "\n"},
+                            ],
+                        ],
+                    },
+                ],
+            )
 
 
-# def max_length_to_offsets_2(line_tokens):
-#     for token in line_tokens:
-#         if token["type"] == "property":
-#             if token["content"] == "MaxLength":
-#                 token["content"] = "ContractedOffset"
+def max_length_to_offsets_2(line_tokens):
+    for token in line_tokens:
+        if token["type"] == "property":
+            if token["content"] == "MaxLength":
+                token["content"] = "ContractedOffset"
 
-#                 for token_2 in line_tokens:
-#                     if token_2["type"] == "value":
-#                         old_value = float(token_2["content"])
-#                         token_2["content"] = "Vector"
+                for token_2 in line_tokens:
+                    if token_2["type"] == "value":
+                        old_value = float(token_2["content"])
+                        token_2["content"] = "Vector"
 
-#                         line_tokens.append(
-#                             {
-#                                 "type": "children",
-#                                 "content": [
-#                                     [
-#                                         {"type": "extra", "content": "\t\t"},
-#                                         {"type": "property", "content": "X"},
-#                                         {"type": "extra", "content": " "},
-#                                         {"type": "extra", "content": "="},
-#                                         {"type": "extra", "content": " "},
-#                                         {
-#                                             "type": "value",
-#                                             "content": remove_excess_zeros(
-#                                                 old_value / 2
-#                                             ),
-#                                         },
-#                                         {"type": "extra", "content": "\n"},
-#                                     ],
-#                                     [
-#                                         {"type": "extra", "content": "\t\t"},
-#                                         {"type": "property", "content": "Y"},
-#                                         {"type": "extra", "content": " "},
-#                                         {"type": "extra", "content": "="},
-#                                         {"type": "extra", "content": " "},
-#                                         {
-#                                             "type": "value",
-#                                             "content": remove_excess_zeros(0),
-#                                         },
-#                                         {"type": "extra", "content": "\n"},
-#                                     ],
-#                                 ],
-#                             }
-#                         )
+                        line_tokens.append(
+                            {
+                                "type": "children",
+                                "content": [
+                                    [
+                                        {"type": "extra", "content": "\t\t"},
+                                        {"type": "property", "content": "X"},
+                                        {"type": "extra", "content": " "},
+                                        {"type": "extra", "content": "="},
+                                        {"type": "extra", "content": " "},
+                                        {
+                                            "type": "value",
+                                            "content": remove_excess_zeros(
+                                                old_value / 2
+                                            ),
+                                        },
+                                        {"type": "extra", "content": "\n"},
+                                    ],
+                                    [
+                                        {"type": "extra", "content": "\t\t"},
+                                        {"type": "property", "content": "Y"},
+                                        {"type": "extra", "content": " "},
+                                        {"type": "extra", "content": "="},
+                                        {"type": "extra", "content": " "},
+                                        {
+                                            "type": "value",
+                                            "content": remove_excess_zeros(0),
+                                        },
+                                        {"type": "extra", "content": "\n"},
+                                    ],
+                                ],
+                            }
+                        )
 
-#                         return old_value
+                        return old_value
 
 
 def iconfile_path_to_thumbnail_generator(section, output_folder_path):
@@ -387,9 +416,9 @@ def pie_menu_fix(section: list):
     # Keep track of and update slice directions.
     for x in dirs:
         dir = int(x[0])
-        line = x[1]
+        line_tokens = x[1]
         if sliceDirCounts[dir] == MAX_PIE_QUADRANT_SIZE:
-            ini_rules_utils.set_line_value(line, 4)
+            ini_rules_utils.set_line_value(line_tokens, 4)
         else:
             sliceDirCounts[dir] += 1
         sliceCount += 1
@@ -544,11 +573,11 @@ def rename_section_preset(section, entity, old, new, recursive=False):
 
     children = ini_rules_utils.get_children(section)
     if recursive:
-        for line in children:
-            rename_section_preset(line, entity, old, new, recursive)
+        for line_tokens in children:
+            rename_section_preset(line_tokens, entity, old, new, recursive)
 
     if not ini_rules_utils.line_contains_value(section, entity):
         return
 
-    for line in children:
-        ini_rules_utils.replace_value_of_property(line, "PresetOf", new, old)
+    for line_tokens in children:
+        ini_rules_utils.replace_value_of_property(line_tokens, "PresetOf", new, old)
