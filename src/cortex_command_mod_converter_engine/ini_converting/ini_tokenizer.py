@@ -1,7 +1,6 @@
 import re
 
 
-# Gets tokens using filepath
 def get_tokens(filepath):
 
     with open(filepath, "r") as f:

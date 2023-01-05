@@ -1,14 +1,7 @@
 import json
-import math
 import os
-import platform
 import shutil
-import time
 from pathlib import Path
-from subprocess import Popen
-
-import PySimpleGUI as sg
-from playsound import playsound
 
 from cortex_command_mod_converter_engine import (
     bmp_to_png,

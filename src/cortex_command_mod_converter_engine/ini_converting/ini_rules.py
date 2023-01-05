@@ -128,113 +128,150 @@ def max_throttle_range_to_positive_throttle_multiplier(old_value):
     return remove_excess_zeros(new_value)
 
 
-# TODO: Refactor max_length_to_offsets and max_length_to_offsets_2
-def max_length_to_offsets(children):
-    """
-    If the parent line is AddActor = Leg:
-    MaxLength = old_value
-    ->
-    ContractedOffset = Vector
-            X = old_value / 2
-            Y = 0
-    ExtendedOffset = Vector
-            X = old_value
-            Y = 0
-    """
+def shovel_flash_fix(children):
+    for line_tokens in children:
+        for token in line_tokens:
+            if token["type"] == "property":
+                if token["content"] == "SpriteFile":
+                    # TODO: Check if the value "ContentFile" is also used, because "SpriteFile" might be able to have other values in the future!
 
-    for index, line_tokens in enumerate(children):
-        old_value = max_length_to_offsets_2(line_tokens)
+                    for token_2 in line_tokens:
+                        if token_2["type"] == "children":
+                            for subline_tokens in token_2["content"]:
+                                for subtoken in subline_tokens:
+                                    if (
+                                        subtoken["type"] == "property"
+                                        and subtoken["content"] == "FilePath"
+                                    ):
+                                        for subtoken in subline_tokens:
+                                            if subtoken["type"] == "value" and subtoken[
+                                                "content"
+                                            ] in (
+                                                "Ronin.rte/Devices/Sprites/ShovelFlash.bmp",
+                                                "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png",
+                                            ):
+                                                subtoken[
+                                                    "content"
+                                                ] = "Ronin.rte/Devices/Tools/Shovel/Effects/ShovelFlash.png"
 
-        if old_value != None:
-            # print(index, old_value)
-
-            # TODO: Can this be done with .append() instead of .insert() ?
-            children.insert(
-                index + 1,
-                [
-                    {"type": "extra", "content": "\t"},
-                    {"type": "property", "content": "ExtendedOffset"},
-                    {"type": "extra", "content": " "},
-                    {"type": "extra", "content": "="},
-                    {"type": "extra", "content": " "},
-                    {"type": "value", "content": "Vector"},
-                    {"type": "extra", "content": "\n"},
-                    {
-                        "type": "children",
-                        "content": [
-                            [
-                                {"type": "extra", "content": "\t\t"},
-                                {"type": "property", "content": "X"},
-                                {"type": "extra", "content": " "},
-                                {"type": "extra", "content": "="},
-                                {"type": "extra", "content": " "},
-                                {
-                                    "type": "value",
-                                    "content": remove_excess_zeros(old_value),
-                                },
-                                {"type": "extra", "content": "\n"},
-                            ],
-                            [
-                                {"type": "extra", "content": "\t\t"},
-                                {"type": "property", "content": "Y"},
-                                {"type": "extra", "content": " "},
-                                {"type": "extra", "content": "="},
-                                {"type": "extra", "content": " "},
-                                {"type": "value", "content": remove_excess_zeros(0)},
-                                {"type": "extra", "content": "\n"},
-                            ],
-                        ],
-                    },
-                ],
-            )
+                                                shovel_flash_fix_change_frame_count(
+                                                    children
+                                                )
 
 
-def max_length_to_offsets_2(line_tokens):
-    for token in line_tokens:
-        if token["type"] == "property":
-            if token["content"] == "MaxLength":
-                token["content"] = "ContractedOffset"
+def shovel_flash_fix_change_frame_count(children):
+    for line_tokens2 in children:
+        for token2 in line_tokens2:
+            if token2["type"] == "property":
+                if token2["content"] == "FrameCount":
+                    for token3 in line_tokens2:
+                        if token3["type"] == "value":
+                            if token3["content"] == "2":
+                                token3["content"] = "1"
 
-                for token_2 in line_tokens:
-                    if token_2["type"] == "value":
-                        old_value = float(token_2["content"])
-                        token_2["content"] = "Vector"
 
-                        line_tokens.append(
-                            {
-                                "type": "children",
-                                "content": [
-                                    [
-                                        {"type": "extra", "content": "\t\t"},
-                                        {"type": "property", "content": "X"},
-                                        {"type": "extra", "content": " "},
-                                        {"type": "extra", "content": "="},
-                                        {"type": "extra", "content": " "},
-                                        {
-                                            "type": "value",
-                                            "content": remove_excess_zeros(
-                                                old_value / 2
-                                            ),
-                                        },
-                                        {"type": "extra", "content": "\n"},
-                                    ],
-                                    [
-                                        {"type": "extra", "content": "\t\t"},
-                                        {"type": "property", "content": "Y"},
-                                        {"type": "extra", "content": " "},
-                                        {"type": "extra", "content": "="},
-                                        {"type": "extra", "content": " "},
-                                        {
-                                            "type": "value",
-                                            "content": remove_excess_zeros(0),
-                                        },
-                                        {"type": "extra", "content": "\n"},
-                                    ],
-                                ],
-                            }
-                        )
+def max_length_to_offsets(section):
+    pass
+    # if not section:
+    #     return
+    # if not ini_rules_utils.line_contains_property(section, "MaxLength"):
+    #     return
 
-                        return old_value
+
+# def max_length_to_offsets(children):
+#     for index, line_tokens in enumerate(children):
+#         old_value = max_length_to_offsets_2(line_tokens)
+
+#         if old_value != None:
+#             # print(index, old_value)
+
+#             # TODO: Can this be done with .append() instead of .insert() ?
+#             children.insert(
+#                 index + 1,
+#                 [
+#                     {"type": "extra", "content": "\t"},
+#                     {"type": "property", "content": "ExtendedOffset"},
+#                     {"type": "extra", "content": " "},
+#                     {"type": "extra", "content": "="},
+#                     {"type": "extra", "content": " "},
+#                     {"type": "value", "content": "Vector"},
+#                     {"type": "extra", "content": "\n"},
+#                     {
+#                         "type": "children",
+#                         "content": [
+#                             [
+#                                 {"type": "extra", "content": "\t\t"},
+#                                 {"type": "property", "content": "X"},
+#                                 {"type": "extra", "content": " "},
+#                                 {"type": "extra", "content": "="},
+#                                 {"type": "extra", "content": " "},
+#                                 {
+#                                     "type": "value",
+#                                     "content": remove_excess_zeros(old_value),
+#                                 },
+#                                 {"type": "extra", "content": "\n"},
+#                             ],
+#                             [
+#                                 {"type": "extra", "content": "\t\t"},
+#                                 {"type": "property", "content": "Y"},
+#                                 {"type": "extra", "content": " "},
+#                                 {"type": "extra", "content": "="},
+#                                 {"type": "extra", "content": " "},
+#                                 {"type": "value", "content": remove_excess_zeros(0)},
+#                                 {"type": "extra", "content": "\n"},
+#                             ],
+#                         ],
+#                     },
+#                 ],
+#             )
+
+
+# def max_length_to_offsets_2(line_tokens):
+#     for token in line_tokens:
+#         if token["type"] == "property":
+#             if token["content"] == "MaxLength":
+#                 token["content"] = "ContractedOffset"
+
+#                 for token_2 in line_tokens:
+#                     if token_2["type"] == "value":
+#                         old_value = float(token_2["content"])
+#                         token_2["content"] = "Vector"
+
+#                         line_tokens.append(
+#                             {
+#                                 "type": "children",
+#                                 "content": [
+#                                     [
+#                                         {"type": "extra", "content": "\t\t"},
+#                                         {"type": "property", "content": "X"},
+#                                         {"type": "extra", "content": " "},
+#                                         {"type": "extra", "content": "="},
+#                                         {"type": "extra", "content": " "},
+#                                         {
+#                                             "type": "value",
+#                                             "content": remove_excess_zeros(
+#                                                 old_value / 2
+#                                             ),
+#                                         },
+#                                         {"type": "extra", "content": "\n"},
+#                                     ],
+#                                     [
+#                                         {"type": "extra", "content": "\t\t"},
+#                                         {"type": "property", "content": "Y"},
+#                                         {"type": "extra", "content": " "},
+#                                         {"type": "extra", "content": "="},
+#                                         {"type": "extra", "content": " "},
+#                                         {
+#                                             "type": "value",
+#                                             "content": remove_excess_zeros(0),
+#                                         },
+#                                         {"type": "extra", "content": "\n"},
+#                                     ],
+#                                 ],
+#                             }
+#                         )
+
+#                         return old_value
 
 
 def iconfile_path_to_thumbnail_generator(section, output_folder_path):
@@ -265,10 +302,6 @@ def iconfile_path_to_thumbnail_generator(section, output_folder_path):
                                                 thumbnail_generator.generate_thumbnail(
                                                     iconfile_path, output_folder_path
                                                 )
-
-
-def duplicate_script_path(parsed_subset):
-    pass
 
 
 def pie_menu_fix(section: list):
@@ -385,61 +418,6 @@ def pie_menu_fix(section: list):
     for x in range(len(slices) - 1, -1, -1):
         ind = slices[x][0]
         secChildren.pop(ind + 1)
-
-    # We should be done here.
-
-
-def shovel_flash_fix(children):
-    """
-    SpriteFile = ContentFile
-            FilePath = Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png
-    FrameCount = 2
-    ->
-    SpriteFile = ContentFile
-            FilePath = Ronin.rte/Devices/Tools/Shovel/Effects/ShovelFlash.png
-    FrameCount = 1
-    """
-
-    # TODO: Make this recursive somehow.
-    for line_tokens in children:
-        for token in line_tokens:
-            if token["type"] == "property":
-                if token["content"] == "SpriteFile":
-                    # TODO: Check if the value "ContentFile" is also used, because "SpriteFile" might be able to have other values in the future!
-
-                    for token_2 in line_tokens:
-                        if token_2["type"] == "children":
-                            for subline_tokens in token_2["content"]:
-                                for subtoken in subline_tokens:
-                                    if (
-                                        subtoken["type"] == "property"
-                                        and subtoken["content"] == "FilePath"
-                                    ):
-                                        for subtoken in subline_tokens:
-                                            if subtoken["type"] == "value" and subtoken[
-                                                "content"
-                                            ] in (
-                                                "Ronin.rte/Devices/Sprites/ShovelFlash.bmp",
-                                                "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png",
-                                            ):
-                                                subtoken[
-                                                    "content"
-                                                ] = "Ronin.rte/Devices/Tools/Shovel/Effects/ShovelFlash.png"
-
-                                                shovel_flash_fix_change_frame_count(
-                                                    children
-                                                )
-
-
-def shovel_flash_fix_change_frame_count(children):
-    for line_tokens2 in children:
-        for token2 in line_tokens2:
-            if token2["type"] == "property":
-                if token2["content"] == "FrameCount":
-                    for token3 in line_tokens2:
-                        if token3["type"] == "value":
-                            if token3["content"] == "2":
-                                token3["content"] = "1"
 
 
 def add_grip_strength_if_missing(section):

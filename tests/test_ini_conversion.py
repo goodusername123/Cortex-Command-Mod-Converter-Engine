@@ -33,11 +33,6 @@ class TestINIConversion(unittest.TestCase):
             for in_filepath in self.get_in_filepaths()
         )
 
-    def get_out_filepath(self, in_filepath):
-        return in_filepath.with_stem(
-            in_filepath.stem.replace(self.IN_STEM, self.OUT_STEM)
-        )
-
     def get_in_filepaths(self):
         return (
             entry_path
@@ -45,4 +40,9 @@ class TestINIConversion(unittest.TestCase):
                 "*" + self.IN_STEM + ".ini"
             )
             if entry_path.is_file()
+        )
+
+    def get_out_filepath(self, in_filepath):
+        return in_filepath.with_stem(
+            in_filepath.stem.removesuffix(self.IN_STEM) + self.OUT_STEM
         )
