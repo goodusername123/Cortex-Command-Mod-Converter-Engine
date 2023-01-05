@@ -1,11 +1,39 @@
 import unittest
 
 from cortex_command_mod_converter_engine.ini_converting import ini_tokenizer
-
 from tests.get_test_path_from_filename import get_test_path_from_filename
 
 
 class TestINITokenizer(unittest.TestCase):
+    def test_comment_across_multiline_tabs(self):
+        self.tokenizer_test(
+            "comment_across_multiline_tabs",
+            [
+                {"type": "WORD", "content": "A1"},
+                {"type": "EXTRA", "content": " "},
+                {"type": "EQUALS", "content": "="},
+                {"type": "EXTRA", "content": " "},
+                {"type": "WORD", "content": "A2"},
+                {"type": "NEWLINES", "content": "\n"},
+                {"type": "TABS", "content": "\t"},
+                {"type": "WORD", "content": "B1"},
+                {"type": "EXTRA", "content": " "},
+                {"type": "EQUALS", "content": "="},
+                {"type": "EXTRA", "content": " "},
+                {"type": "WORD", "content": "B2"},
+                {"type": "NEWLINES", "content": "\n"},
+                {"type": "TABS", "content": "\t"},
+                {"type": "EXTRA", "content": "/*\n*/"},
+                {"type": "TABS", "content": "\t"},
+                {"type": "WORD", "content": "C1"},
+                {"type": "EXTRA", "content": " "},
+                {"type": "EQUALS", "content": "="},
+                {"type": "EXTRA", "content": " "},
+                {"type": "WORD", "content": "C2"},
+                {"type": "NEWLINES", "content": "\n"},
+            ],
+        )
+
     def test_comment_before_tabs(self):
         self.tokenizer_test(
             "comment_before_tabs",
@@ -550,6 +578,21 @@ class TestINITokenizer(unittest.TestCase):
                 {"type": "EQUALS", "content": "="},
                 {"type": "EXTRA", "content": " "},
                 {"type": "WORD", "content": "Bar Baz"},
+            ],
+        )
+
+    def test_tabbed_comment(self):
+        self.tokenizer_test(
+            "tabbed_comment",
+            [
+                {"type": "EXTRA", "content": "// foo"},
+                {"type": "NEWLINES", "content": "\n"},
+                {"type": "WORD", "content": "AddEffect"},
+                {"type": "EXTRA", "content": " "},
+                {"type": "EQUALS", "content": "="},
+                {"type": "EXTRA", "content": " "},
+                {"type": "WORD", "content": "MOPixel"},
+                {"type": "NEWLINES", "content": "\n"},
             ],
         )
 

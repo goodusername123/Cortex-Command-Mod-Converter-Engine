@@ -1,14 +1,56 @@
 import unittest
 
-from cortex_command_mod_converter_engine.ini_converting import ini_tokenizer
-from cortex_command_mod_converter_engine.ini_converting import ini_cst
-
+from cortex_command_mod_converter_engine.ini_converting import ini_cst, ini_tokenizer
 from cortex_command_mod_converter_engine.ini_converting.ini_cst import TooManyTabs
-
 from tests.get_test_path_from_filename import get_test_path_from_filename
 
 
 class TestINICST(unittest.TestCase):
+    def test_comment_across_multiline_tabs(self):
+        self.cst_test(
+            "comment_across_multiline_tabs",
+            [
+                [
+                    {"type": "property", "content": "A1"},
+                    {"type": "extra", "content": " "},
+                    {"type": "extra", "content": "="},
+                    {"type": "extra", "content": " "},
+                    {"type": "value", "content": "A2"},
+                    {"type": "extra", "content": "\n"},
+                    {
+                        "type": "children",
+                        "content": [
+                            [
+                                {"type": "extra", "content": "\t"},
+                                {"type": "property", "content": "B1"},
+                                {"type": "extra", "content": " "},
+                                {"type": "extra", "content": "="},
+                                {"type": "extra", "content": " "},
+                                {"type": "value", "content": "B2"},
+                                {"type": "extra", "content": "\n"},
+                                {
+                                    "type": "children",
+                                    "content": [
+                                        [
+                                            {"type": "extra", "content": "\t"},
+                                            {"type": "extra", "content": "/*\n*/"},
+                                            {"type": "extra", "content": "\t"},
+                                            {"type": "property", "content": "C1"},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "extra", "content": "="},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "value", "content": "C2"},
+                                            {"type": "extra", "content": "\n"},
+                                        ]
+                                    ],
+                                },
+                            ]
+                        ],
+                    },
+                ]
+            ],
+        )
+
     def test_comment_before_tabs(self):
         self.cst_test(
             "comment_before_tabs",
@@ -833,6 +875,23 @@ class TestINICST(unittest.TestCase):
                     {"type": "extra", "content": " "},
                     {"type": "value", "content": "Bar Baz"},
                 ]
+            ],
+        )
+
+    def test_tabbed_comment(self):
+        self.cst_test(
+            "tabbed_comment",
+            [
+                [
+                    {"type": "extra", "content": "// foo"},
+                    {"type": "extra", "content": "\n"},
+                    {"type": "property", "content": "AddEffect"},
+                    {"type": "extra", "content": " "},
+                    {"type": "extra", "content": "="},
+                    {"type": "extra", "content": " "},
+                    {"type": "value", "content": "MOPixel"},
+                    {"type": "extra", "content": "\n"},
+                ],
             ],
         )
 
