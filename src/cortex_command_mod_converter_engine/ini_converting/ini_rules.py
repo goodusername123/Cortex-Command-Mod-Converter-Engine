@@ -62,7 +62,7 @@ def apply_rules_on_sections(parsed_subset, output_folder_path):
 
         pie_menu_fix(section)
 
-        remove_slterrain_properties(section)
+        remove_sl_terrain_properties(section)
 
         if output_folder_path != None:
             iconfile_path_to_thumbnail_generator(section, output_folder_path)
@@ -214,6 +214,11 @@ def max_length_to_offsets(children):
         if old_value != None:
             # print(index, old_value)
 
+            # foo = ini_tokenizer.get_tokens_from_str(
+            #     f"\tExtendedOffset = Vector\n\t\tX = {remove_excess_zeros(old_value)}\n\t\tY = 0\n"
+            # )
+            # bar = ini_cst.get_cst(foo, depth=1)
+
             # TODO: Can this be done with .append() instead of .insert() ?
             children.insert(
                 index + 1,
@@ -246,7 +251,7 @@ def max_length_to_offsets(children):
                                 {"type": "extra", "content": " "},
                                 {"type": "extra", "content": "="},
                                 {"type": "extra", "content": " "},
-                                {"type": "value", "content": remove_excess_zeros(0)},
+                                {"type": "value", "content": "0"},
                                 {"type": "extra", "content": "\n"},
                             ],
                         ],
@@ -303,34 +308,44 @@ def max_length_to_offsets_2(line_tokens):
                         return old_value
 
 
-def iconfile_path_to_thumbnail_generator(section, output_folder_path):
-    if {"type": "property", "content": "DataModule"} in section:
-        for a in section:
-            if a["type"] == "children":
-                b = a["content"]
-                for c in b:
-                    if {"type": "property", "content": "IconFile"} in c and {
-                        "type": "value",
-                        "content": "ContentFile",
-                    } in c:
-                        for token in c:
-                            if token["type"] == "children":
-                                subchildren = token["content"]
-                                # print(subchildren)
+def add_grip_strength_if_missing(section):
+    """
+    TODO: Check if this description is accurate to what *actually* was decided between me and Gacyr regarding the future behavior of GripStrength.
 
-                                for subline_tokens in subchildren:
-                                    if {
-                                        "type": "property",
-                                        "content": "FilePath",
-                                    } in subline_tokens:
-                                        # print(subline_tokens)
-                                        for subtoken in subline_tokens:
-                                            if subtoken["type"] == "value":
-                                                # print(subtoken)
-                                                iconfile_path = subtoken["content"]
-                                                thumbnail_generator.generate_thumbnail(
-                                                    iconfile_path, output_folder_path
-                                                )
+    GripStrength was added in pre4 as an optional property to Arms.
+    It defaulted to JointStrength if it wasn't defined for an Arm, but this suddenly caused a lot of actors in old mods to throw their HeldDevices away.
+    In response, pre4.1 made JointStrength a non-optional property, with the idea being that this function could then fix old mods by adding GripStrength = <high_value> to them.
+    """
+
+    arbitrarily_high_default_grip_strength = 424242
+
+    # TODO: Make this recursive somehow.
+    if ini_rules_utils.line_contains_property_and_value(section, "AddActor", "Arm"):
+        for token in section:
+            if token["type"] == "children":
+                children = token["content"]
+
+                # The second condition will make sure that GripStrength isn't added to an Arm without a GripStrength
+                # that CopyOfs an Arm that *does* have a GripStrength.
+                if not ini_rules_utils.children_contain_property_shallowly(
+                    children, "GripStrength"
+                ) and not ini_rules_utils.children_contain_property_shallowly(
+                    children, "CopyOf"
+                ):
+                    children.append(
+                        [
+                            {"type": "extra", "content": "\t"},
+                            {"type": "property", "content": "GripStrength"},
+                            {"type": "extra", "content": " "},
+                            {"type": "extra", "content": "="},
+                            {"type": "extra", "content": " "},
+                            {
+                                "type": "value",
+                                "content": str(arbitrarily_high_default_grip_strength),
+                            },
+                            {"type": "extra", "content": "\n"},
+                        ]
+                    )
 
 
 def pie_menu_fix(section: list):
@@ -449,47 +464,7 @@ def pie_menu_fix(section: list):
         secChildren.pop(ind + 1)
 
 
-def add_grip_strength_if_missing(section):
-    """
-    TODO: Check if this description is accurate to what *actually* was decided between me and Gacyr regarding the future behavior of GripStrength.
-
-    GripStrength was added in pre4 as an optional property to Arms.
-    It defaulted to JointStrength if it wasn't defined for an Arm, but this suddenly caused a lot of actors in old mods to throw their HeldDevices away.
-    In response, pre4.1 made JointStrength a non-optional property, with the idea being that this function could then fix old mods by adding GripStrength = <high_value> to them.
-    """
-
-    arbitrarily_high_default_grip_strength = 424242
-
-    # TODO: Make this recursive somehow.
-    if ini_rules_utils.line_contains_property_and_value(section, "AddActor", "Arm"):
-        for token in section:
-            if token["type"] == "children":
-                children = token["content"]
-
-                # The second condition will make sure that GripStrength isn't added to an Arm without a GripStrength
-                # that CopyOfs an Arm that *does* have a GripStrength.
-                if not ini_rules_utils.children_contain_property_shallowly(
-                    children, "GripStrength"
-                ) and not ini_rules_utils.children_contain_property_shallowly(
-                    children, "CopyOf"
-                ):
-                    children.append(
-                        [
-                            {"type": "extra", "content": "\t"},
-                            {"type": "property", "content": "GripStrength"},
-                            {"type": "extra", "content": " "},
-                            {"type": "extra", "content": "="},
-                            {"type": "extra", "content": " "},
-                            {
-                                "type": "value",
-                                "content": str(arbitrarily_high_default_grip_strength),
-                            },
-                            {"type": "extra", "content": "\n"},
-                        ]
-                    )
-
-
-def remove_slterrain_properties(section):
+def remove_sl_terrain_properties(section):
     """
     Remove 'Offset' and 'ScrollRatio' property from SLTerrain objects.
     Fixes PlaceTerrainObject's
@@ -530,7 +505,7 @@ def remove_slterrain_properties(section):
             section, "Terrain", "SLTerrain"
         )
         for _, child in children:
-            remove_slterrain_properties(child)
+            remove_sl_terrain_properties(child)
     if not ini_rules_utils.line_contains_property_and_value(
         section, "Terrain", "SLTerrain"
     ):
@@ -550,34 +525,31 @@ def remove_slterrain_properties(section):
         )
 
 
-# this might belong in utils but i'm keeping it here for now
-# this can work recursively if needed in case the entity might
-# be nested inside a section (material presets, for example)
-def rename_section_preset(section, entity, old, new, recursive=False):
-    """Renames a preset name from old to new of specified entity.
-    Ideally, we should be able to put these in a JSON file, but for now, it'll be in here.
+def iconfile_path_to_thumbnail_generator(section, output_folder_path):
+    if {"type": "property", "content": "DataModule"} in section:
+        for a in section:
+            if a["type"] == "children":
+                b = a["content"]
+                for c in b:
+                    if {"type": "property", "content": "IconFile"} in c and {
+                        "type": "value",
+                        "content": "ContentFile",
+                    } in c:
+                        for token in c:
+                            if token["type"] == "children":
+                                subchildren = token["content"]
+                                # print(subchildren)
 
-    AddBackgroundLayer = <entity>
-            PresetName = <old>
-            AddToGroup = Near Backdrops
-    ->
-    AddBackgroundLayer = <entity>
-            PresetName = <new>
-            AddToGroup = Near Backdrops
-    """
-
-    if not section:
-        return
-    if not ini_rules_utils.has_children(section):
-        return
-
-    children = ini_rules_utils.get_children(section)
-    if recursive:
-        for line_tokens in children:
-            rename_section_preset(line_tokens, entity, old, new, recursive)
-
-    if not ini_rules_utils.line_contains_value(section, entity):
-        return
-
-    for line_tokens in children:
-        ini_rules_utils.replace_value_of_property(line_tokens, "PresetOf", new, old)
+                                for subline_tokens in subchildren:
+                                    if {
+                                        "type": "property",
+                                        "content": "FilePath",
+                                    } in subline_tokens:
+                                        # print(subline_tokens)
+                                        for subtoken in subline_tokens:
+                                            if subtoken["type"] == "value":
+                                                # print(subtoken)
+                                                iconfile_path = subtoken["content"]
+                                                thumbnail_generator.generate_thumbnail(
+                                                    iconfile_path, output_folder_path
+                                                )

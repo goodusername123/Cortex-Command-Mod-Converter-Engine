@@ -205,3 +205,36 @@ def append(foo, depth):
     This function should replace the .append() calls in ini_rules.py.
     This depth argument should be used to indent stuff the right amount.
     """
+
+
+# this might belong in utils but i'm keeping it here for now
+# this can work recursively if needed in case the entity might
+# be nested inside a section (material presets, for example)
+# def rename_section_preset(section, entity, old, new, recursive=False):
+#     """Renames a preset name from old to new of specified entity.
+#     Ideally, we should be able to put these in a JSON file, but for now, it'll be in here.
+
+#     AddBackgroundLayer = <entity>
+#             PresetName = <old>
+#             AddToGroup = Near Backdrops
+#     ->
+#     AddBackgroundLayer = <entity>
+#             PresetName = <new>
+#             AddToGroup = Near Backdrops
+#     """
+
+#     if not section:
+#         return
+#     if not ini_rules_utils.has_children(section):
+#         return
+
+#     children = ini_rules_utils.get_children(section)
+#     if recursive:
+#         for line_tokens in children:
+#             rename_section_preset(line_tokens, entity, old, new, recursive)
+
+#     if not ini_rules_utils.line_contains_value(section, entity):
+#         return
+
+#     for line_tokens in children:
+#         ini_rules_utils.replace_value_of_property(line_tokens, "PresetOf", new, old)

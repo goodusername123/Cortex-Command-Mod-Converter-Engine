@@ -10,9 +10,6 @@ from cortex_command_mod_converter_engine.ini_converting import (
 
 
 class TestINIConversion(unittest.TestCase):
-    IN_STEM = "_in"
-    OUT_STEM = "_out"
-
     CONVERSION_TESTS_PATH = Path("tests/ini_test_files/conversion")
 
     def test_conversions(self):
@@ -36,13 +33,9 @@ class TestINIConversion(unittest.TestCase):
     def get_in_filepaths(self):
         return (
             entry_path
-            for entry_path in self.CONVERSION_TESTS_PATH.rglob(
-                "*" + self.IN_STEM + ".ini"
-            )
+            for entry_path in self.CONVERSION_TESTS_PATH.rglob("in.ini")
             if entry_path.is_file()
         )
 
     def get_out_filepath(self, in_filepath):
-        return in_filepath.with_stem(
-            in_filepath.stem.removesuffix(self.IN_STEM) + self.OUT_STEM
-        )
+        return in_filepath.with_stem("out")
