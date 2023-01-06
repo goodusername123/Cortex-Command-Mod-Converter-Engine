@@ -10,19 +10,28 @@ from cortex_command_mod_converter_engine.ini_converting import (
 
 
 class TestINIConversion(unittest.TestCase):
-    CONVERSION_TESTS_PATH = Path("tests/ini_test_files/conversion")
+    CONVERSION_TESTS_PATH = Path("tests/ini_test_files")
 
     def test_conversions(self):
         for in_filepath, out_filepath in self.get_filepaths():
-            in_str = in_filepath.read_text()
-            out_str = out_filepath.read_text()
+            with self.subTest(msg=in_filepath):
+                in_str = in_filepath.read_text()
+                out_str = out_filepath.read_text()
 
-            tokens = ini_tokenizer.get_tokens_from_str(in_str, in_filepath)
-            cst = ini_cst.get_cst(tokens)
-            ini_rules.apply_rules_on_sections([cst[0]], None)
+                tokens = ini_tokenizer.get_tokens_from_str(in_str.lstrip(), in_filepath)
 
-            result = ini_writer.get_ini_cst_string(cst)
-            self.assertEqual(result, out_str)
+                try:
+                    cst = ini_cst.get_cst(tokens)
+                except ini_cst.TooManyTabs as exception:
+                    if in_filepath.parent.name == "too_many_tabs":
+                        continue
+                    else:
+                        raise exception
+
+                ini_rules.apply_rules_on_sections([cst[0]], None)
+
+                result = ini_writer.get_ini_cst_string(cst)
+                self.assertEqual(result, out_str)
 
     def get_filepaths(self):
         return (
