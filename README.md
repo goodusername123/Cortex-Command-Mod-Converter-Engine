@@ -10,9 +10,13 @@ This builds the project and overwrites any older pip build of it:
 
 ## Running the tests
 
-The unit tests are only executed on the pip build, so the pip build has to be updated first:
+The unit tests are only executed on the pip build, so if you edit Python files inside of `src/` you'll need to launch `rebuild & test`.
 
-`py -m build && pip install dist/*.tar.gz && py -m unittest`
+If you just made changes to Python files inside of `tests/` however, you can just launch `test`.
+
+Once you've launched either of these configurations once, you can just press `F5` to relaunch that same configuration.
+
+Note that these launch configurations have the `justMyCode` option disabled, which allows you to step into tests while debugging.
 
 ## Updating this project on PyPI
 
