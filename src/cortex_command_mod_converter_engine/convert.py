@@ -22,9 +22,10 @@ from cortex_command_mod_converter_engine.ini_converting import (
 def convert(
     input_mod_path,
     output_folder_path,
-    beautify_lua,
-    output_zip,
-    skip_conversion,
+    beautify_lua=True,
+    output_zip=False,
+    skip_conversion=False,
+    remove_input_mod_folder=False,
 ):
     input_mod_path = Path(input_mod_path)
     input_folder_path = str(input_mod_path.parent)
@@ -69,6 +70,9 @@ def convert(
 
     if output_zip:
         zips.zip(input_mod_name, Path(output_folder_path))
+
+    if remove_input_mod_folder:
+        shutil.rmtree(input_mod_path)
 
 
 def get_conversion_rules():
