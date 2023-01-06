@@ -537,13 +537,6 @@ def update_supported_game_version(section):
         # Update SupportedGameVersion
 
         for line_tokens in children:
-            #     for token in line_tokens:
-            #         if token["type"] == "property":
-            #             if token["content"] == "SupportedGameVersion":
-            #                 for token_2 in line_tokens:
-            #                     if token_2["type"] == "value":
-            #                         token_2["content"] = cfg.SUPPORTED_GAME_VERSION
-
             ini_rules_utils.replace_value_of_property(
                 line_tokens, "SupportedGameVersion", cfg.SUPPORTED_GAME_VERSION
             )
@@ -551,7 +544,7 @@ def update_supported_game_version(section):
         # Add SupportedGameVersion
 
         appended_tokens = ini_tokenizer.get_tokens_from_str(
-            f"\tSupportedGameVersion = {cfg.SUPPORTED_GAME_VERSION}\n"
+            f"\n\tSupportedGameVersion = {cfg.SUPPORTED_GAME_VERSION}\n"
         )
         appended_cst = ini_cst.get_cst(appended_tokens, depth=1)[0]
         children.append(appended_cst)
