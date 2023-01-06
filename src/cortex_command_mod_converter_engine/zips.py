@@ -6,10 +6,11 @@ import cortex_command_mod_converter_engine.cfg as cfg
 
 
 def unzip(input_mod_path, input_folder_path):
-    if zipfile.is_zipfile(input_mod_path):
-        with zipfile.ZipFile(input_mod_path) as item:
-            item.extractall(input_folder_path)
-        os.remove(input_mod_path)
+    with zipfile.ZipFile(input_mod_path) as item:
+        item.extractall(input_folder_path)
+        extracted_name = item.namelist()[0]
+    os.remove(input_mod_path)
+    return extracted_name[:-1]
 
 
 def zip(input_mod_name, output_folder_path):

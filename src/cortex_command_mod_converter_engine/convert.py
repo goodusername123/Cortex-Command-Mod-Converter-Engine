@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import zipfile
 from pathlib import Path
 
 from cortex_command_mod_converter_engine import (
@@ -25,12 +26,17 @@ def convert(
     output_zip,
     skip_conversion,
 ):
+    input_mod_path = Path(input_mod_path)
+    input_folder_path = str(input_mod_path.parent)
 
-    input_mod_name = Path(input_mod_path).name
-    input_folder_path = str(Path(input_mod_path).parent)
+    if zipfile.is_zipfile(input_mod_path):
+        input_mod_name = zips.unzip(input_mod_path, input_folder_path)
+        input_mod_path = input_mod_path.with_name(input_mod_name)
+        # input_mod_path = input_mod_path.with_suffix(".rte")
+    else:
+        input_mod_name = input_mod_path.name
+
     output_mod_path = Path(output_folder_path) / input_mod_name
-
-    zips.unzip(input_mod_path, input_folder_path)
 
     # TODO: Maybe give this input_mod_path instead of input_folder_path
     case_check.init_glob(output_folder_path, input_folder_path)
@@ -42,7 +48,7 @@ def convert(
     conversion_rules = get_conversion_rules()
 
     converter_walk(
-        Path(input_mod_path),
+        input_mod_path,
         input_folder_path,
         output_folder_path,
         conversion_rules,
@@ -56,7 +62,7 @@ def convert(
     #     cfg.progress_bar.segment(utils.get_ini_files_in_dir_deep(output_mod_path) * 3)
     #     cfg.progress_bar.setSubtext("building syntax tree")
     ini_cst = ini_cst_builder.get_full_cst(
-        input_folder_path, output_folder_path, Path(input_mod_path)
+        input_folder_path, output_folder_path, input_mod_path
     )
     ini_rules.apply_rules_on_ini_cst(ini_cst, output_folder_path)
     ini_writer.write_converted_ini_cst(ini_cst, output_mod_path)
