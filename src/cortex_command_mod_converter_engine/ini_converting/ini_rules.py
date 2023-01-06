@@ -1,4 +1,4 @@
-from cortex_command_mod_converter_engine import thumbnail_generator
+from cortex_command_mod_converter_engine import cfg, thumbnail_generator
 from cortex_command_mod_converter_engine.ini_converting import (
     ini_cst,
     ini_rules_utils,
@@ -66,6 +66,8 @@ def apply_rules_on_sections(parsed_subset, output_folder_path):
 
         if output_folder_path != None:
             iconfile_path_to_thumbnail_generator(section, output_folder_path)
+
+        update_supported_game_version(section)
 
 
 def max_mass_to_max_inventory_mass(children):
@@ -212,52 +214,12 @@ def max_length_to_offsets(children):
         old_value = max_length_to_offsets_2(line_tokens)
 
         if old_value != None:
-            # print(index, old_value)
-
-            # foo = ini_tokenizer.get_tokens_from_str(
-            #     f"\tExtendedOffset = Vector\n\t\tX = {remove_excess_zeros(old_value)}\n\t\tY = 0\n"
-            # )
-            # bar = ini_cst.get_cst(foo, depth=1)
-
-            # TODO: Can this be done with .append() instead of .insert() ?
-            children.insert(
-                index + 1,
-                [
-                    {"type": "extra", "content": "\t"},
-                    {"type": "property", "content": "ExtendedOffset"},
-                    {"type": "extra", "content": " "},
-                    {"type": "extra", "content": "="},
-                    {"type": "extra", "content": " "},
-                    {"type": "value", "content": "Vector"},
-                    {"type": "extra", "content": "\n"},
-                    {
-                        "type": "children",
-                        "content": [
-                            [
-                                {"type": "extra", "content": "\t\t"},
-                                {"type": "property", "content": "X"},
-                                {"type": "extra", "content": " "},
-                                {"type": "extra", "content": "="},
-                                {"type": "extra", "content": " "},
-                                {
-                                    "type": "value",
-                                    "content": remove_excess_zeros(old_value),
-                                },
-                                {"type": "extra", "content": "\n"},
-                            ],
-                            [
-                                {"type": "extra", "content": "\t\t"},
-                                {"type": "property", "content": "Y"},
-                                {"type": "extra", "content": " "},
-                                {"type": "extra", "content": "="},
-                                {"type": "extra", "content": " "},
-                                {"type": "value", "content": "0"},
-                                {"type": "extra", "content": "\n"},
-                            ],
-                        ],
-                    },
-                ],
+            inserted_tokens = ini_tokenizer.get_tokens_from_str(
+                f"\tExtendedOffset = Vector\n\t\tX = {remove_excess_zeros(old_value)}\n\t\tY = 0\n"
             )
+            inserted_cst = ini_cst.get_cst(inserted_tokens, depth=1)[0]
+
+            children.insert(index + 1, inserted_cst)
 
 
 def max_length_to_offsets_2(line_tokens):
@@ -553,3 +515,41 @@ def iconfile_path_to_thumbnail_generator(section, output_folder_path):
                                                 thumbnail_generator.generate_thumbnail(
                                                     iconfile_path, output_folder_path
                                                 )
+
+
+def update_supported_game_version(section):
+    if not section:
+        return
+    if not ini_rules_utils.has_children(section):
+        return
+    if not ini_rules_utils.line_contains_property(section, "DataModule"):
+        return
+
+    children = ini_rules_utils.get_children(section)
+    if not children:
+        return
+
+    if ini_rules_utils.children_contain_property_shallowly(
+        children, "SupportedGameVersion"
+    ):
+        # Update SupportedGameVersion
+
+        for line_tokens in children:
+            #     for token in line_tokens:
+            #         if token["type"] == "property":
+            #             if token["content"] == "SupportedGameVersion":
+            #                 for token_2 in line_tokens:
+            #                     if token_2["type"] == "value":
+            #                         token_2["content"] = cfg.SUPPORTED_GAME_VERSION
+
+            ini_rules_utils.replace_value_of_property(
+                line_tokens, "SupportedGameVersion", cfg.SUPPORTED_GAME_VERSION
+            )
+    else:
+        # Add SupportedGameVersion
+
+        appended_tokens = ini_tokenizer.get_tokens_from_str(
+            f"\tSupportedGameVersion = {cfg.SUPPORTED_GAME_VERSION}\n"
+        )
+        appended_cst = ini_cst.get_cst(appended_tokens, depth=1)[0]
+        children.append(appended_cst)

@@ -16,7 +16,7 @@ def zip(input_mod_name, output_folder_path):
     print("Zipping '{}'".format(input_mod_name))
 
     output_mod_zip_name = input_mod_name.replace(
-        ".rte", f"-{cfg.GAME_VERSION}-v1.0.rte"
+        ".rte", f"-{cfg.SUPPORTED_GAME_VERSION}-v1.0.rte"
     )
     shutil.make_archive(
         output_folder_path / output_mod_zip_name,

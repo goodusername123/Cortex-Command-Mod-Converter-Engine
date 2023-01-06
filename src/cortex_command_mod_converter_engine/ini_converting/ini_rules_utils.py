@@ -172,22 +172,20 @@ def change_line_value(line_tokens, value):
 
 # replace the value of line if property (and value) matches, ignores children
 def replace_value_of_property(line_tokens, property, value, old_value=None):
-    hasProp = False
-    for i, token in enumerate(line_tokens):
+    has_right_property = False
+
+    for token in line_tokens:
         type_ = token["type"]
         content = token["content"]
-        if not hasProp:
+
+        if has_right_property:
+            if type_ == "value" and (old_value == None or old_value == content):
+                token["content"] = value
+        else:
             if type_ == "children":
                 return
             if type_ == "property" and content == property:
-                hasProp = True
-        else:
-            if (
-                type_ == "value"
-                and (old_value and old_value == content)
-                or not old_value
-            ):
-                line_tokens[i][type_] = value
+                has_right_property = True
 
 
 def replace_property_names_of_children_shallowly(section, old_property, new_property):

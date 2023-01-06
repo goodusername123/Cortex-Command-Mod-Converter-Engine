@@ -1,1 +1,1 @@
-GAME_VERSION = "pre4.0"
+SUPPORTED_GAME_VERSION = "Pre-Release 4.0"
