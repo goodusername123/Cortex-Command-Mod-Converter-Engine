@@ -6,271 +6,6 @@ from tests.get_test_path_from_filename import get_test_path_from_filename
 
 
 class TestINICST(unittest.TestCase):
-    def test_comment_across_multiline_tabs(self):
-        self.cst_test(
-            "comment_across_multiline_tabs",
-            [
-                [
-                    {"type": "property", "content": "A1"},
-                    {"type": "extra", "content": " "},
-                    {"type": "extra", "content": "="},
-                    {"type": "extra", "content": " "},
-                    {"type": "value", "content": "A2"},
-                    {"type": "extra", "content": "\n"},
-                    {
-                        "type": "children",
-                        "content": [
-                            [
-                                {"type": "extra", "content": "\t"},
-                                {"type": "property", "content": "B1"},
-                                {"type": "extra", "content": " "},
-                                {"type": "extra", "content": "="},
-                                {"type": "extra", "content": " "},
-                                {"type": "value", "content": "B2"},
-                                {"type": "extra", "content": "\n"},
-                                {
-                                    "type": "children",
-                                    "content": [
-                                        [
-                                            {"type": "extra", "content": "\t"},
-                                            {"type": "extra", "content": "/*\n*/"},
-                                            {"type": "extra", "content": "\t"},
-                                            {"type": "property", "content": "C1"},
-                                            {"type": "extra", "content": " "},
-                                            {"type": "extra", "content": "="},
-                                            {"type": "extra", "content": " "},
-                                            {"type": "value", "content": "C2"},
-                                            {"type": "extra", "content": "\n"},
-                                        ]
-                                    ],
-                                },
-                            ]
-                        ],
-                    },
-                ]
-            ],
-        )
-
-    def test_comment_before_tabs(self):
-        self.cst_test(
-            "comment_before_tabs",
-            [
-                [
-                    {"type": "property", "content": "A1"},
-                    {"type": "extra", "content": " "},
-                    {"type": "extra", "content": "="},
-                    {"type": "extra", "content": " "},
-                    {"type": "value", "content": "A2"},
-                    {"type": "extra", "content": "\n"},
-                    {
-                        "type": "children",
-                        "content": [
-                            [
-                                {"type": "extra", "content": "\t"},
-                                {"type": "property", "content": "B1"},
-                                {"type": "extra", "content": " "},
-                                {"type": "extra", "content": "="},
-                                {"type": "extra", "content": " "},
-                                {"type": "value", "content": "B2"},
-                                {"type": "extra", "content": "\n"},
-                                {
-                                    "type": "children",
-                                    "content": [
-                                        [
-                                            {"type": "extra", "content": "\t\t"},
-                                            {"type": "property", "content": "C1"},
-                                            {"type": "extra", "content": " "},
-                                            {"type": "extra", "content": "="},
-                                            {"type": "extra", "content": " "},
-                                            {"type": "value", "content": "C2"},
-                                            {"type": "extra", "content": "\n"},
-                                            {
-                                                "type": "children",
-                                                "content": [
-                                                    [
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "/*foo*/",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "\t\t\t",
-                                                        },
-                                                        {
-                                                            "type": "property",
-                                                            "content": "D1",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": " ",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "=",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": " ",
-                                                        },
-                                                        {
-                                                            "type": "value",
-                                                            "content": "D2",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "\n",
-                                                        },
-                                                    ],
-                                                    [
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "\t\t\t",
-                                                        },
-                                                        {
-                                                            "type": "property",
-                                                            "content": "E1",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": " ",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "=",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": " ",
-                                                        },
-                                                        {
-                                                            "type": "value",
-                                                            "content": "E2",
-                                                        },
-                                                    ],
-                                                ],
-                                            },
-                                        ]
-                                    ],
-                                },
-                            ]
-                        ],
-                    },
-                ]
-            ],
-        )
-
-    def test_comment_in_tabs(self):
-        self.cst_test(
-            "comment_in_tabs",
-            [
-                [
-                    {"type": "property", "content": "A1"},
-                    {"type": "extra", "content": " "},
-                    {"type": "extra", "content": "="},
-                    {"type": "extra", "content": " "},
-                    {"type": "value", "content": "A2"},
-                    {"type": "extra", "content": "\n"},
-                    {
-                        "type": "children",
-                        "content": [
-                            [
-                                {"type": "extra", "content": "\t"},
-                                {"type": "property", "content": "B1"},
-                                {"type": "extra", "content": " "},
-                                {"type": "extra", "content": "="},
-                                {"type": "extra", "content": " "},
-                                {"type": "value", "content": "B2"},
-                                {"type": "extra", "content": "\n"},
-                                {
-                                    "type": "children",
-                                    "content": [
-                                        [
-                                            {"type": "extra", "content": "\t\t"},
-                                            {"type": "property", "content": "C1"},
-                                            {"type": "extra", "content": " "},
-                                            {"type": "extra", "content": "="},
-                                            {"type": "extra", "content": " "},
-                                            {"type": "value", "content": "C2"},
-                                            {"type": "extra", "content": "\n"},
-                                            {
-                                                "type": "children",
-                                                "content": [
-                                                    [
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "\t",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "/*foo*/",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "\t\t",
-                                                        },
-                                                        {
-                                                            "type": "property",
-                                                            "content": "D1",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": " ",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "=",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": " ",
-                                                        },
-                                                        {
-                                                            "type": "value",
-                                                            "content": "D2",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "\n",
-                                                        },
-                                                    ],
-                                                    [
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "\t\t\t",
-                                                        },
-                                                        {
-                                                            "type": "property",
-                                                            "content": "E1",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": " ",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": "=",
-                                                        },
-                                                        {
-                                                            "type": "extra",
-                                                            "content": " ",
-                                                        },
-                                                        {
-                                                            "type": "value",
-                                                            "content": "E2",
-                                                        },
-                                                    ],
-                                                ],
-                                            },
-                                        ]
-                                    ],
-                                },
-                            ]
-                        ],
-                    },
-                ]
-            ],
-        )
-
     def test_comments(self):
         self.cst_test(
             "comments",
@@ -669,13 +404,13 @@ class TestINICST(unittest.TestCase):
             ],
         )
 
-    def test_invalid_tabbing(self):
+    def test_too_many_tabs(self):
         with self.assertRaises(TooManyTabs):
-            self.cst_test("invalid_tabbing", [])
+            self.cst_test("too_many_tabs", [])
 
-    def test_lstripped_tab(self):
+    def test_left_stripped_tab(self):
         self.cst_test(
-            "lstripped_tab",
+            "left_stripped_tab",
             [
                 [
                     {"type": "property", "content": "Foo"},
@@ -683,6 +418,383 @@ class TestINICST(unittest.TestCase):
                     {"type": "extra", "content": "="},
                     {"type": "extra", "content": " "},
                     {"type": "value", "content": "Bar"},
+                ]
+            ],
+        )
+
+    def test_multiline_comment_after_tabs(self):
+        self.cst_test(
+            "multiline_comment_after_tabs",
+            [
+                [
+                    {"type": "property", "content": "A1"},
+                    {"type": "extra", "content": " "},
+                    {"type": "extra", "content": "="},
+                    {"type": "extra", "content": " "},
+                    {"type": "value", "content": "A2"},
+                    {"type": "extra", "content": "\n"},
+                    {
+                        "type": "children",
+                        "content": [
+                            [
+                                {"type": "extra", "content": "\t"},
+                                {"type": "property", "content": "B1"},
+                                {"type": "extra", "content": " "},
+                                {"type": "extra", "content": "="},
+                                {"type": "extra", "content": " "},
+                                {"type": "value", "content": "B2"},
+                                {"type": "extra", "content": "\n"},
+                                {
+                                    "type": "children",
+                                    "content": [
+                                        [
+                                            {"type": "extra", "content": "\t\t"},
+                                            {"type": "property", "content": "C1"},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "extra", "content": "="},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "value", "content": "C2"},
+                                            {"type": "extra", "content": "\n"},
+                                            {
+                                                "type": "children",
+                                                "content": [
+                                                    [
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\t\t\t",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "/*foo*/",
+                                                        },
+                                                        {
+                                                            "type": "property",
+                                                            "content": "D1",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "=",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "value",
+                                                            "content": "D2",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\n",
+                                                        },
+                                                    ],
+                                                    [
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\t\t\t",
+                                                        },
+                                                        {
+                                                            "type": "property",
+                                                            "content": "E1",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "=",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "value",
+                                                            "content": "E2",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\n",
+                                                        },
+                                                    ],
+                                                ],
+                                            },
+                                        ]
+                                    ],
+                                },
+                            ]
+                        ],
+                    },
+                ]
+            ],
+        )
+
+    def test_multiline_comment_before_tabs(self):
+        self.cst_test(
+            "multiline_comment_before_tabs",
+            [
+                [
+                    {"type": "property", "content": "A1"},
+                    {"type": "extra", "content": " "},
+                    {"type": "extra", "content": "="},
+                    {"type": "extra", "content": " "},
+                    {"type": "value", "content": "A2"},
+                    {"type": "extra", "content": "\n"},
+                    {
+                        "type": "children",
+                        "content": [
+                            [
+                                {"type": "extra", "content": "\t"},
+                                {"type": "property", "content": "B1"},
+                                {"type": "extra", "content": " "},
+                                {"type": "extra", "content": "="},
+                                {"type": "extra", "content": " "},
+                                {"type": "value", "content": "B2"},
+                                {"type": "extra", "content": "\n"},
+                                {
+                                    "type": "children",
+                                    "content": [
+                                        [
+                                            {"type": "extra", "content": "\t\t"},
+                                            {"type": "property", "content": "C1"},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "extra", "content": "="},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "value", "content": "C2"},
+                                            {"type": "extra", "content": "\n"},
+                                            {
+                                                "type": "children",
+                                                "content": [
+                                                    [
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "/*foo*/",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\t\t\t",
+                                                        },
+                                                        {
+                                                            "type": "property",
+                                                            "content": "D1",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "=",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "value",
+                                                            "content": "D2",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\n",
+                                                        },
+                                                    ],
+                                                    [
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\t\t\t",
+                                                        },
+                                                        {
+                                                            "type": "property",
+                                                            "content": "E1",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "=",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "value",
+                                                            "content": "E2",
+                                                        },
+                                                    ],
+                                                ],
+                                            },
+                                        ]
+                                    ],
+                                },
+                            ]
+                        ],
+                    },
+                ]
+            ],
+        )
+
+    def test_multiline_comment_between_multiline_tabs(self):
+        self.cst_test(
+            "multiline_comment_between_multiline_tabs",
+            [
+                [
+                    {"type": "property", "content": "A1"},
+                    {"type": "extra", "content": " "},
+                    {"type": "extra", "content": "="},
+                    {"type": "extra", "content": " "},
+                    {"type": "value", "content": "A2"},
+                    {"type": "extra", "content": "\n"},
+                    {
+                        "type": "children",
+                        "content": [
+                            [
+                                {"type": "extra", "content": "\t"},
+                                {"type": "property", "content": "B1"},
+                                {"type": "extra", "content": " "},
+                                {"type": "extra", "content": "="},
+                                {"type": "extra", "content": " "},
+                                {"type": "value", "content": "B2"},
+                                {"type": "extra", "content": "\n"},
+                                {
+                                    "type": "children",
+                                    "content": [
+                                        [
+                                            {"type": "extra", "content": "\t"},
+                                            {"type": "extra", "content": "/*\n*/"},
+                                            {"type": "extra", "content": "\t"},
+                                            {"type": "property", "content": "C1"},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "extra", "content": "="},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "value", "content": "C2"},
+                                            {"type": "extra", "content": "\n"},
+                                        ]
+                                    ],
+                                },
+                            ]
+                        ],
+                    },
+                ]
+            ],
+        )
+
+    def test_multiline_comment_between_tabs(self):
+        self.cst_test(
+            "multiline_comment_between_tabs",
+            [
+                [
+                    {"type": "property", "content": "A1"},
+                    {"type": "extra", "content": " "},
+                    {"type": "extra", "content": "="},
+                    {"type": "extra", "content": " "},
+                    {"type": "value", "content": "A2"},
+                    {"type": "extra", "content": "\n"},
+                    {
+                        "type": "children",
+                        "content": [
+                            [
+                                {"type": "extra", "content": "\t"},
+                                {"type": "property", "content": "B1"},
+                                {"type": "extra", "content": " "},
+                                {"type": "extra", "content": "="},
+                                {"type": "extra", "content": " "},
+                                {"type": "value", "content": "B2"},
+                                {"type": "extra", "content": "\n"},
+                                {
+                                    "type": "children",
+                                    "content": [
+                                        [
+                                            {"type": "extra", "content": "\t\t"},
+                                            {"type": "property", "content": "C1"},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "extra", "content": "="},
+                                            {"type": "extra", "content": " "},
+                                            {"type": "value", "content": "C2"},
+                                            {"type": "extra", "content": "\n"},
+                                            {
+                                                "type": "children",
+                                                "content": [
+                                                    [
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\t",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "/*foo*/",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\t\t",
+                                                        },
+                                                        {
+                                                            "type": "property",
+                                                            "content": "D1",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "=",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "value",
+                                                            "content": "D2",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\n",
+                                                        },
+                                                    ],
+                                                    [
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "\t\t\t",
+                                                        },
+                                                        {
+                                                            "type": "property",
+                                                            "content": "E1",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": "=",
+                                                        },
+                                                        {
+                                                            "type": "extra",
+                                                            "content": " ",
+                                                        },
+                                                        {
+                                                            "type": "value",
+                                                            "content": "E2",
+                                                        },
+                                                    ],
+                                                ],
+                                            },
+                                        ]
+                                    ],
+                                },
+                            ]
+                        ],
+                    },
                 ]
             ],
         )
