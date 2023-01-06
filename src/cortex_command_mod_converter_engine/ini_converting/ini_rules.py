@@ -394,7 +394,7 @@ def pie_menu_fix(section: list):
     for x in dirs:
         dir = int(x[0])
         line_tokens = x[1]
-        if dir >= 4:
+        if dir == 4:
             continue
         if sliceDirCounts[dir] == MAX_PIE_QUADRANT_SIZE:
             ini_rules_utils.set_line_value(line_tokens, 4)
