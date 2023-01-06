@@ -340,9 +340,9 @@ def pie_menu_fix(section: list):
 
     # Pie constants (pulled from source)
     MAX_PIE_QUADRANT_SIZE = 5
-    MAX_PIE_SLICES = MAX_PIE_QUADRANT_SIZE * 4
+    # MAX_PIE_SLICES = MAX_PIE_QUADRANT_SIZE * 4
     DEFAULT_PIES = {
-        # Sizes: number of slices in the preset
+        # Sizes: number of slices in the preset. Each can be increased by mods up to 5.
         # 0 = Up, 1 = Down, 2 = Left, 3 = Right, 4 = Any
         "Actor": {
             "sizes": [1, 0, 0, 0],
@@ -381,7 +381,7 @@ def pie_menu_fix(section: list):
         return
 
     sliceDirCounts = DEFAULT_PIES[s_val]["sizes"]
-    sliceCount = sum(sliceDirCounts)
+    # sliceCount = sum(sliceDirCounts)
 
     # get the direction counts of the slices so we can change if need be.
     dirs = ini_rules_utils.get_values_of_properties_of_children_shallowly(
@@ -394,11 +394,13 @@ def pie_menu_fix(section: list):
     for x in dirs:
         dir = int(x[0])
         line_tokens = x[1]
+        if dir >= 4:
+            continue
         if sliceDirCounts[dir] == MAX_PIE_QUADRANT_SIZE:
             ini_rules_utils.set_line_value(line_tokens, 4)
         else:
             sliceDirCounts[dir] += 1
-        sliceCount += 1
+        # sliceCount += 1
 
     # get the indent of the first slice (we'll need it later)
     indent = ini_rules_utils.get_indent(slices[0][1])
@@ -411,10 +413,10 @@ def pie_menu_fix(section: list):
     CopyOf = ini_cst.get_cst(CT, depth=indent + 1)[0]
     # indent all the existing slices by one so they can be
     # put in the pie menu appropriately
-    for i, x in slices:
+    for _, x in slices:
         ini_rules_utils.indent(x)
 
-    PieMenu.append({"type": "children", "content": [CopyOf] + [x for i, x in slices]})
+    PieMenu.append({"type": "children", "content": [CopyOf] + [x for _, x in slices]})
 
     # TODO: Don't assume the lines are read in-order.
     # Add the new PieMenu and remove the PieSlices from the section's children
