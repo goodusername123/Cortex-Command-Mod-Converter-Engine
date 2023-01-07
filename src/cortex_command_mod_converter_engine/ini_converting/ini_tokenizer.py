@@ -13,34 +13,26 @@ def get_tokens_from_str(text, filepath=None):
     text_len = len(text)
     line_number = 1
 
+    tokenize_lookup_table = {
+        "/": tokenize_comment,
+        "\t": tokenize_tabs,
+        " ": tokenize_spaces,
+        "=": tokenize_equals,
+        "\n": tokenize_newlines,
+    }
+
     i = 0
     while i < text_len:
         char = text[i]
 
-        if char == "/":
-            i, token_type, content, line_number = tokenize_comment(
-                i, text_len, text, tokens, line_number, filepath
-            )
-        elif char == "\t":
-            i, token_type, content, line_number = tokenize_tabs(
-                i, text_len, text, tokens, line_number, filepath
-            )
-        elif char == " ":
-            i, token_type, content, line_number = tokenize_spaces(
-                i, text_len, text, tokens, line_number, filepath
-            )
-        elif char == "=":
-            i, token_type, content, line_number = tokenize_equals(
-                i, text_len, text, tokens, line_number, filepath
-            )
-        elif char == "\n":
-            i, token_type, content, line_number = tokenize_newlines(
-                i, text_len, text, tokens, line_number, filepath
-            )
+        if char in tokenize_lookup_table:
+            tokenize_fn = tokenize_lookup_table[char]
         else:
-            i, token_type, content, line_number = tokenize_word(
-                i, text_len, text, tokens, line_number, filepath
-            )
+            tokenize_fn = tokenize_word
+
+        i, token_type, content, line_number = tokenize_fn(
+            i, text_len, text, tokens, line_number, filepath
+        )
 
         tokens.append(get_token(token_type, content, line_number, filepath))
 
