@@ -79,7 +79,7 @@ def is_deeper(depth, token, tokens, next_token_idx):
     new_depth = get_depth(token, tokens, next_token_idx)
 
     if new_depth > depth + 1:
-        raise TooManyTabs()
+        raise TooManyTabs(token["filepath"], f"line {token['line_number']}")
 
     return new_depth > depth
 
