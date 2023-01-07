@@ -335,8 +335,6 @@ def pie_menu_fix(section: list):
         return
     if not ini_rules_utils.has_children(section):
         return
-    if not ini_rules_utils.line_contains_property(section, "AddActor"):
-        return
 
     # Pie constants (pulled from source)
     MAX_PIE_QUADRANT_SIZE = 5
@@ -371,16 +369,17 @@ def pie_menu_fix(section: list):
     }
 
     # Make sure we're one of the actors that need pie menu adjustments
-    s_val = ini_rules_utils.line_contains_any_values(section, DEFAULT_PIES)
-    if not s_val or s_val not in DEFAULT_PIES:
-        return
+    default_pie_name = ini_rules_utils.line_contains_any_values(section, DEFAULT_PIES)
+    if default_pie_name:
+        sliceDirCounts = DEFAULT_PIES[default_pie_name]["sizes"]
+    else:
+        sliceDirCounts = [0, 0, 0, 0]
 
     # Get all added slices, if we have any.
     slices = ini_rules_utils.get_children_with_property_shallow(section, "AddPieSlice")
     if not slices:
         return
 
-    sliceDirCounts = DEFAULT_PIES[s_val]["sizes"]
     # sliceCount = sum(sliceDirCounts)
 
     # get the direction counts of the slices so we can change if need be.
@@ -390,42 +389,66 @@ def pie_menu_fix(section: list):
 
     # TODO: Comment out pie slices when we're above the max pie slice limit.
 
+    direction_string_to_index = {
+        "Up": 0,
+        "Down": 1,
+        "Left": 2,
+        "Right": 3,
+        "Any": 4,
+    }
+    direction_index_to_string = ("Up", "Down", "Left", "Right", "Any")
+
     # Keep track of and update slice directions.
     for x in dirs:
-        dir = int(x[0])
+        try:
+            dir = int(x[0])
+        except ValueError:
+            dir = direction_string_to_index[x[0]]
+
         line_tokens = x[1]
-        if dir == 4:
-            continue
-        if sliceDirCounts[dir] == MAX_PIE_QUADRANT_SIZE:
-            ini_rules_utils.set_line_value(line_tokens, 4)
+        if dir == 4 or sliceDirCounts[dir] == MAX_PIE_QUADRANT_SIZE:
+            ini_rules_utils.set_line_value(line_tokens, "Any")
         else:
+            ini_rules_utils.set_line_value(line_tokens, direction_index_to_string[dir])
             sliceDirCounts[dir] += 1
         # sliceCount += 1
 
+    if not default_pie_name:
+        return
+
+    wrap_in_pie_menu(slices, DEFAULT_PIES, default_pie_name, section)
+
+
+def wrap_in_pie_menu(slices, DEFAULT_PIES, default_pie_name, section):
     # get the indent of the first slice (we'll need it later)
     indent = ini_rules_utils.get_indent(slices[0][1])
+
     # Create the parent PieMenu and move everything inside it.
-    PT = ini_tokenizer.get_tokens_from_str(("\t" * indent) + "PieMenu = PieMenu\n")
-    PieMenu = ini_cst.get_cst(PT, depth=indent)[0]
-    CT = ini_tokenizer.get_tokens_from_str(
-        ("\t" * (indent + 1)) + f"CopyOf = {DEFAULT_PIES[s_val]['preset']}\n"
+    pie_menu_tokens = ini_tokenizer.get_tokens_from_str(
+        ("\t" * indent) + "PieMenu = PieMenu\n"
     )
-    CopyOf = ini_cst.get_cst(CT, depth=indent + 1)[0]
+    pie_menu_cst = ini_cst.get_cst(pie_menu_tokens, depth=indent)[0]
+    copy_of_tokens = ini_tokenizer.get_tokens_from_str(
+        ("\t" * (indent + 1)) + f"CopyOf = {DEFAULT_PIES[default_pie_name]['preset']}\n"
+    )
+    copy_of_cst = ini_cst.get_cst(copy_of_tokens, depth=indent + 1)[0]
     # indent all the existing slices by one so they can be
     # put in the pie menu appropriately
     for _, x in slices:
         ini_rules_utils.indent(x)
 
-    PieMenu.append({"type": "children", "content": [CopyOf] + [x for _, x in slices]})
+    pie_menu_cst.append(
+        {"type": "children", "content": [copy_of_cst] + [x for _, x in slices]}
+    )
 
     # TODO: Don't assume the lines are read in-order.
-    # Add the new PieMenu and remove the PieSlices from the section's children
-    secChildren = ini_rules_utils.get_children(section)
-    secChildren.insert(slices[0][0], PieMenu)
+    # Add the new pie_menu_cst and remove the PieSlices from the section's children
+    section_children = ini_rules_utils.get_children(section)
+    section_children.insert(slices[0][0], pie_menu_cst)
 
     for x in range(len(slices) - 1, -1, -1):
-        ind = slices[x][0]
-        secChildren.pop(ind + 1)
+        index = slices[x][0]
+        section_children.pop(index + 1)
 
 
 def remove_sl_terrain_properties(section):
