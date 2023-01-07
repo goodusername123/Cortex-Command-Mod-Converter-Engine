@@ -31,7 +31,7 @@ def get_tokens_from_str(text, filepath=None):
             tokenize_fn = tokenize_word
 
         i, token_type, content, line_number = tokenize_fn(
-            i, text_len, text, tokens, line_number, filepath
+            i, text_len, text, line_number
         )
 
         tokens.append(get_token(token_type, content, line_number, filepath))
@@ -39,18 +39,14 @@ def get_tokens_from_str(text, filepath=None):
     return tokens
 
 
-def tokenize_comment(i, text_len, text, tokens, line_number, filepath):
+def tokenize_comment(i, text_len, text, line_number):
     if i + 1 < text_len and text[i + 1] == "/":
-        return tokenize_single_line_comment(
-            i, text_len, text, tokens, line_number, filepath
-        )
+        return tokenize_single_line_comment(i, text_len, text, line_number)
     else:
-        return tokenize_multi_line_comment(
-            i, text_len, text, tokens, line_number, filepath
-        )
+        return tokenize_multi_line_comment(i, text_len, text, line_number)
 
 
-def tokenize_single_line_comment(i, text_len, text, tokens, line_number, filepath):
+def tokenize_single_line_comment(i, text_len, text, line_number):
     content = ""
 
     while i < text_len and text[i] != "\n":
@@ -60,16 +56,7 @@ def tokenize_single_line_comment(i, text_len, text, tokens, line_number, filepat
     return i, "EXTRA", content, line_number
 
 
-def get_token(token_type, content, line_number, filepath):
-    return {
-        "type": token_type,
-        "content": content,
-        "line_number": line_number,
-        "filepath": filepath,
-    }
-
-
-def tokenize_multi_line_comment(i, text_len, text, tokens, line_number, filepath):
+def tokenize_multi_line_comment(i, text_len, text, line_number):
     content = ""
 
     while i < text_len and not (
@@ -84,7 +71,7 @@ def tokenize_multi_line_comment(i, text_len, text, tokens, line_number, filepath
     return i, "EXTRA", content, line_number
 
 
-def tokenize_tabs(i, text_len, text, tokens, line_number, filepath):
+def tokenize_tabs(i, text_len, text, line_number):
     content = ""
 
     while i < text_len and text[i] == "\t":
@@ -94,7 +81,7 @@ def tokenize_tabs(i, text_len, text, tokens, line_number, filepath):
     return i, "TABS", content, line_number
 
 
-def tokenize_spaces(i, text_len, text, tokens, line_number, filepath):
+def tokenize_spaces(i, text_len, text, line_number):
     content = ""
 
     while i < text_len and text[i] == " ":
@@ -104,7 +91,7 @@ def tokenize_spaces(i, text_len, text, tokens, line_number, filepath):
     return i, "EXTRA", content, line_number
 
 
-def tokenize_equals(i, text_len, text, tokens, line_number, filepath):
+def tokenize_equals(i, text_len, text, line_number):
     content = ""
 
     while i < text_len and text[i] == "=":
@@ -114,7 +101,7 @@ def tokenize_equals(i, text_len, text, tokens, line_number, filepath):
     return i, "EQUALS", content, line_number
 
 
-def tokenize_newlines(i, text_len, text, tokens, line_number, filepath):
+def tokenize_newlines(i, text_len, text, line_number):
     content = ""
 
     while i < text_len and text[i] == "\n":
@@ -125,7 +112,7 @@ def tokenize_newlines(i, text_len, text, tokens, line_number, filepath):
     return i, "NEWLINES", content, line_number
 
 
-def tokenize_word(i, text_len, text, tokens, line_number, filepath):
+def tokenize_word(i, text_len, text, line_number):
     content = ""
 
     subtext = text[i:]
@@ -135,3 +122,12 @@ def tokenize_word(i, text_len, text, tokens, line_number, filepath):
     i += len(content)
 
     return i, "WORD", content, line_number
+
+
+def get_token(token_type, content, line_number, filepath):
+    return {
+        "type": token_type,
+        "content": content,
+        "line_number": line_number,
+        "filepath": filepath,
+    }
