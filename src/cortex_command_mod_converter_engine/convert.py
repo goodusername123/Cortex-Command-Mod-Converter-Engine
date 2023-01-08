@@ -164,7 +164,7 @@ def create_converted_file(
         encoding="utf-8",
         errors="ignore",  # TODO: Why ignore errors?
     ) as file_in:
-        with open(output_file_path, "w") as file_out:
+        with open(output_file_path, "w", encoding="utf-8") as file_out:
             all_lines = ""
             file_path = os.path.relpath(input_file_path, input_folder_path)
 

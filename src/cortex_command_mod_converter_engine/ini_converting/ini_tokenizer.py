@@ -2,7 +2,7 @@ import re
 
 
 def get_tokens(filepath):
-    with open(filepath, "r") as f:
+    with open(filepath, "r", encoding="utf-8") as f:
         text = f.read().lstrip()
 
     return get_tokens_from_str(text, filepath)

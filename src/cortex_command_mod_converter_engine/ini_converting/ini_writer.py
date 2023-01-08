@@ -9,7 +9,7 @@ def write_converted_ini_cst(parsed_portion, output_folder_path):
             write_converted_ini_cst(dict_or_list, Path(output_folder_path) / name)
         else:  # Else dict_or_list contains a list of the sections of a file.
             p = str(Path(output_folder_path) / name)
-            with open(p, mode="w") as f:
+            with open(p, mode="w", encoding="utf-8") as f:
                 f.write(get_ini_cst_string(dict_or_list))
 
 
