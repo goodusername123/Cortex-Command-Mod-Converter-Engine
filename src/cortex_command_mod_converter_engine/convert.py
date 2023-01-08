@@ -40,10 +40,6 @@ def convert(
 
     case_check.init_glob(output_folder_path, input_folder_path)
 
-    # if cfg.progress_bar:
-    #     cfg.progress_bar.segment(2)
-    # cfg.progress_bar.setSubtext(f"processing file tree")
-
     conversion_rules = get_conversion_rules()
 
     converter_walk(
@@ -56,10 +52,6 @@ def convert(
 
     if beautify_lua:
         stylua.stylize(output_mod_path)
-
-    # if cfg.progress_bar:
-    #     cfg.progress_bar.segment(utils.get_ini_files_in_dir_deep(output_mod_path) * 3)
-    #     cfg.progress_bar.setSubtext("building syntax tree")
 
     ini_cst = ini_cst_builder.get_full_cst(
         input_folder_path, output_folder_path, input_mod_path
@@ -95,10 +87,6 @@ def converter_walk(
     conversion_rules,
     skip_conversion,
 ):
-    subfolders = 1
-    for _, dirs, __ in os.walk(input_mod_path):
-        subfolders += len(dirs)
-    # cfg.progress_bar.segment(subfolders)
     for input_subfolder_path, _input_subfolders, input_subfiles in os.walk(
         input_mod_path
     ):
@@ -117,10 +105,6 @@ def converter_walk(
                 conversion_rules,
                 skip_conversion,
             )
-            # if cfg.progress_bar:
-            #     cfg.progress_bar.inc()
-            # c += 1
-    # print(c, subfolders)
 
 
 def process_files(

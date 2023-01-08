@@ -16,9 +16,6 @@ def apply_rules_on_ini_cst_recursively(parsed_subset, output_folder_path):
         if isinstance(value, dict):
             apply_rules_on_ini_cst_recursively(value, output_folder_path)
         else:  # If it's a list of the sections of a file.
-            # if cfg.progress_bar:
-            #     cfg.progress_bar.inc()
-            #     cfg.progress_bar.setSubtext(f"applying rules on {key}")
             apply_rules_on_sections(value, output_folder_path)
 
 

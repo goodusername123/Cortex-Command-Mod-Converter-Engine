@@ -11,8 +11,6 @@ def write_converted_ini_cst(parsed_portion, output_folder_path):
             p = str(Path(output_folder_path) / name)
             with open(p, mode="w") as f:
                 f.write(get_ini_cst_string(dict_or_list))
-                # cfg.progress_bar.inc()
-                # cfg.progress_bar.setSubtext(f"writing file {p}")
 
 
 def get_ini_cst_string(cst):
