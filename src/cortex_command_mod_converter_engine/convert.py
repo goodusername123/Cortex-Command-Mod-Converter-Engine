@@ -69,7 +69,7 @@ def convert(
 def get_conversion_rules():
     conversion_rules = {}
 
-    for folder_path, _, subfiles in os.walk("conversion_rules"):
+    for folder_path, _, subfiles in os.walk(utils.get_path("conversion_rules")):
         for filename in subfiles:
             p = folder_path / Path(filename)
 

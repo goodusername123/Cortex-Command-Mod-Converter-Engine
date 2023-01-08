@@ -15,7 +15,7 @@ class ShouldHaveRaisedException(Exception):
 
 
 class TestINIConversion(unittest.TestCase):
-    CONVERSION_TESTS_PATH = Path("tests/ini_test_files")
+    conversion_tests_path = Path("tests/ini_test_files")
 
     def test_conversions(self):
         for in_test_path, out_test_path in self.get_filepaths():
@@ -61,7 +61,7 @@ class TestINIConversion(unittest.TestCase):
     def get_in_test_paths(self):
         return (
             entry_path
-            for entry_path in self.CONVERSION_TESTS_PATH.rglob("in.ini")
+            for entry_path in self.conversion_tests_path.rglob("in.ini")
             if entry_path.is_file()
         )
 
