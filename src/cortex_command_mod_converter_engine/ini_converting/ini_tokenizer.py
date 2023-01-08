@@ -56,6 +56,10 @@ def tokenize_single_line_comment(i, text_len, text, line_number):
     return i, "EXTRA", content, line_number
 
 
+class UnclosedMultilineComment(Exception):
+    pass
+
+
 def tokenize_multi_line_comment(i, text_len, text, line_number):
     content = ""
 
@@ -64,6 +68,9 @@ def tokenize_multi_line_comment(i, text_len, text, line_number):
     ):
         content += text[i]
         i += 1
+
+    if i == text_len:
+        raise UnclosedMultilineComment(f"line {line_number}")
 
     content += "*/"
     i += 2
