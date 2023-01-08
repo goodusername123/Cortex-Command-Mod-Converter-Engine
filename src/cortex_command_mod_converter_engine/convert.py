@@ -159,8 +159,11 @@ def create_converted_file(
 ):
     # try: # TODO: Figure out why this try/except is necessary and why it doesn't check for an error type.
     with open(
-        input_file_path, "r", errors="ignore"
-    ) as file_in:  # TODO: Why ignore errors?
+        input_file_path,
+        "r",
+        encoding="utf-8",
+        errors="ignore",  # TODO: Why ignore errors?
+    ) as file_in:
         with open(output_file_path, "w") as file_out:
             all_lines = ""
             file_path = os.path.relpath(input_file_path, input_folder_path)
