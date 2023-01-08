@@ -25,7 +25,7 @@ def convert(
     beautify_lua=True,
     output_zip=False,
     skip_conversion=False,
-    remove_input_mod_folder=False,
+    remove_input_mod_path=False,
 ):
     input_mod_path = Path(input_mod_path)
     input_folder_path = str(input_mod_path.parent)
@@ -62,7 +62,7 @@ def convert(
     if output_zip:
         zips.zip(input_mod_name, Path(output_folder_path))
 
-    if remove_input_mod_folder:
+    if remove_input_mod_path:
         shutil.rmtree(input_mod_path)
 
 
