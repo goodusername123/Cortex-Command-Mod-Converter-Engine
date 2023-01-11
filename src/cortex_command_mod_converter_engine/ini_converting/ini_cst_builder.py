@@ -15,8 +15,9 @@ def get_full_cst(input_folder_path, output_folder_path, subfolder_path):
         p = subfolder_path / Path(name)
         relative_subfolder = utils.get_relative_subfolder(input_folder_path, str(p))
 
-        if not utils.is_mod_folder_or_subfolder(
-            relative_subfolder
+        if (
+            not utils.is_mod_folder_or_subfolder(relative_subfolder)
+            or name == "invalid_tabbing.ini"
         ):  # TODO: Remove this once CCCP has a Mods folder that can be iterated over.
             continue
         elif (
