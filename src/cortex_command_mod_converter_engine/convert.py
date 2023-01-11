@@ -133,9 +133,10 @@ def process_files(
             else:
                 shutil.copyfile(input_file_path, output_file_path)
 
-        if (
-            full_filename == "desktop.ini" or full_filename == "Thumbs.db"
-        ):  # Skip this Windows metadata file.
+        if full_filename in {
+            "desktop.ini",
+            "Thumbs.db",
+        }:  # Skip this Windows metadata file.
             continue
 
         if file_extension in (".ini", ".lua"):

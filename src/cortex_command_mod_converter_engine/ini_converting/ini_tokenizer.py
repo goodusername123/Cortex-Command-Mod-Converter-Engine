@@ -30,9 +30,12 @@ def get_tokens_from_str(text, filepath=None):
         else:
             tokenize_fn = tokenize_word
 
-        i, token_type, content, line_number = tokenize_fn(
-            i, text_len, text, line_number
-        )
+        try:
+            i, token_type, content, line_number = tokenize_fn(
+                i, text_len, text, line_number
+            )
+        except UnclosedMultilineComment:
+            raise UnclosedMultilineComment(filepath, f"line {line_number}")
 
         tokens.append(get_token(token_type, content, line_number, filepath))
 
@@ -70,7 +73,7 @@ def tokenize_multi_line_comment(i, text_len, text, line_number):
         i += 1
 
     if i == text_len:
-        raise UnclosedMultilineComment(f"line {line_number}")
+        raise UnclosedMultilineComment
 
     content += "*/"
     i += 2
