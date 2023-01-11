@@ -976,9 +976,9 @@ class TestINICST(unittest.TestCase):
             ],
         )
 
-    def test_spaces(self):
+    def test_space_in_value(self):
         self.cst_test(
-            "spaces",
+            "space_in_value",
             [
                 [
                     {"type": "property", "content": "Foo"},

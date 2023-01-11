@@ -611,9 +611,9 @@ class TestINITokenizer(unittest.TestCase):
             ],
         )
 
-    def test_spaces(self):
+    def test_space_in_value(self):
         self.tokenizer_test(
-            "spaces",
+            "space_in_value",
             [
                 {"type": "WORD", "content": "Foo"},
                 {"type": "EXTRA", "content": " "},
