@@ -251,7 +251,6 @@ class TestINITokenizer(unittest.TestCase):
                 {"type": "WORD", "content": "X"},
                 {"type": "NEWLINES", "content": "\n"},
                 {"type": "TABS", "content": "\t"},
-                {"type": "EXTRA", "content": " "},
                 {"type": "NEWLINES", "content": "\n"},
                 {"type": "TABS", "content": "\t\t"},
                 {"type": "WORD", "content": "B2"},
@@ -585,6 +584,21 @@ class TestINITokenizer(unittest.TestCase):
                 {"type": "EQUALS", "content": "="},
                 {"type": "EXTRA", "content": " "},
                 {"type": "WORD", "content": "E2"},
+            ],
+        )
+
+    def test_multiline_comments_with_space_in_between(self):
+        self.tokenizer_test(
+            "multiline_comments_with_space_in_between",
+            [
+                {"type": "WORD", "content": "A"},
+                {"type": "NEWLINES", "content": "\n"},
+                {"type": "EXTRA", "content": " "},
+                {"type": "EXTRA", "content": "/*foo*/"},
+                {"type": "EXTRA", "content": " "},
+                {"type": "EXTRA", "content": "/*bar*/"},
+                {"type": "EXTRA", "content": " "},
+                {"type": "NEWLINES", "content": "\n"},
             ],
         )
 

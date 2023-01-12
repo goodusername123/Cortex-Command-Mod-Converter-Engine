@@ -161,7 +161,6 @@ class TestINICST(unittest.TestCase):
                                 {"type": "extra", "content": " "},
                                 {"type": "value", "content": "X"},
                                 {"type": "extra", "content": "\n"},
-                                {"type": "extra", "content": " "},
                                 {"type": "extra", "content": "\n"},
                             ],
                             [
@@ -249,7 +248,6 @@ class TestINICST(unittest.TestCase):
                                             {"type": "extra", "content": " "},
                                             {"type": "value", "content": "X"},
                                             {"type": "extra", "content": "\n"},
-                                            {"type": "extra", "content": " "},
                                             {"type": "extra", "content": "\n"},
                                         ],
                                         [
@@ -343,7 +341,6 @@ class TestINICST(unittest.TestCase):
                                             {"type": "value", "content": "X"},
                                             {"type": "extra", "content": "\n"},
                                             {"type": "extra", "content": "\t"},
-                                            {"type": "extra", "content": " "},
                                             {"type": "extra", "content": "\n"},
                                         ],
                                         [
@@ -1126,6 +1123,20 @@ class TestINICST(unittest.TestCase):
             ],
         )
 
+    def test_multiline_comments_with_space_in_between(self):
+        self.cst_test(
+            "multiline_comments_with_space_in_between",
+            [
+                [
+                    {"type": "property", "content": "A"},
+                    {"type": "extra", "content": "\n"},
+                    {"type": "extra", "content": "/*foo*/"},
+                    {"type": "extra", "content": "/*bar*/"},
+                    {"type": "extra", "content": "\n"},
+                ]
+            ],
+        )
+
     def test_multiple(self):
         self.cst_test(
             "multiple",
@@ -1305,7 +1316,6 @@ class TestINICST(unittest.TestCase):
                     {"type": "extra", "content": " "},
                     {"type": "value", "content": "Bar"},
                     {"type": "extra", "content": "\n"},
-                    {"type": "extra", "content": "    "},
                 ],
                 [
                     {"type": "property", "content": "Baz"},

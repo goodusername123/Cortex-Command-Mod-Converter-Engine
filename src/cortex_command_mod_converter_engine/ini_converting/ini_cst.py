@@ -61,7 +61,12 @@ def get_cst_recursively(tokens, depth, parsed=None, token_idx=None):
             token_idx[0] += 1
 
         else:
-            append({"type": "extra", "content": token["content"]}, parsed)
+            if not (
+                state == "newline"
+                and all(character == " " for character in token["content"])
+            ):
+                append({"type": "extra", "content": token["content"]}, parsed)
+
             token_idx[0] += 1
 
     return parsed
