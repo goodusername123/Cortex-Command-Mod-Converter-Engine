@@ -1,0 +1,15 @@
+{
+	"Browncoat Fuel Bomb Burn Sound": "Browncoat Fuel Bomb Ignition",
+	"Timed Grenade Payload": "Frag Grenade Payload",
+	":Running(": ":IsRunning(",
+	":Paused(": ":IsPaused(",
+	":ActivityOver(": ":IsOver(",
+	"SceneMan:SetOffset(": "CameraMan:SetOffset(",
+	"SceneMan:GetScreenOcclusion(": "CameraMan:GetScreenOcclusion(",
+	"SceneMan:SetScreenOcclusion(": "CameraMan:SetScreenOcclusion(",
+	"SceneMan:GetScrollTarget(": "CameraMan:GetScrollTarget(",
+	"SceneMan:SetScrollTarget(": "CameraMan:SetScrollTarget(",
+	"SceneMan:TargetDistanceScalar(": "CameraMan:TargetDistanceScalar(",
+	"SceneMan:CheckOffset(": "CameraMan:CheckOffset(",
+	"SceneMan:SetScroll(": "CameraMan:SetScroll("
+}

@@ -63,5 +63,14 @@
 	"Coalition Gatling Turret Dislodge Path Left": "Null Path",
 	"Coalition Gatling Turret Dislodge Path Right": "Null Path",
 	"CopyOf = Ronin.rte/Magazine M16\n": "CopyOf = Ronin.rte/Magazine Ronin M16\n",
-	"CopyOf = Ronin.rte/Magazine M1 Garand\n": "CopyOf = Ronin.rte/Magazine Ronin M1 Garand\n"
+	"CopyOf = Ronin.rte/Magazine M1 Garand\n": "CopyOf = Ronin.rte/Magazine Ronin M1 Garand\n",
+	"CopyOf = Base.rte/TutShaft M\n": "CopyOf = Base.rte/Shaft M\n",
+	"CopyOf = Base.rte/TutShaft L\n": "CopyOf = Base.rte/Shaft L\n",
+	"CopyOf = Base.rte/TutShaft R\n": "CopyOf = Base.rte/Shaft R\n",
+	"CopyOf = Base.rte/TutShaft Entry M\n": "CopyOf = Base.rte/Shaft Entry M\n",
+	"CopyOf = Base.rte/TutShaft Entry L Light\n": "CopyOf = Base.rte/Shaft Entry L Light\n",
+	"CopyOf = Base.rte/TutShaft Entry R Light\n": "CopyOf = Base.rte/Shaft Entry R Light\n",
+	"CopyOf = Base.rte/TutShaft Entry L Dark\n": "CopyOf = Base.rte/Shaft Entry L Dark\n",
+	"CopyOf = Base.rte/TutShaft Entry R Dark\n": "CopyOf = Base.rte/Shaft Entry R Dark\n",
+	"CopyOf = Magazine Shotgun\n": "CopyOf = Magazine Old Stock Shotgun\n"
 }

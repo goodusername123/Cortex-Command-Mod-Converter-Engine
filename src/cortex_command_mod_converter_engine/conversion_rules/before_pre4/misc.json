@@ -199,7 +199,7 @@
 
 	"ProvidesPieMenuContext = 0": "",
 	"ProvidesPieMenuContext = 1": "",
-	"TextureFile = ": "FGTextureFile = ",
+	"\tTextureFile = ": "\tFGTextureFile = ",
 	"AddBackgroundLayer = SceneLayer": "AddBackgroundLayer = SLBackground",
 	"ScriptFile = ": "ScriptPath = ",
 	"OnlyOnSurface = 0": "DebrisPlacementMode = 0",
@@ -262,5 +262,4 @@
 	"CopyOf = Base.rte/Tut Right Border": "CopyOf = Right Border",
 	"CopyOf = Tut End Border": "CopyOf = End Border",
 	"CopyOf = Base.rte/Tut End Border": "CopyOf = End Border"
-
 }
