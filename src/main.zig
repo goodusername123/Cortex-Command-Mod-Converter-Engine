@@ -1,5 +1,9 @@
 const std = @import("std");
 
+const expect = std.testing.expect;
+const ArrayList = std.ArrayList;
+const test_allocator = std.testing.allocator;
+
 // /* foo   */ /* foo2*//*foo3*/
 // DataModule
 // \t/* bar */Description      = Epic /* baz
@@ -29,8 +33,17 @@ const TokenType = enum {
 
 const Token = struct {
     token_type: TokenType,
-    value: []const u8,
+    slice: []const u8,
 };
+
+fn get_token(text: []const u8, line_number: *i32) Token {
+    _ = line_number;
+
+    const char = text[0];
+    _ = char;
+
+    return Token{ .token_type = .Word, .slice = text };
+}
 
 // const AST = struct {
 //     property: []const u8,
@@ -69,10 +82,10 @@ pub fn main() !void {
 
 test "ast" {
     // TODO: Try making gpa const
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = &gpa.allocator();
-    _ = allocator;
-    defer _ = gpa.deinit();
+    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    // const allocator = &gpa.allocator();
+    // _ = allocator;
+    // defer _ = gpa.deinit();
 
     var path_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     const path = try std.fs.realpath("tests/ini_test_files/token_and_cst/simple/in.ini", &path_buf);
@@ -83,17 +96,43 @@ test "ast" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
 
+    var list = ArrayList(Token).init(test_allocator);
+    defer list.deinit();
+
     // TODO: Replace 4242 with something else
     var buf: [4242]u8 = undefined;
     while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        var iter = std.mem.split(u8, line, "=");
-        var count: usize = 0;
-        while (iter.next()) |token| : (count += 1) {
-            std.log.warn("{d}: '{s}'", .{ count, token });
-        }
+        try list.append(Token{ .token_type = .Word, .slice = line });
+
+        // var iter = std.mem.split(u8, line, "=");
+        // var count: usize = 0;
+        // while (iter.next()) |token| : (count += 1) {
+        //     std.log.warn("{d}: '{s}'", .{ count, token });
+        // }
+
         // try std.testing.expectEqualStrings("AddEffect = MOPixel", line);
         // std.log.warn("{s}", .{line});
     }
+
+    std.log.warn("{s} '{s}'", .{ @tagName(list.items[0].token_type), list.items[0].slice });
+
+    // std.log.warn("{s}", .{@tagName(list.items[1].token_type)});
+    // std.log.warn("'{s}'", .{list.items[1].slice});
+
+    // const x = list.items[0];
+    // _ = x;
+    // const x = list.?[0];
+    // std.log.warn("{s}", .{x.slice});
+    // try expect(1 == 2);
+    // try expect(eql(
+    //     []Token,
+    //     list.items,
+    //     []Token{{.token_type = .Word, .slice = "xd",}},
+    // ));
+    // try expect(std.meta.eql(
+    //     list.items[0],
+    //     Token{ .token_type = .Word, .slice = "AddEffect = MOPixel" },
+    // ));
 
     // const ast = AST{
     //     .property = "a",
