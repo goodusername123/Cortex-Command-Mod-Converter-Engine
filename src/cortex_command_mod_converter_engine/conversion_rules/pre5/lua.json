@@ -11,5 +11,6 @@
 	"SceneMan:SetScrollTarget(": "CameraMan:SetScrollTarget(",
 	"SceneMan:TargetDistanceScalar(": "CameraMan:TargetDistanceScalar(",
 	"SceneMan:CheckOffset(": "CameraMan:CheckOffset(",
-	"SceneMan:SetScroll(": "CameraMan:SetScroll("
+	"SceneMan:SetScroll(": "CameraMan:SetScroll(",
+	".ReloadTime = ": ".BaseReloadTime = "
 }
