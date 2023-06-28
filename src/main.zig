@@ -42,12 +42,24 @@ const Token = struct {
 
 fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
     _ = in_multiline_comment;
-    const character = slice.*[0];
-    return switch (character) {
+    return switch (slice.*[0]) {
+        '\t' => {
+            var i: usize = 1;
+            for (slice.*[1..]) |character| {
+                if (character != '\t') {
+                    break;
+                }
+                i += 1;
+            }
+
+            const token = Token{ .token_type = .Tabs, .slice = slice.*[0..i] };
+            slice.* = slice.*[i..];
+            return token;
+        },
         ' ' => {
-            var i: usize = 0;
-            for (slice.*) |char| {
-                if (char != ' ') {
+            var i: usize = 1;
+            for (slice.*[1..]) |character| {
+                if (character != ' ') {
                     break;
                 }
                 i += 1;
@@ -119,6 +131,11 @@ test "ast" {
 
     var token: Token = undefined;
     var in_multiline_comment = false;
+
+    token = getToken(&text_slice, &in_multiline_comment);
+    try expect(token.token_type == .Tabs);
+    try std.testing.expectEqualStrings("\t\t", token.slice);
+    try std.testing.expectEqualStrings("=  =\n", text_slice);
 
     token = getToken(&text_slice, &in_multiline_comment);
     try expect(token.token_type == .Equals);
