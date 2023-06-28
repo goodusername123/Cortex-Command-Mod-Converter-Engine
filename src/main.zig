@@ -29,7 +29,6 @@ const TokenType = enum {
     Tabs,
     Spaces,
     Equals,
-    Newlines,
     Word,
 };
 
@@ -38,9 +37,18 @@ const Token = struct {
     slice: []const u8,
 };
 
-fn getToken(line_ptr: []const u8, index: *usize) Token {
-    index.* += 1;
-    return Token{ .token_type = .Word, .slice = line_ptr };
+fn getToken(slice: []const u8, index: *usize) Token {
+    const character = slice[0];
+    return switch (character) {
+        ' ' => {
+            index.* += 1; // TODO: Do this in a loop
+            return Token{ .token_type = .Spaces, .slice = slice };
+        },
+        else => {
+            index.* += 1; // TODO: Do this in a loop
+            return Token{ .token_type = .Word, .slice = slice };
+        },
+    };
 }
 
 // const AST = struct {
