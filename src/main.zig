@@ -41,96 +41,12 @@ const Token = struct {
     slice: []const u8,
 };
 
-fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
-    if (in_multiline_comment.*) {
-        var i: usize = 0;
-        while (i < slice.len) : (i += 1) {
-            if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
-                in_multiline_comment.* = false;
-                break;
-            }
-        }
-
-        const token = Token{ .token_type = .MultiComment, .slice = slice.*[0 .. i + 2] };
-        slice.* = slice.*[i + 2 ..];
-        return token;
-    }
-
-    return switch (slice.*[0]) {
-        '/' => {
-            return switch (slice.*[1]) {
-                '/' => {
-                    const token = Token{ .token_type = .SingleComment, .slice = slice.* };
-                    slice.* = slice.*[slice.len..];
-                    return token;
-                },
-                '*' => {
-                    in_multiline_comment.* = true;
-
-                    var i: usize = 2;
-                    while (i < slice.len) : (i += 1) {
-                        if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
-                            in_multiline_comment.* = false;
-                            break;
-                        }
-                    }
-
-                    const token = Token{ .token_type = .MultiComment, .slice = slice.*[0 .. i + 2] };
-                    slice.* = slice.*[i + 2 ..];
-                    return token;
-                },
-                else => {
-                    const token = Token{ .token_type = .Word, .slice = slice.*[0..] };
-                    slice.* = slice.*[1..];
-                    return token;
-                },
-            };
-        },
-        '\t' => {
-            var i: usize = 1;
-            for (slice.*[1..]) |character| {
-                if (character != '\t') {
-                    break;
-                }
-                i += 1;
-            }
-
-            const token = Token{ .token_type = .Tabs, .slice = slice.*[0..i] };
-            slice.* = slice.*[i..];
-            return token;
-        },
-        ' ' => {
-            var i: usize = 1;
-            for (slice.*[1..]) |character| {
-                if (character != ' ') {
-                    break;
-                }
-                i += 1;
-            }
-
-            const token = Token{ .token_type = .Spaces, .slice = slice.*[0..i] };
-            slice.* = slice.*[i..];
-            return token;
-        },
-        '=' => {
-            const token = Token{ .token_type = .Equals, .slice = slice.*[0..1] };
-            slice.* = slice.*[1..];
-            return token;
-        },
-        else => {
-            const token = Token{ .token_type = .Word, .slice = slice.*[0..] };
-            slice.* = slice.*[1..];
-            return token;
-        },
-    };
-}
-
-// const AST = struct {
-//     property: []const u8,
-//     value: []const u8,
-//     comment: ?[]const u8 = null,
-//     children: ?*AST = null,
-// };
+const AST = struct {
+    property: []const u8,
+    value: []const u8,
+    comment: ?[]const u8 = null,
+    children: ?*AST = null,
+};
 
 pub fn main() !void {
     // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
@@ -252,4 +168,88 @@ test "ast" {
     //     .property = "a",
     //     .value = "b",
     // };
+}
+
+fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
+    if (in_multiline_comment.*) {
+        var i: usize = 0;
+        while (i < slice.len) : (i += 1) {
+            if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
+                in_multiline_comment.* = false;
+                break;
+            }
+        }
+
+        const token = Token{ .token_type = .MultiComment, .slice = slice.*[0 .. i + 2] };
+        slice.* = slice.*[i + 2 ..];
+        return token;
+    }
+
+    return switch (slice.*[0]) {
+        '/' => {
+            return switch (slice.*[1]) {
+                '/' => {
+                    const token = Token{ .token_type = .SingleComment, .slice = slice.* };
+                    slice.* = slice.*[slice.len..];
+                    return token;
+                },
+                '*' => {
+                    in_multiline_comment.* = true;
+
+                    var i: usize = 2;
+                    while (i < slice.len) : (i += 1) {
+                        if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
+                            in_multiline_comment.* = false;
+                            break;
+                        }
+                    }
+
+                    const token = Token{ .token_type = .MultiComment, .slice = slice.*[0 .. i + 2] };
+                    slice.* = slice.*[i + 2 ..];
+                    return token;
+                },
+                else => {
+                    const token = Token{ .token_type = .Word, .slice = slice.*[0..] };
+                    slice.* = slice.*[1..];
+                    return token;
+                },
+            };
+        },
+        '\t' => {
+            var i: usize = 1;
+            for (slice.*[1..]) |character| {
+                if (character != '\t') {
+                    break;
+                }
+                i += 1;
+            }
+
+            const token = Token{ .token_type = .Tabs, .slice = slice.*[0..i] };
+            slice.* = slice.*[i..];
+            return token;
+        },
+        ' ' => {
+            var i: usize = 1;
+            for (slice.*[1..]) |character| {
+                if (character != ' ') {
+                    break;
+                }
+                i += 1;
+            }
+
+            const token = Token{ .token_type = .Spaces, .slice = slice.*[0..i] };
+            slice.* = slice.*[i..];
+            return token;
+        },
+        '=' => {
+            const token = Token{ .token_type = .Equals, .slice = slice.*[0..1] };
+            slice.* = slice.*[1..];
+            return token;
+        },
+        else => {
+            const token = Token{ .token_type = .Word, .slice = slice.*[0..] };
+            slice.* = slice.*[1..];
+            return token;
+        },
+    };
 }
