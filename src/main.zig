@@ -4,24 +4,26 @@ const expect = std.testing.expect;
 const ArrayList = std.ArrayList;
 const test_allocator = std.testing.allocator;
 
-// /* foo   */ /* foo2*//*foo3*/
-// DataModule
-// \t/* bar */Description      = Epic /* baz
-// bee */\tSupportedGameVersion = Pre4
-//
-// // foo foo2 foo3
-// DataModule
-// \tDescription = Epic // bar baz
-// \tSupportedGameVersion = Pre4 // bee
-//
-// [
-//     { "comment": "foo foo2 foo3" },
-//     { "property": "DataModule", "children": [
-//         { "property": "Description", "value": "Epic", "comment": "bar baz" },
-//         { "property": "SupportedGameVersion", "value": "Pre4", "comment": "bee" }
-//     ]}
-// [
-
+/// This .ini input file:
+/// /* foo   */ /* foo2*//*foo3*/
+/// DataModule
+/// \t/* bar */Description      = Epic /* baz
+/// bee */\tSupportedGameVersion = Pre4
+///
+/// Turns into this .ini output file:
+/// // foo foo2 foo3
+/// DataModule
+/// \tDescription = Epic // bar baz
+/// \tSupportedGameVersion = Pre4 // bee
+///
+/// That output file is internally represented with these AST nodes:
+/// [
+///     { "comment": "foo foo2 foo3" },
+///     { "property": "DataModule", "children": [
+///         { "property": "Description", "value": "Epic", "comment": "bar baz" },
+///         { "property": "SupportedGameVersion", "value": "Pre4", "comment": "bee" }
+///     ]}
+/// [
 const TokenType = enum {
     Comment,
     Tabs,
@@ -36,13 +38,9 @@ const Token = struct {
     slice: []const u8,
 };
 
-fn get_token(line_slice: []const u8, line_number: i32) Token {
-    _ = line_number;
-
-    const char = line_slice[0];
-    _ = char;
-
-    return Token{ .token_type = .Word, .slice = line_slice };
+fn getToken(line_ptr: []const u8, index: *usize) Token {
+    index.* += 1;
+    return Token{ .token_type = .Word, .slice = line_ptr };
 }
 
 // const AST = struct {
@@ -68,18 +66,6 @@ pub fn main() !void {
     try bw.flush(); // don't forget to flush!
 }
 
-// test "simple test" {
-//     var list = std.ArrayList(i32).init(std.testing.allocator);
-//     defer list.deinit(); // try commenting this out and see if zig detects the memory leak!
-//     try list.append(42);
-//     try std.testing.expectEqual(@as(i32, 42), list.pop());
-// }
-
-// fn add_line(ast: *AST, line: []const u8, allocator: ) void {
-//     _ = line;
-//     _ = ast;
-// }
-
 test "ast" {
     // TODO: Try making gpa const
     // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -104,23 +90,40 @@ test "ast" {
 
     // std.log.warn("'{s}'", .{text});
 
-    var line_number: i32 = 1;
+    var index: usize = 0;
 
-    var line_iter = std.mem.split(u8, text, "\n");
-    while (line_iter.next()) |line| {
-        try tokens.append(get_token(line, line_number));
+    var token: Token = undefined;
 
-        line_number += 1;
+    token = getToken(text[index..], &index);
+    try expect(token.token_type == .Word);
+    try std.testing.expectEqualStrings("AddEffect = MOPixel", token.slice);
+    try std.testing.expectEqualStrings("ddEffect = MOPixel", text[index..]);
 
-        // var iter = std.mem.split(u8, line, "=");
-        // var count: usize = 0;
-        // while (iter.next()) |token| : (count += 1) {
-        //     std.log.warn("{d}: '{s}'", .{ count, token });
-        // }
+    token = getToken(text[index..], &index);
+    try expect(token.token_type == .Word);
+    try std.testing.expectEqualStrings("ddEffect = MOPixel", token.slice);
+    try std.testing.expectEqualStrings("dEffect = MOPixel", text[index..]);
 
-        // try std.testing.expectEqualStrings("AddEffect = MOPixel", line);
-        // std.log.warn("{s}", .{line});
-    }
+    // var line_number: i32 = 1;
+
+    // var line_iter = std.mem.split(u8, text, "\n");
+    // while (line_iter.next()) |line| {
+    //     // Move "line" along as ptr/slice and add tokens in loop
+    //     while (true) {
+    //         try tokens.append(getToken(&line, line_number));
+    //     }
+
+    //     line_number += 1;
+
+    //     // var iter = std.mem.split(u8, line, "=");
+    //     // var count: usize = 0;
+    //     // while (iter.next()) |token| : (count += 1) {
+    //     //     std.log.warn("{d}: '{s}'", .{ count, token });
+    //     // }
+
+    //     // try std.testing.expectEqualStrings("AddEffect = MOPixel", line);
+    //     // std.log.warn("{s}", .{line});
+    // }
 
     // std.log.warn("{d}", .{line_number});
     // std.log.warn("{s} '{s}'", .{ @tagName(tokens.items[0].token_type), tokens.items[0].slice });
