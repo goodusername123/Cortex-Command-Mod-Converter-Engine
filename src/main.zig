@@ -175,15 +175,15 @@ test "ast" {
     var token: Token = undefined;
     var in_multiline_comment = false;
 
-    token = getToken(&text_slice, &in_multiline_comment);
-    try expect(token.token_type == .MultiComment);
-    try expectEqualStrings("/* a */", token.slice);
-    try expectEqualStrings("// b", text_slice);
+    // token = getToken(&text_slice, &in_multiline_comment);
+    // try expect(token.token_type == .MultiComment);
+    // try expectEqualStrings("/* a */", token.slice);
+    // try expectEqualStrings("// b", text_slice);
 
-    token = getToken(&text_slice, &in_multiline_comment);
-    try expect(token.token_type == .SingleComment);
-    try expectEqualStrings("// b", token.slice);
-    try expectEqualStrings("", text_slice);
+    // token = getToken(&text_slice, &in_multiline_comment);
+    // try expect(token.token_type == .SingleComment);
+    // try expectEqualStrings("// b", token.slice);
+    // try expectEqualStrings("", text_slice);
 
     // token = getToken(&text_slice, &in_multiline_comment);
     // try expect(token.token_type == .Tabs);
@@ -201,25 +201,31 @@ test "ast" {
     // try expectEqualStrings("=\n", text_slice);
 
     // var line_number: i32 = 1;
+    // _ = line_number;
 
-    // var line_iter = std.mem.splitSequence(u8, text, "\n");
-    // while (line_iter.next()) |line| {
-    //     // Move "line" along as ptr/slice and add tokens in loop
-    //     while (true) {
-    //         try tokens.append(getToken(&line, line_number));
-    //     }
+    var lines = std.mem.split(u8, text, "\n");
+    while (lines.next()) |line| {
+        _ = line;
 
-    //     line_number += 1;
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .MultiComment);
+        try expectEqualStrings("/* a */", token.slice);
+        try expectEqualStrings("// b", text_slice);
 
-    //     // var iter = std.mem.split(u8, line, "=");
-    //     // var count: usize = 0;
-    //     // while (iter.next()) |token| : (count += 1) {
-    //     //     std.log.warn("{d}: '{s}'", .{ count, token });
-    //     // }
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .SingleComment);
+        try expectEqualStrings("// b", token.slice);
+        try expectEqualStrings("", text_slice);
 
-    //     // try expectEqualStrings("AddEffect = MOPixel", line);
-    //     // std.log.warn("{s}", .{line});
-    // }
+        std.log.warn("xd", .{});
+
+        // Move "line" along as ptr/slice and add tokens in loop
+        // while (true) {
+        //     try tokens.append(getToken(&line, line_number));
+        // }
+
+        // line_number += 1;
+    }
 
     // std.log.warn("{d}", .{line_number});
     // std.log.warn("{s} '{s}'", .{ @tagName(tokens.items[0].token_type), tokens.items[0].slice });
