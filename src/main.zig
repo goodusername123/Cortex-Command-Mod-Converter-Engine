@@ -25,7 +25,10 @@ const test_allocator = std.testing.allocator;
 ///     ]}
 /// [
 const TokenType = enum {
-    Comment,
+    // TODO: Maybe merge these as "Comment"
+    SingleComment,
+    MultiComment,
+
     Tabs,
     Spaces,
     Equals,
@@ -42,12 +45,25 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
     const character = slice.*[0];
     return switch (character) {
         ' ' => {
-            const token = Token{ .token_type = .Spaces, .slice = slice.* };
+            var i: usize = 0;
+            for (slice.*) |char| {
+                if (char != ' ') {
+                    break;
+                }
+                i += 1;
+            }
+
+            const token = Token{ .token_type = .Spaces, .slice = slice.*[0..i] };
+            slice.* = slice.*[i..];
+            return token;
+        },
+        '=' => {
+            const token = Token{ .token_type = .Equals, .slice = slice.*[0..1] };
             slice.* = slice.*[1..];
             return token;
         },
         else => {
-            const token = Token{ .token_type = .Word, .slice = slice.* };
+            const token = Token{ .token_type = .Word, .slice = slice.*[0..] };
             slice.* = slice.*[1..];
             return token;
         },
@@ -85,7 +101,7 @@ test "ast" {
     // defer _ = gpa.deinit();
 
     var path_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
-    const path = try std.fs.realpath("tests/ini_test_files/token_and_cst/simple/in.ini", &path_buf);
+    const path = try std.fs.realpath("src/test.ini", &path_buf);
 
     var file = try std.fs.openFileAbsolute(path, .{});
     defer file.close();
@@ -105,14 +121,14 @@ test "ast" {
     var in_multiline_comment = false;
 
     token = getToken(&text_slice, &in_multiline_comment);
-    try expect(token.token_type == .Word);
-    try std.testing.expectEqualStrings("AddEffect = MOPixel", token.slice);
-    try std.testing.expectEqualStrings("ddEffect = MOPixel", text_slice);
+    try expect(token.token_type == .Equals);
+    try std.testing.expectEqualStrings("=", token.slice);
+    try std.testing.expectEqualStrings("  =\n", text_slice);
 
     token = getToken(&text_slice, &in_multiline_comment);
-    try expect(token.token_type == .Word);
-    try std.testing.expectEqualStrings("ddEffect = MOPixel", token.slice);
-    try std.testing.expectEqualStrings("dEffect = MOPixel", text_slice);
+    try expect(token.token_type == .Spaces);
+    try std.testing.expectEqualStrings("  ", token.slice);
+    try std.testing.expectEqualStrings("=\n", text_slice);
 
     // var line_number: i32 = 1;
 
