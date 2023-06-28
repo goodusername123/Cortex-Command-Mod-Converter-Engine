@@ -37,16 +37,19 @@ const Token = struct {
     slice: []const u8,
 };
 
-fn getToken(slice: []const u8, index: *usize) Token {
-    const character = slice[0];
+fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
+    _ = in_multiline_comment;
+    const character = slice.*[0];
     return switch (character) {
         ' ' => {
-            index.* += 1; // TODO: Do this in a loop
-            return Token{ .token_type = .Spaces, .slice = slice };
+            const token = Token{ .token_type = .Spaces, .slice = slice.* };
+            slice.* = slice.*[1..];
+            return token;
         },
         else => {
-            index.* += 1; // TODO: Do this in a loop
-            return Token{ .token_type = .Word, .slice = slice };
+            const token = Token{ .token_type = .Word, .slice = slice.* };
+            slice.* = slice.*[1..];
+            return token;
         },
     };
 }
@@ -96,23 +99,20 @@ test "ast" {
     var text = try in_stream.readAllAlloc(test_allocator, std.math.maxInt(usize));
     defer test_allocator.free(text);
 
-    // std.log.warn("'{s}'", .{text});
-
-    var index: usize = 0;
+    var text_slice: []const u8 = text;
 
     var token: Token = undefined;
+    var in_multiline_comment = false;
 
-    token = getToken(text[index..], &index);
+    token = getToken(&text_slice, &in_multiline_comment);
     try expect(token.token_type == .Word);
     try std.testing.expectEqualStrings("AddEffect = MOPixel", token.slice);
-    try std.testing.expectEqualStrings("ddEffect = MOPixel", text[index..]);
-    try expect(index == 1);
+    try std.testing.expectEqualStrings("ddEffect = MOPixel", text_slice);
 
-    token = getToken(text[index..], &index);
+    token = getToken(&text_slice, &in_multiline_comment);
     try expect(token.token_type == .Word);
     try std.testing.expectEqualStrings("ddEffect = MOPixel", token.slice);
-    try std.testing.expectEqualStrings("dEffect = MOPixel", text[index..]);
-    try expect(index == 2);
+    try std.testing.expectEqualStrings("dEffect = MOPixel", text_slice);
 
     // var line_number: i32 = 1;
 
