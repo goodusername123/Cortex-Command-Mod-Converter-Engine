@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const expect = std.testing.expect;
+const expectEqualStrings = std.testing.expectEqualStrings;
 const ArrayList = std.ArrayList;
 const test_allocator = std.testing.allocator;
 
@@ -41,8 +42,50 @@ const Token = struct {
 };
 
 fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
-    _ = in_multiline_comment;
+    if (in_multiline_comment.*) {
+        var i: usize = 0;
+        while (i < slice.len) : (i += 1) {
+            if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
+                in_multiline_comment.* = false;
+                break;
+            }
+        }
+
+        const token = Token{ .token_type = .MultiComment, .slice = slice.*[0 .. i + 2] };
+        slice.* = slice.*[i + 2 ..];
+        return token;
+    }
+
     return switch (slice.*[0]) {
+        '/' => {
+            return switch (slice.*[1]) {
+                '/' => {
+                    const token = Token{ .token_type = .SingleComment, .slice = slice.* };
+                    slice.* = slice.*[slice.len..];
+                    return token;
+                },
+                '*' => {
+                    in_multiline_comment.* = true;
+
+                    var i: usize = 2;
+                    while (i < slice.len) : (i += 1) {
+                        if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
+                            in_multiline_comment.* = false;
+                            break;
+                        }
+                    }
+
+                    const token = Token{ .token_type = .MultiComment, .slice = slice.*[0 .. i + 2] };
+                    slice.* = slice.*[i + 2 ..];
+                    return token;
+                },
+                else => {
+                    const token = Token{ .token_type = .Word, .slice = slice.*[0..] };
+                    slice.* = slice.*[1..];
+                    return token;
+                },
+            };
+        },
         '\t' => {
             var i: usize = 1;
             for (slice.*[1..]) |character| {
@@ -133,23 +176,33 @@ test "ast" {
     var in_multiline_comment = false;
 
     token = getToken(&text_slice, &in_multiline_comment);
-    try expect(token.token_type == .Tabs);
-    try std.testing.expectEqualStrings("\t\t", token.slice);
-    try std.testing.expectEqualStrings("=  =\n", text_slice);
+    try expect(token.token_type == .MultiComment);
+    try expectEqualStrings("/* a */", token.slice);
+    try expectEqualStrings("// b", text_slice);
 
     token = getToken(&text_slice, &in_multiline_comment);
-    try expect(token.token_type == .Equals);
-    try std.testing.expectEqualStrings("=", token.slice);
-    try std.testing.expectEqualStrings("  =\n", text_slice);
+    try expect(token.token_type == .SingleComment);
+    try expectEqualStrings("// b", token.slice);
+    try expectEqualStrings("", text_slice);
 
-    token = getToken(&text_slice, &in_multiline_comment);
-    try expect(token.token_type == .Spaces);
-    try std.testing.expectEqualStrings("  ", token.slice);
-    try std.testing.expectEqualStrings("=\n", text_slice);
+    // token = getToken(&text_slice, &in_multiline_comment);
+    // try expect(token.token_type == .Tabs);
+    // try expectEqualStrings("\t\t", token.slice);
+    // try expectEqualStrings("=  =\n", text_slice);
+
+    // token = getToken(&text_slice, &in_multiline_comment);
+    // try expect(token.token_type == .Equals);
+    // try expectEqualStrings("=", token.slice);
+    // try expectEqualStrings("  =\n", text_slice);
+
+    // token = getToken(&text_slice, &in_multiline_comment);
+    // try expect(token.token_type == .Spaces);
+    // try expectEqualStrings("  ", token.slice);
+    // try expectEqualStrings("=\n", text_slice);
 
     // var line_number: i32 = 1;
 
-    // var line_iter = std.mem.split(u8, text, "\n");
+    // var line_iter = std.mem.splitSequence(u8, text, "\n");
     // while (line_iter.next()) |line| {
     //     // Move "line" along as ptr/slice and add tokens in loop
     //     while (true) {
@@ -164,7 +217,7 @@ test "ast" {
     //     //     std.log.warn("{d}: '{s}'", .{ count, token });
     //     // }
 
-    //     // try std.testing.expectEqualStrings("AddEffect = MOPixel", line);
+    //     // try expectEqualStrings("AddEffect = MOPixel", line);
     //     // std.log.warn("{s}", .{line});
     // }
 
