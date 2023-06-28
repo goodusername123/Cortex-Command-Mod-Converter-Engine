@@ -106,11 +106,13 @@ test "ast" {
     try expect(token.token_type == .Word);
     try std.testing.expectEqualStrings("AddEffect = MOPixel", token.slice);
     try std.testing.expectEqualStrings("ddEffect = MOPixel", text[index..]);
+    try expect(index == 1);
 
     token = getToken(text[index..], &index);
     try expect(token.token_type == .Word);
     try std.testing.expectEqualStrings("ddEffect = MOPixel", token.slice);
     try std.testing.expectEqualStrings("dEffect = MOPixel", text[index..]);
+    try expect(index == 2);
 
     // var line_number: i32 = 1;
 
