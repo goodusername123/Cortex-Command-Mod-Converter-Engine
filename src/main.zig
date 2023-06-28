@@ -36,13 +36,13 @@ const Token = struct {
     slice: []const u8,
 };
 
-fn get_token(text: []const u8, line_number: *i32) Token {
+fn get_token(line_slice: []const u8, line_number: i32) Token {
     _ = line_number;
 
-    const char = text[0];
+    const char = line_slice[0];
     _ = char;
 
-    return Token{ .token_type = .Word, .slice = text };
+    return Token{ .token_type = .Word, .slice = line_slice };
 }
 
 // const AST = struct {
@@ -96,13 +96,21 @@ test "ast" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
 
-    var list = ArrayList(Token).init(test_allocator);
-    defer list.deinit();
+    var tokens = ArrayList(Token).init(test_allocator);
+    defer tokens.deinit();
 
-    // TODO: Replace 4242 with something else
-    var buf: [4242]u8 = undefined;
-    while (try in_stream.readUntilDelimiterOrEof(&buf, '\n')) |line| {
-        try list.append(Token{ .token_type = .Word, .slice = line });
+    var text = try in_stream.readAllAlloc(test_allocator, std.math.maxInt(usize));
+    defer test_allocator.free(text);
+
+    // std.log.warn("'{s}'", .{text});
+
+    var line_number: i32 = 1;
+
+    var line_iter = std.mem.split(u8, text, "\n");
+    while (line_iter.next()) |line| {
+        try tokens.append(get_token(line, line_number));
+
+        line_number += 1;
 
         // var iter = std.mem.split(u8, line, "=");
         // var count: usize = 0;
@@ -114,23 +122,24 @@ test "ast" {
         // std.log.warn("{s}", .{line});
     }
 
-    std.log.warn("{s} '{s}'", .{ @tagName(list.items[0].token_type), list.items[0].slice });
+    // std.log.warn("{d}", .{line_number});
+    // std.log.warn("{s} '{s}'", .{ @tagName(tokens.items[0].token_type), tokens.items[0].slice });
 
-    // std.log.warn("{s}", .{@tagName(list.items[1].token_type)});
-    // std.log.warn("'{s}'", .{list.items[1].slice});
+    // std.log.warn("{s}", .{@tagName(tokens.items[1].token_type)});
+    // std.log.warn("'{s}'", .{tokens.items[1].slice});
 
-    // const x = list.items[0];
+    // const x = tokens.items[0];
     // _ = x;
-    // const x = list.?[0];
+    // const x = tokens.?[0];
     // std.log.warn("{s}", .{x.slice});
     // try expect(1 == 2);
     // try expect(eql(
     //     []Token,
-    //     list.items,
+    //     tokens.items,
     //     []Token{{.token_type = .Word, .slice = "xd",}},
     // ));
     // try expect(std.meta.eql(
-    //     list.items[0],
+    //     tokens.items[0],
     //     Token{ .token_type = .Word, .slice = "AddEffect = MOPixel" },
     // ));
 
