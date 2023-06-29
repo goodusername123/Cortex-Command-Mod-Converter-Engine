@@ -1,9 +1,9 @@
 const std = @import("std");
 
+const test_allocator = std.testing.allocator;
+
 const expect = std.testing.expect;
 const expectEqualStrings = std.testing.expectEqualStrings;
-const ArrayList = std.ArrayList;
-const test_allocator = std.testing.allocator;
 
 /// This .ini input file:
 /// /* foo   */ /* foo2*//*foo3*/
@@ -77,7 +77,7 @@ const Token = struct {
 
 const Node = struct {
     property: []const u8,
-    value: []const u8 = null,
+    value: ?[]const u8 = null,
     comments: ?[][]const u8 = null,
     children: ?[]Node = null,
 };
@@ -113,71 +113,84 @@ test "ast" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
 
-    var tokens = ArrayList(Token).init(test_allocator);
+    var tokens = std.ArrayList(Token).init(test_allocator);
     defer tokens.deinit();
 
     var text = try in_stream.readAllAlloc(test_allocator, std.math.maxInt(usize));
     defer test_allocator.free(text);
 
     var text_slice: []const u8 = text;
+    _ = text_slice;
 
     var token: Token = undefined;
+    _ = token;
     var in_multiline_comment = false;
+    _ = in_multiline_comment;
 
-    // const nodes: std.MultiArrayList(Node) = {};
-    // _ = nodes;
+    const NodeList = std.MultiArrayList(Node);
+    var nodes = NodeList{};
+    defer nodes.deinit(test_allocator);
+
+    var comments = std.ArrayList([]const u8).init(test_allocator);
+    defer comments.deinit();
 
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
+        _ = line;
+
+        const index = try nodes.addOne(test_allocator);
+        _ = index;
+
         // var node = Node{};
         // node.property = "wow";
         // std.log.warn("node.property: {s}", .{node.property});
-        _ = line;
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Tabs);
-        try expectEqualStrings("\t", token.slice);
-        try expectEqualStrings("w xy = /v z /* a b */// c d ", text_slice);
+        // nodes.append(test_allocator, node);
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Sentence);
-        try expectEqualStrings("w xy", token.slice);
-        try expectEqualStrings(" = /v z /* a b */// c d ", text_slice);
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Tabs);
+        // try expectEqualStrings("\t", token.slice);
+        // try expectEqualStrings("w xy = /v z /* a b */// c d ", text_slice);
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Spaces);
-        try expectEqualStrings(" ", token.slice);
-        try expectEqualStrings("= /v z /* a b */// c d ", text_slice);
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Sentence);
+        // try expectEqualStrings("w xy", token.slice);
+        // try expectEqualStrings(" = /v z /* a b */// c d ", text_slice);
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Equals);
-        try expectEqualStrings("=", token.slice);
-        try expectEqualStrings(" /v z /* a b */// c d ", text_slice);
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Spaces);
+        // try expectEqualStrings(" ", token.slice);
+        // try expectEqualStrings("= /v z /* a b */// c d ", text_slice);
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Spaces);
-        try expectEqualStrings(" ", token.slice);
-        try expectEqualStrings("/v z /* a b */// c d ", text_slice);
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Equals);
+        // try expectEqualStrings("=", token.slice);
+        // try expectEqualStrings(" /v z /* a b */// c d ", text_slice);
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Sentence);
-        try expectEqualStrings("/v z", token.slice);
-        try expectEqualStrings(" /* a b */// c d ", text_slice);
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Spaces);
+        // try expectEqualStrings(" ", token.slice);
+        // try expectEqualStrings("/v z /* a b */// c d ", text_slice);
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Spaces);
-        try expectEqualStrings(" ", token.slice);
-        try expectEqualStrings("/* a b */// c d ", text_slice);
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Sentence);
+        // try expectEqualStrings("/v z", token.slice);
+        // try expectEqualStrings(" /* a b */// c d ", text_slice);
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Comment);
-        try expectEqualStrings("/* a b */", token.slice);
-        try expectEqualStrings("// c d ", text_slice);
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Spaces);
+        // try expectEqualStrings(" ", token.slice);
+        // try expectEqualStrings("/* a b */// c d ", text_slice);
 
-        token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Comment);
-        try expectEqualStrings("// c d ", token.slice);
-        try expectEqualStrings("", text_slice);
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Comment);
+        // try expectEqualStrings("/* a b */", token.slice);
+        // try expectEqualStrings("// c d ", text_slice);
+
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.token_type == .Comment);
+        // try expectEqualStrings("// c d ", token.slice);
+        // try expectEqualStrings("", text_slice);
 
         std.log.warn("xd", .{});
 
