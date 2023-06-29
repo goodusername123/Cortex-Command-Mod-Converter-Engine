@@ -136,20 +136,33 @@ test "ast" {
         var node = Node{};
 
         const SeenStates = enum {
-            start,
-            property,
-            value,
+            Start,
+            Property,
+            Equals,
+            Value,
         };
 
-        var seen: SeenStates = .start;
-        _ = seen;
+        var seen: SeenStates = .Start;
 
         while (text_slice.len > 0) {
             const token = getToken(&text_slice, &in_multiline_comment);
 
-            if (token.type == .Sentence) {
-                std.log.warn("{s}", .{token.slice});
+            // std.log.warn("{s}", .{token.slice});
+            if (seen == .Start and token.type == .Sentence) {
+                node.property = token.slice;
+                seen = .Property;
             }
+            if (seen == .Property and token.type == .Equals) {
+                seen = .Equals;
+            }
+            if (seen == .Equals and token.type == .Sentence) {
+                node.value = token.slice;
+                seen = .Value;
+            }
+            if (token.type == .Comment) {
+                try comments.append(token.slice);
+            }
+            if (token.type == .Tabs) {}
         }
 
         try nodes.append(test_allocator, node);
