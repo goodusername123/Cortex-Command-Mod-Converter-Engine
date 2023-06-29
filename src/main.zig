@@ -67,10 +67,7 @@ const Token = struct {
     slice: []const u8,
 
     const TokenType = enum {
-        // TODO: Maybe merge these as "Comment"
-        SingleComment,
-        MultiComment,
-
+        Comment,
         Tabs,
         Spaces,
         Equals,
@@ -129,12 +126,12 @@ test "ast" {
     var in_multiline_comment = false;
 
     // token = getToken(&text_slice, &in_multiline_comment);
-    // try expect(token.token_type == .MultiComment);
+    // try expect(token.token_type == .Comment);
     // try expectEqualStrings("/* a */", token.slice);
     // try expectEqualStrings("// b", text_slice);
 
     // token = getToken(&text_slice, &in_multiline_comment);
-    // try expect(token.token_type == .SingleComment);
+    // try expect(token.token_type == .Comment);
     // try expectEqualStrings("// b", token.slice);
     // try expectEqualStrings("", text_slice);
 
@@ -164,13 +161,13 @@ test "ast" {
         _ = line;
 
         token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .MultiComment);
-        try expectEqualStrings("/* a */", token.slice);
-        try expectEqualStrings("// b", text_slice);
+        try expect(token.token_type == .Comment);
+        try expectEqualStrings("/* a b */", token.slice);
+        try expectEqualStrings("// c d ", text_slice);
 
         token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .SingleComment);
-        try expectEqualStrings("// b", token.slice);
+        try expect(token.token_type == .Comment);
+        try expectEqualStrings("// c d ", token.slice);
         try expectEqualStrings("", text_slice);
 
         std.log.warn("xd", .{});
@@ -220,7 +217,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             }
         }
 
-        const token = Token{ .token_type = .MultiComment, .slice = slice.*[0 .. i + 2] };
+        const token = Token{ .token_type = .Comment, .slice = slice.*[0 .. i + 2] };
         slice.* = slice.*[i + 2 ..];
         return token;
     }
@@ -229,7 +226,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         '/' => {
             return switch (slice.*[1]) {
                 '/' => {
-                    const token = Token{ .token_type = .SingleComment, .slice = slice.* };
+                    const token = Token{ .token_type = .Comment, .slice = slice.* };
                     slice.* = slice.*[slice.len..];
                     return token;
                 },
@@ -240,12 +237,13 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                     while (i < slice.len) : (i += 1) {
                         if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
                             in_multiline_comment.* = false;
+                            i += 2;
                             break;
                         }
                     }
 
-                    const token = Token{ .token_type = .MultiComment, .slice = slice.*[0 .. i + 2] };
-                    slice.* = slice.*[i + 2 ..];
+                    const token = Token{ .token_type = .Comment, .slice = slice.*[0..i] };
+                    slice.* = slice.*[i..];
                     return token;
                 },
                 else => {
