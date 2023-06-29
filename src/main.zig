@@ -17,14 +17,53 @@ const test_allocator = std.testing.allocator;
 /// \tDescription = Epic // bar baz
 /// \tSupportedGameVersion = Pre4 // bee
 ///
-/// That output file is internally represented with these AST nodes:
-/// [
-///     { "comment": "foo foo2 foo3" },
-///     { "property": "DataModule", "children": [
-///         { "property": "Description", "value": "Epic", "comment": "bar baz" },
-///         { "property": "SupportedGameVersion", "value": "Pre4", "comment": "bee" }
-///     ]}
-/// [
+/// That output file is stored roughly like so:
+/// {
+///     {
+///         .property = "DataModule",
+///         .comments = { "foo", "foo2", "foo3" },
+///         .children = {
+///             {
+///                 .property = "Description",
+///                 .value = "Epic",
+///                 .comments = { "bar", "baz" }
+///             },
+///             {
+///                 .property = "SupportedGameVersion",
+///                 .value = "Pre4",
+///                 .comments = { "bee" }
+///             }
+///         }
+///     }
+/// }
+///
+/// The actual way it is stored tries to use very few memory allocations:
+///
+/// // Not using ArrayList, since we don't want padding
+/// nodes: MultiArrayList(AST) = {
+///     {
+///         .property = "DataModule",
+///         .comments = { "foo", "foo2", "foo3" },
+///         .children = { nodes 1 and 2 }
+///     },
+///     {
+///         .property = "Description",
+///         .value = "Epic",
+///         .comments = { "bar", "baz" }
+///     },
+///     {
+///         .property = "SupportedGameVersion",
+///         .value = "Pre4",
+///         .comments = { "bee" }
+///     }
+/// };
+///
+/// // The node at index 0 owns index 0, 1 and 2
+/// comments: ArrayList([]const u8) = {
+///     "foo", "foo2", "foo3", "bar", "baz", "bee"
+/// };
+
+// TODO: Try nesting this enum inside of the Token struct
 const TokenType = enum {
     // TODO: Maybe merge these as "Comment"
     SingleComment,
@@ -43,9 +82,9 @@ const Token = struct {
 
 const AST = struct {
     property: []const u8,
-    value: []const u8,
-    comment: ?[]const u8 = null,
-    children: ?*AST = null,
+    value: []const u8 = null,
+    comments: ?[][]const u8 = null,
+    children: ?[]AST = null,
 };
 
 pub fn main() !void {
@@ -121,6 +160,9 @@ test "ast" {
 
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
+        var ast = AST{};
+        // ast.property = "wow";
+        std.log.warn("ast.property: {s}", .{ast.property});
         _ = line;
 
         token = getToken(&text_slice, &in_multiline_comment);
