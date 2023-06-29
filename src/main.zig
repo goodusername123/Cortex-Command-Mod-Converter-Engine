@@ -125,31 +125,6 @@ test "ast" {
     var token: Token = undefined;
     var in_multiline_comment = false;
 
-    // token = getToken(&text_slice, &in_multiline_comment);
-    // try expect(token.token_type == .Comment);
-    // try expectEqualStrings("/* a */", token.slice);
-    // try expectEqualStrings("// b", text_slice);
-
-    // token = getToken(&text_slice, &in_multiline_comment);
-    // try expect(token.token_type == .Comment);
-    // try expectEqualStrings("// b", token.slice);
-    // try expectEqualStrings("", text_slice);
-
-    // token = getToken(&text_slice, &in_multiline_comment);
-    // try expect(token.token_type == .Tabs);
-    // try expectEqualStrings("\t\t", token.slice);
-    // try expectEqualStrings("=  =\n", text_slice);
-
-    // token = getToken(&text_slice, &in_multiline_comment);
-    // try expect(token.token_type == .Equals);
-    // try expectEqualStrings("=", token.slice);
-    // try expectEqualStrings("  =\n", text_slice);
-
-    // token = getToken(&text_slice, &in_multiline_comment);
-    // try expect(token.token_type == .Spaces);
-    // try expectEqualStrings("  ", token.slice);
-    // try expectEqualStrings("=\n", text_slice);
-
     // var line_number: i32 = 1;
     // _ = line_number;
 
@@ -159,6 +134,36 @@ test "ast" {
         // node.property = "wow";
         // std.log.warn("node.property: {s}", .{node.property});
         _ = line;
+
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .Tabs);
+        try expectEqualStrings("\t", token.slice);
+        try expectEqualStrings("xy = z/* a b */// c d ", text_slice);
+
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .Word);
+        try expectEqualStrings("xy", token.slice);
+        try expectEqualStrings(" = z/* a b */// c d ", text_slice);
+
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .Spaces);
+        try expectEqualStrings(" ", token.slice);
+        try expectEqualStrings("= z/* a b */// c d ", text_slice);
+
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .Equals);
+        try expectEqualStrings("=", token.slice);
+        try expectEqualStrings(" z/* a b */// c d ", text_slice);
+
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .Spaces);
+        try expectEqualStrings(" ", token.slice);
+        try expectEqualStrings("z/* a b */// c d ", text_slice);
+
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .Word);
+        try expectEqualStrings("z", token.slice);
+        try expectEqualStrings("/* a b */// c d ", text_slice);
 
         token = getToken(&text_slice, &in_multiline_comment);
         try expect(token.token_type == .Comment);
@@ -172,7 +177,6 @@ test "ast" {
 
         std.log.warn("xd", .{});
 
-        // Move "line" along as ptr/slice and add tokens in loop
         // while (true) {
         //     try tokens.append(getToken(&line, line_number));
         // }
@@ -234,6 +238,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                     in_multiline_comment.* = true;
 
                     var i: usize = 2;
+                    // TODO: Either use while-loops or for-loops everywhere in this function
                     while (i < slice.len) : (i += 1) {
                         if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
                             in_multiline_comment.* = false;
@@ -247,8 +252,17 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                     return token;
                 },
                 else => {
-                    const token = Token{ .token_type = .Word, .slice = slice.*[0..] };
-                    slice.* = slice.*[1..];
+                    // A word stops at a space, or the start of a comment
+                    var end_index: usize = 2;
+                    for (slice.*[2..]) |character| {
+                        if (character == ' ' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
+                            break;
+                        }
+                        end_index += 1;
+                    }
+
+                    const token = Token{ .token_type = .Word, .slice = slice.*[0..end_index] };
+                    slice.* = slice.*[end_index..];
                     return token;
                 },
             };
@@ -285,8 +299,17 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             return token;
         },
         else => {
-            const token = Token{ .token_type = .Word, .slice = slice.*[0..] };
-            slice.* = slice.*[1..];
+            // A word stops at a space, or the start of a comment
+            var end_index: usize = 1;
+            for (slice.*[1..]) |character| {
+                if (character == ' ' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
+                    break;
+                }
+                end_index += 1;
+            }
+
+            const token = Token{ .token_type = .Word, .slice = slice.*[0..end_index] };
+            slice.* = slice.*[end_index..];
             return token;
         },
     };
