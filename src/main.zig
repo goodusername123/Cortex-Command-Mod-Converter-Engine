@@ -1,9 +1,9 @@
 const std = @import("std");
 
-const test_allocator = std.testing.allocator;
+// const test_allocator = std.testing.allocator;
 
-const expect = std.testing.expect;
-const expectEqualStrings = std.testing.expectEqualStrings;
+// const expect = std.testing.expect;
+// const expectEqualStrings = std.testing.expectEqualStrings;
 
 /// This .ini input file:
 /// /* foo   */ /* foo2*//*foo3*/
@@ -83,26 +83,9 @@ const Node = struct {
 };
 
 pub fn main() !void {
-    // Prints to stderr (it's a shortcut based on `std.io.getStdErr()`)
-    std.debug.print("All your {s} are belong to us.\n", .{"codebase"});
-
-    // stdout is for the actual output of your application, for example if you
-    // are implementing gzip, then only the compressed bytes should be sent to
-    // stdout, not any debugging messages.
-    const stdout_file = std.io.getStdOut().writer();
-    var bw = std.io.bufferedWriter(stdout_file);
-    const stdout = bw.writer();
-
-    try stdout.print("Run `zig build test` to run the tests.\n", .{});
-
-    try bw.flush(); // don't forget to flush!
-}
-
-test "ast" {
-    // const gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // defer _ = gpa.deinit();
-    // const allocator = &gpa.allocator();
-    // _ = allocator;
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    var allocator = gpa.allocator();
 
     var path_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     const path = try std.fs.realpath("src/test.ini", &path_buf);
@@ -113,26 +96,26 @@ test "ast" {
     var buf_reader = std.io.bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
 
-    var tokens = std.ArrayList(Token).init(test_allocator);
+    var tokens = std.ArrayList(Token).init(allocator);
     defer tokens.deinit();
 
-    var text = try in_stream.readAllAlloc(test_allocator, std.math.maxInt(usize));
-    defer test_allocator.free(text);
+    var text = try in_stream.readAllAlloc(allocator, std.math.maxInt(usize));
+    defer allocator.free(text);
 
     var in_multiline_comment = false;
 
     const NodeList = std.MultiArrayList(Node);
     var nodes = NodeList{};
-    defer nodes.deinit(test_allocator);
+    defer nodes.deinit(allocator);
 
-    var comments = std.ArrayList([]const u8).init(test_allocator);
+    var comments = std.ArrayList([]const u8).init(allocator);
     defer comments.deinit();
 
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
         var line_slice: []const u8 = line;
 
-        std.log.warn("'{s}'", .{line});
+        std.debug.print("'{s}'\n", .{line});
 
         var node = Node{};
 
@@ -148,7 +131,7 @@ test "ast" {
         while (line_slice.len > 0) {
             const token = getToken(&line_slice, &in_multiline_comment);
 
-            std.log.warn("'{s}' {}", .{ token.slice, token.type });
+            std.debug.print("'{s}' {}\n", .{ token.slice, token.type });
 
             if (seen == .Start and token.type == .Sentence) {
                 node.property = token.slice;
@@ -167,90 +150,60 @@ test "ast" {
             if (token.type == .Tabs) {}
         }
 
-        try nodes.append(test_allocator, node);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Tabs);
-        // try expectEqualStrings("\t", token.slice);
-        // try expectEqualStrings("w xy = /v z /* a b */// c d ", line_slice);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Sentence);
-        // try expectEqualStrings("w xy", token.slice);
-        // try expectEqualStrings(" = /v z /* a b */// c d ", line_slice);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Spaces);
-        // try expectEqualStrings(" ", token.slice);
-        // try expectEqualStrings("= /v z /* a b */// c d ", line_slice);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Equals);
-        // try expectEqualStrings("=", token.slice);
-        // try expectEqualStrings(" /v z /* a b */// c d ", line_slice);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Spaces);
-        // try expectEqualStrings(" ", token.slice);
-        // try expectEqualStrings("/v z /* a b */// c d ", line_slice);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Sentence);
-        // try expectEqualStrings("/v z", token.slice);
-        // try expectEqualStrings(" /* a b */// c d ", line_slice);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Spaces);
-        // try expectEqualStrings(" ", token.slice);
-        // try expectEqualStrings("/* a b */// c d ", line_slice);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Comment);
-        // try expectEqualStrings("/* a b */", token.slice);
-        // try expectEqualStrings("// c d ", line_slice);
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Comment);
-        // try expectEqualStrings("// c d ", token.slice);
-        // try expectEqualStrings("", line_slice);
-
-        // std.log.warn("{d}", .{line_slice.len});
-
-        // token = getToken(&line_slice, &in_multiline_comment);
-        // try expect(token.type == .Comment);
-        // try expectEqualStrings("// c d ", token.slice);
-        // try expectEqualStrings("", line_slice);
-
-        // while (true) {
-        //     try tokens.append(getToken(&line_slice, line_number));
-        // }
+        try nodes.append(allocator, node);
     }
+}
 
-    // std.log.warn("{d}", .{line_number});
-    // std.log.warn("{s} '{s}'", .{ @tagName(tokens.items[0].type), tokens.items[0].slice });
+test "ast" {
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Tabs);
+    // try expectEqualStrings("\t", token.slice);
+    // try expectEqualStrings("w xy = /v z /* a b */// c d ", line_slice);
 
-    // std.log.warn("{s}", .{@tagName(tokens.items[1].type)});
-    // std.log.warn("'{s}'", .{tokens.items[1].slice});
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Sentence);
+    // try expectEqualStrings("w xy", token.slice);
+    // try expectEqualStrings(" = /v z /* a b */// c d ", line_slice);
 
-    // const x = tokens.items[0];
-    // _ = x;
-    // const x = tokens.?[0];
-    // std.log.warn("{s}", .{x.slice});
-    // try expect(1 == 2);
-    // try expect(eql(
-    //     []Token,
-    //     tokens.items,
-    //     []Token{{.type = .Sentence, .slice = "xd",}},
-    // ));
-    // try expect(std.meta.eql(
-    //     tokens.items[0],
-    //     Token{ .type = .Sentence, .slice = "AddEffect = MOPixel" },
-    // ));
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Spaces);
+    // try expectEqualStrings(" ", token.slice);
+    // try expectEqualStrings("= /v z /* a b */// c d ", line_slice);
 
-    // const node = Node{
-    //     .property = "a",
-    //     .value = "b",
-    // };
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Equals);
+    // try expectEqualStrings("=", token.slice);
+    // try expectEqualStrings(" /v z /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Spaces);
+    // try expectEqualStrings(" ", token.slice);
+    // try expectEqualStrings("/v z /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Sentence);
+    // try expectEqualStrings("/v z", token.slice);
+    // try expectEqualStrings(" /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Spaces);
+    // try expectEqualStrings(" ", token.slice);
+    // try expectEqualStrings("/* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Comment);
+    // try expectEqualStrings("/* a b */", token.slice);
+    // try expectEqualStrings("// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Comment);
+    // try expectEqualStrings("// c d ", token.slice);
+    // try expectEqualStrings("", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Comment);
+    // try expectEqualStrings("// c d ", token.slice);
+    // try expectEqualStrings("", line_slice);
 }
 
 fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
