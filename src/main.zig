@@ -63,7 +63,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 ///     "foo", "foo2", "foo3", "bar", "baz", "bee"
 /// };
 const Token = struct {
-    token_type: TokenType,
+    type: TokenType,
     slice: []const u8,
 
     const TokenType = enum {
@@ -76,7 +76,7 @@ const Token = struct {
 };
 
 const Node = struct {
-    property: []const u8,
+    property: ?[]const u8 = null,
     value: ?[]const u8 = null,
     comments: ?[][]const u8 = null,
     children: ?[]Node = null,
@@ -120,12 +120,8 @@ test "ast" {
     defer test_allocator.free(text);
 
     var text_slice: []const u8 = text;
-    _ = text_slice;
 
-    var token: Token = undefined;
-    _ = token;
     var in_multiline_comment = false;
-    _ = in_multiline_comment;
 
     const NodeList = std.MultiArrayList(Node);
     var nodes = NodeList{};
@@ -137,58 +133,76 @@ test "ast" {
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
         _ = line;
+        var node = Node{};
 
-        const index = try nodes.addOne(test_allocator);
-        _ = index;
+        const SeenStates = enum {
+            start,
+            property,
+            value,
+        };
 
-        // var node = Node{};
-        // node.property = "wow";
-        // std.log.warn("node.property: {s}", .{node.property});
+        var seen: SeenStates = .start;
+        _ = seen;
 
-        // nodes.append(test_allocator, node);
+        while (text_slice.len > 0) {
+            const token = getToken(&text_slice, &in_multiline_comment);
+
+            if (token.type == .Sentence) {
+                std.log.warn("{s}", .{token.slice});
+            }
+        }
+
+        try nodes.append(test_allocator, node);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Tabs);
+        // try expect(token.type == .Tabs);
         // try expectEqualStrings("\t", token.slice);
         // try expectEqualStrings("w xy = /v z /* a b */// c d ", text_slice);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Sentence);
+        // try expect(token.type == .Sentence);
         // try expectEqualStrings("w xy", token.slice);
         // try expectEqualStrings(" = /v z /* a b */// c d ", text_slice);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Spaces);
+        // try expect(token.type == .Spaces);
         // try expectEqualStrings(" ", token.slice);
         // try expectEqualStrings("= /v z /* a b */// c d ", text_slice);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Equals);
+        // try expect(token.type == .Equals);
         // try expectEqualStrings("=", token.slice);
         // try expectEqualStrings(" /v z /* a b */// c d ", text_slice);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Spaces);
+        // try expect(token.type == .Spaces);
         // try expectEqualStrings(" ", token.slice);
         // try expectEqualStrings("/v z /* a b */// c d ", text_slice);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Sentence);
+        // try expect(token.type == .Sentence);
         // try expectEqualStrings("/v z", token.slice);
         // try expectEqualStrings(" /* a b */// c d ", text_slice);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Spaces);
+        // try expect(token.type == .Spaces);
         // try expectEqualStrings(" ", token.slice);
         // try expectEqualStrings("/* a b */// c d ", text_slice);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Comment);
+        // try expect(token.type == .Comment);
         // try expectEqualStrings("/* a b */", token.slice);
         // try expectEqualStrings("// c d ", text_slice);
 
         // token = getToken(&text_slice, &in_multiline_comment);
-        // try expect(token.token_type == .Comment);
+        // try expect(token.type == .Comment);
+        // try expectEqualStrings("// c d ", token.slice);
+        // try expectEqualStrings("", text_slice);
+
+        // std.log.warn("{d}", .{text_slice.len});
+
+        // token = getToken(&text_slice, &in_multiline_comment);
+        // try expect(token.type == .Comment);
         // try expectEqualStrings("// c d ", token.slice);
         // try expectEqualStrings("", text_slice);
 
@@ -200,9 +214,9 @@ test "ast" {
     }
 
     // std.log.warn("{d}", .{line_number});
-    // std.log.warn("{s} '{s}'", .{ @tagName(tokens.items[0].token_type), tokens.items[0].slice });
+    // std.log.warn("{s} '{s}'", .{ @tagName(tokens.items[0].type), tokens.items[0].slice });
 
-    // std.log.warn("{s}", .{@tagName(tokens.items[1].token_type)});
+    // std.log.warn("{s}", .{@tagName(tokens.items[1].type)});
     // std.log.warn("'{s}'", .{tokens.items[1].slice});
 
     // const x = tokens.items[0];
@@ -213,11 +227,11 @@ test "ast" {
     // try expect(eql(
     //     []Token,
     //     tokens.items,
-    //     []Token{{.token_type = .Sentence, .slice = "xd",}},
+    //     []Token{{.type = .Sentence, .slice = "xd",}},
     // ));
     // try expect(std.meta.eql(
     //     tokens.items[0],
-    //     Token{ .token_type = .Sentence, .slice = "AddEffect = MOPixel" },
+    //     Token{ .type = .Sentence, .slice = "AddEffect = MOPixel" },
     // ));
 
     // const node = Node{
@@ -236,7 +250,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             }
         }
 
-        const token = Token{ .token_type = .Comment, .slice = slice.*[0 .. i + 2] };
+        const token = Token{ .type = .Comment, .slice = slice.*[0 .. i + 2] };
         slice.* = slice.*[i + 2 ..];
         return token;
     }
@@ -245,7 +259,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         '/' => {
             return switch (slice.*[1]) {
                 '/' => {
-                    const token = Token{ .token_type = .Comment, .slice = slice.* };
+                    const token = Token{ .type = .Comment, .slice = slice.* };
                     slice.* = slice.*[slice.len..];
                     return token;
                 },
@@ -262,7 +276,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                         }
                     }
 
-                    const token = Token{ .token_type = .Comment, .slice = slice.*[0..i] };
+                    const token = Token{ .type = .Comment, .slice = slice.*[0..i] };
                     slice.* = slice.*[i..];
                     return token;
                 },
@@ -281,7 +295,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                         }
                     }
 
-                    const token = Token{ .token_type = .Sentence, .slice = slice.*[0..sentence_end_index] };
+                    const token = Token{ .type = .Sentence, .slice = slice.*[0..sentence_end_index] };
                     slice.* = slice.*[sentence_end_index..];
                     return token;
                 },
@@ -296,7 +310,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                 i += 1;
             }
 
-            const token = Token{ .token_type = .Tabs, .slice = slice.*[0..i] };
+            const token = Token{ .type = .Tabs, .slice = slice.*[0..i] };
             slice.* = slice.*[i..];
             return token;
         },
@@ -309,12 +323,12 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                 i += 1;
             }
 
-            const token = Token{ .token_type = .Spaces, .slice = slice.*[0..i] };
+            const token = Token{ .type = .Spaces, .slice = slice.*[0..i] };
             slice.* = slice.*[i..];
             return token;
         },
         '=' => {
-            const token = Token{ .token_type = .Equals, .slice = slice.*[0..1] };
+            const token = Token{ .type = .Equals, .slice = slice.*[0..1] };
             slice.* = slice.*[1..];
             return token;
         },
@@ -333,7 +347,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                 }
             }
 
-            const token = Token{ .token_type = .Sentence, .slice = slice.*[0..sentence_end_index] };
+            const token = Token{ .type = .Sentence, .slice = slice.*[0..sentence_end_index] };
             slice.* = slice.*[sentence_end_index..];
             return token;
         },
