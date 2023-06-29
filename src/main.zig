@@ -63,10 +63,10 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 ///     "foo", "foo2", "foo3", "bar", "baz", "bee"
 /// };
 const Token = struct {
-    type: TokenType,
+    type: Type,
     slice: []const u8,
 
-    const TokenType = enum {
+    const Type = enum {
         Comment,
         Tabs,
         Spaces,
@@ -119,8 +119,6 @@ test "ast" {
     var text = try in_stream.readAllAlloc(test_allocator, std.math.maxInt(usize));
     defer test_allocator.free(text);
 
-    var text_slice: []const u8 = text;
-
     var in_multiline_comment = false;
 
     const NodeList = std.MultiArrayList(Node);
@@ -132,22 +130,26 @@ test "ast" {
 
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
-        _ = line;
+        var line_slice: []const u8 = line;
+
+        std.log.warn("'{s}'", .{line});
+
         var node = Node{};
 
-        const SeenStates = enum {
+        const States = enum {
             Start,
             Property,
             Equals,
             Value,
         };
 
-        var seen: SeenStates = .Start;
+        var seen: States = .Start;
 
-        while (text_slice.len > 0) {
-            const token = getToken(&text_slice, &in_multiline_comment);
+        while (line_slice.len > 0) {
+            const token = getToken(&line_slice, &in_multiline_comment);
 
-            // std.log.warn("{s}", .{token.slice});
+            std.log.warn("'{s}' {}", .{ token.slice, token.type });
+
             if (seen == .Start and token.type == .Sentence) {
                 node.property = token.slice;
                 seen = .Property;
@@ -167,62 +169,60 @@ test "ast" {
 
         try nodes.append(test_allocator, node);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Tabs);
         // try expectEqualStrings("\t", token.slice);
-        // try expectEqualStrings("w xy = /v z /* a b */// c d ", text_slice);
+        // try expectEqualStrings("w xy = /v z /* a b */// c d ", line_slice);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Sentence);
         // try expectEqualStrings("w xy", token.slice);
-        // try expectEqualStrings(" = /v z /* a b */// c d ", text_slice);
+        // try expectEqualStrings(" = /v z /* a b */// c d ", line_slice);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Spaces);
         // try expectEqualStrings(" ", token.slice);
-        // try expectEqualStrings("= /v z /* a b */// c d ", text_slice);
+        // try expectEqualStrings("= /v z /* a b */// c d ", line_slice);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Equals);
         // try expectEqualStrings("=", token.slice);
-        // try expectEqualStrings(" /v z /* a b */// c d ", text_slice);
+        // try expectEqualStrings(" /v z /* a b */// c d ", line_slice);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Spaces);
         // try expectEqualStrings(" ", token.slice);
-        // try expectEqualStrings("/v z /* a b */// c d ", text_slice);
+        // try expectEqualStrings("/v z /* a b */// c d ", line_slice);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Sentence);
         // try expectEqualStrings("/v z", token.slice);
-        // try expectEqualStrings(" /* a b */// c d ", text_slice);
+        // try expectEqualStrings(" /* a b */// c d ", line_slice);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Spaces);
         // try expectEqualStrings(" ", token.slice);
-        // try expectEqualStrings("/* a b */// c d ", text_slice);
+        // try expectEqualStrings("/* a b */// c d ", line_slice);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Comment);
         // try expectEqualStrings("/* a b */", token.slice);
-        // try expectEqualStrings("// c d ", text_slice);
+        // try expectEqualStrings("// c d ", line_slice);
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Comment);
         // try expectEqualStrings("// c d ", token.slice);
-        // try expectEqualStrings("", text_slice);
+        // try expectEqualStrings("", line_slice);
 
-        // std.log.warn("{d}", .{text_slice.len});
+        // std.log.warn("{d}", .{line_slice.len});
 
-        // token = getToken(&text_slice, &in_multiline_comment);
+        // token = getToken(&line_slice, &in_multiline_comment);
         // try expect(token.type == .Comment);
         // try expectEqualStrings("// c d ", token.slice);
-        // try expectEqualStrings("", text_slice);
-
-        std.log.warn("xd", .{});
+        // try expectEqualStrings("", line_slice);
 
         // while (true) {
-        //     try tokens.append(getToken(&line, line_number));
+        //     try tokens.append(getToken(&line_slice, line_number));
         // }
     }
 
