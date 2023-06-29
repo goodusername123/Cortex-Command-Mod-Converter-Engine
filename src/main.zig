@@ -40,7 +40,7 @@ const test_allocator = std.testing.allocator;
 /// The actual way it is stored tries to use very few memory allocations:
 ///
 /// // Not using ArrayList, since we don't want padding
-/// nodes: MultiArrayList(AST) = {
+/// nodes: MultiArrayList(Node) = {
 ///     {
 ///         .property = "DataModule",
 ///         .comments = { "foo", "foo2", "foo3" },
@@ -58,33 +58,31 @@ const test_allocator = std.testing.allocator;
 ///     }
 /// };
 ///
-/// // The node at index 0 owns index 0, 1 and 2
+/// // The Node at index 0 owns index 0, 1 and 2
 /// comments: ArrayList([]const u8) = {
 ///     "foo", "foo2", "foo3", "bar", "baz", "bee"
 /// };
-
-// TODO: Try nesting this enum inside of the Token struct
-const TokenType = enum {
-    // TODO: Maybe merge these as "Comment"
-    SingleComment,
-    MultiComment,
-
-    Tabs,
-    Spaces,
-    Equals,
-    Word,
-};
-
 const Token = struct {
     token_type: TokenType,
     slice: []const u8,
+
+    const TokenType = enum {
+        // TODO: Maybe merge these as "Comment"
+        SingleComment,
+        MultiComment,
+
+        Tabs,
+        Spaces,
+        Equals,
+        Word,
+    };
 };
 
-const AST = struct {
+const Node = struct {
     property: []const u8,
     value: []const u8 = null,
     comments: ?[][]const u8 = null,
-    children: ?[]AST = null,
+    children: ?[]Node = null,
 };
 
 pub fn main() !void {
@@ -160,9 +158,9 @@ test "ast" {
 
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
-        var ast = AST{};
-        // ast.property = "wow";
-        std.log.warn("ast.property: {s}", .{ast.property});
+        // var node = Node{};
+        // node.property = "wow";
+        // std.log.warn("node.property: {s}", .{node.property});
         _ = line;
 
         token = getToken(&text_slice, &in_multiline_comment);
@@ -206,7 +204,7 @@ test "ast" {
     //     Token{ .token_type = .Word, .slice = "AddEffect = MOPixel" },
     // ));
 
-    // const ast = AST{
+    // const node = Node{
     //     .property = "a",
     //     .value = "b",
     // };
