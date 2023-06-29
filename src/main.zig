@@ -20,18 +20,18 @@ const test_allocator = std.testing.allocator;
 /// That output file is stored roughly like so:
 /// {
 ///     {
-///         .property = "DataModule",
-///         .comments = { "foo", "foo2", "foo3" },
+///         .property = "DataModule";
+///         .comments = { "foo", "foo2", "foo3" };
 ///         .children = {
 ///             {
-///                 .property = "Description",
-///                 .value = "Epic",
-///                 .comments = { "bar", "baz" }
+///                 .property = "Description";
+///                 .value = "Epic";
+///                 .comments = { "bar", "baz" };
 ///             },
 ///             {
-///                 .property = "SupportedGameVersion",
-///                 .value = "Pre4",
-///                 .comments = { "bee" }
+///                 .property = "SupportedGameVersion";
+///                 .value = "Pre4";
+///                 .comments = { "bee" };
 ///             }
 ///         }
 ///     }
@@ -42,19 +42,19 @@ const test_allocator = std.testing.allocator;
 /// // Not using ArrayList, since we don't want padding
 /// nodes: MultiArrayList(Node) = {
 ///     {
-///         .property = "DataModule",
-///         .comments = { "foo", "foo2", "foo3" },
-///         .children = { nodes 1 and 2 }
+///         .property = slice of Sentence "DataModule";
+///         .comments = slice of Comments "foo", "foo2", "foo3";
+///         .children = slice of Nodes 1 and 2;
 ///     },
 ///     {
-///         .property = "Description",
-///         .value = "Epic",
-///         .comments = { "bar", "baz" }
+///         .property = slice of Sentence "Description";
+///         .value = slice of Sentence "Epic";
+///         .comments = slice of Comments "bar", "baz";
 ///     },
 ///     {
-///         .property = "SupportedGameVersion",
-///         .value = "Pre4",
-///         .comments = { "bee" }
+///         .property = slice of Sentence "SupportedGameVersion";
+///         .value = slice of Sentence "Pre4";
+///         .comments = slice of Comment "bee";
 ///     }
 /// };
 ///
@@ -71,7 +71,7 @@ const Token = struct {
         Tabs,
         Spaces,
         Equals,
-        Word,
+        Sentence,
     };
 };
 
@@ -99,11 +99,10 @@ pub fn main() !void {
 }
 
 test "ast" {
-    // TODO: Try making gpa const
-    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    // const gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    // defer _ = gpa.deinit();
     // const allocator = &gpa.allocator();
     // _ = allocator;
-    // defer _ = gpa.deinit();
 
     var path_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     const path = try std.fs.realpath("src/test.ini", &path_buf);
@@ -125,8 +124,8 @@ test "ast" {
     var token: Token = undefined;
     var in_multiline_comment = false;
 
-    // var line_number: i32 = 1;
-    // _ = line_number;
+    // const nodes: std.MultiArrayList(Node) = {};
+    // _ = nodes;
 
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
@@ -138,31 +137,36 @@ test "ast" {
         token = getToken(&text_slice, &in_multiline_comment);
         try expect(token.token_type == .Tabs);
         try expectEqualStrings("\t", token.slice);
-        try expectEqualStrings("xy = z/* a b */// c d ", text_slice);
+        try expectEqualStrings("w xy = /v z /* a b */// c d ", text_slice);
 
         token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Word);
-        try expectEqualStrings("xy", token.slice);
-        try expectEqualStrings(" = z/* a b */// c d ", text_slice);
+        try expect(token.token_type == .Sentence);
+        try expectEqualStrings("w xy", token.slice);
+        try expectEqualStrings(" = /v z /* a b */// c d ", text_slice);
 
         token = getToken(&text_slice, &in_multiline_comment);
         try expect(token.token_type == .Spaces);
         try expectEqualStrings(" ", token.slice);
-        try expectEqualStrings("= z/* a b */// c d ", text_slice);
+        try expectEqualStrings("= /v z /* a b */// c d ", text_slice);
 
         token = getToken(&text_slice, &in_multiline_comment);
         try expect(token.token_type == .Equals);
         try expectEqualStrings("=", token.slice);
-        try expectEqualStrings(" z/* a b */// c d ", text_slice);
+        try expectEqualStrings(" /v z /* a b */// c d ", text_slice);
 
         token = getToken(&text_slice, &in_multiline_comment);
         try expect(token.token_type == .Spaces);
         try expectEqualStrings(" ", token.slice);
-        try expectEqualStrings("z/* a b */// c d ", text_slice);
+        try expectEqualStrings("/v z /* a b */// c d ", text_slice);
 
         token = getToken(&text_slice, &in_multiline_comment);
-        try expect(token.token_type == .Word);
-        try expectEqualStrings("z", token.slice);
+        try expect(token.token_type == .Sentence);
+        try expectEqualStrings("/v z", token.slice);
+        try expectEqualStrings(" /* a b */// c d ", text_slice);
+
+        token = getToken(&text_slice, &in_multiline_comment);
+        try expect(token.token_type == .Spaces);
+        try expectEqualStrings(" ", token.slice);
         try expectEqualStrings("/* a b */// c d ", text_slice);
 
         token = getToken(&text_slice, &in_multiline_comment);
@@ -180,8 +184,6 @@ test "ast" {
         // while (true) {
         //     try tokens.append(getToken(&line, line_number));
         // }
-
-        // line_number += 1;
     }
 
     // std.log.warn("{d}", .{line_number});
@@ -198,11 +200,11 @@ test "ast" {
     // try expect(eql(
     //     []Token,
     //     tokens.items,
-    //     []Token{{.token_type = .Word, .slice = "xd",}},
+    //     []Token{{.token_type = .Sentence, .slice = "xd",}},
     // ));
     // try expect(std.meta.eql(
     //     tokens.items[0],
-    //     Token{ .token_type = .Word, .slice = "AddEffect = MOPixel" },
+    //     Token{ .token_type = .Sentence, .slice = "AddEffect = MOPixel" },
     // ));
 
     // const node = Node{
@@ -252,17 +254,22 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                     return token;
                 },
                 else => {
-                    // A word stops at a space, or the start of a comment
+                    // std.log.warn("foo", .{});
+
+                    // A Sentence ends with a word, or the start of a comment
                     var end_index: usize = 2;
-                    for (slice.*[2..]) |character| {
-                        if (character == ' ' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
+                    var sentence_end_index: usize = end_index;
+                    while (end_index < slice.len) : (end_index += 1) {
+                        if (slice.*[end_index] == '=' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
                             break;
                         }
-                        end_index += 1;
+                        if (slice.*[end_index] != ' ') {
+                            sentence_end_index = end_index + 1;
+                        }
                     }
 
-                    const token = Token{ .token_type = .Word, .slice = slice.*[0..end_index] };
-                    slice.* = slice.*[end_index..];
+                    const token = Token{ .token_type = .Sentence, .slice = slice.*[0..sentence_end_index] };
+                    slice.* = slice.*[sentence_end_index..];
                     return token;
                 },
             };
@@ -299,17 +306,22 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             return token;
         },
         else => {
-            // A word stops at a space, or the start of a comment
+            // std.log.warn("bar", .{});
+
+            // A Sentence ends with a word, or the start of a comment
             var end_index: usize = 1;
-            for (slice.*[1..]) |character| {
-                if (character == ' ' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
+            var sentence_end_index: usize = end_index;
+            while (end_index < slice.len) : (end_index += 1) {
+                if (slice.*[end_index] == '=' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
                     break;
                 }
-                end_index += 1;
+                if (slice.*[end_index] != ' ') {
+                    sentence_end_index = end_index + 1;
+                }
             }
 
-            const token = Token{ .token_type = .Word, .slice = slice.*[0..end_index] };
-            slice.* = slice.*[end_index..];
+            const token = Token{ .token_type = .Sentence, .slice = slice.*[0..sentence_end_index] };
+            slice.* = slice.*[sentence_end_index..];
             return token;
         },
     };
