@@ -98,7 +98,7 @@ const Token = struct {
 const Node = struct {
     property: ?[]const u8 = null,
     value: ?[]const u8 = null,
-    comments: ?[][]const u8 = null,
+    comments: std.ArrayList([]const u8),
     children: ?[]Node = null,
 };
 
@@ -128,16 +128,15 @@ pub fn main() !void {
     var nodes = NodeList{};
     defer nodes.deinit(allocator);
 
-    // var comments = std.ArrayList([]const u8).init(allocator);
-    // defer comments.deinit();
-
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
-        var line_slice: []const u8 = line;
-
         // std.debug.print("'{s}'\n", .{line});
 
-        var node = Node{};
+        var line_slice: []const u8 = line;
+
+        var node = Node{
+            .comments = std.ArrayList([]const u8).init(allocator),
+        };
 
         const States = enum {
             Start,
