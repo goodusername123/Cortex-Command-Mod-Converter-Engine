@@ -103,9 +103,9 @@ const Node = struct {
 };
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    defer _ = gpa.deinit();
-    var allocator = gpa.allocator();
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
 
     var path_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
     const path = try std.fs.realpath("src/test.ini", &path_buf);
