@@ -6,32 +6,46 @@ const std = @import("std");
 // const expectEqualStrings = std.testing.expectEqualStrings;
 
 /// This .ini input file:
-/// /* foo   */ /* foo2*//*foo3*/
+/// /* foo1   */ /* foo2*//*foo3*/
 /// DataModule
-/// \t/* bar */Description      = Epic /* baz
-/// bee */\tSupportedGameVersion = Pre4
+/// \tSupportedGameVersion = Pre4
+/// \t/* bar */IconFile      = ContentFile /* baz
+/// bee */\t\tFilePath=foo.png
+/// \tDescription = lol
 ///
 /// Turns into this .ini output file:
-/// // foo foo2 foo3
+/// // foo1 foo2 foo3
 /// DataModule
-/// \tDescription = Epic // bar baz
-/// \tSupportedGameVersion = Pre4 // bee
+/// \tSupportedGameVersion = Pre4
+/// \tIconFile = ContentFile // bar baz
+/// \t\tFilePath = foo.png // bee
+/// \tDescription = lol
 ///
 /// That output file is stored roughly like so:
 /// {
 ///     {
+///         .comments = { "foo1", "foo2", "foo3" };
+///     },
+///     {
 ///         .property = "DataModule";
-///         .comments = { "foo", "foo2", "foo3" };
 ///         .children = {
-///             {
-///                 .property = "Description";
-///                 .value = "Epic";
-///                 .comments = { "bar", "baz" };
-///             },
 ///             {
 ///                 .property = "SupportedGameVersion";
 ///                 .value = "Pre4";
-///                 .comments = { "bee" };
+///             },
+///             {
+///                 .property = "IconFile";
+///                 .value = "ContentFile";
+///                 .comments = { "bar", "baz" };
+///                 .children = {
+///                     .property = "FilePath";
+///                     .value = "foo.png";
+///                     .comments = { "bee" };
+///                 }
+///             },
+///             {
+///                 .property = "Description";
+///                 .value = "lol";
 ///             }
 ///         }
 ///     }
@@ -42,25 +56,48 @@ const std = @import("std");
 /// // Not using ArrayList, since we don't want padding
 /// nodes: MultiArrayList(Node) = {
 ///     {
-///         .property = slice of Sentence "DataModule";
-///         .comments = slice of Comments "foo", "foo2", "foo3";
-///         .children = slice of Nodes 1 and 2;
+///         .comments = slice of Comments "foo1", "foo2", "foo3" from comments;
 ///     },
 ///     {
-///         .property = slice of Sentence "Description";
-///         .value = slice of Sentence "Epic";
-///         .comments = slice of Comments "bar", "baz";
+///         .property = slice of Sentence "DataModule";
+///         .children = slice of child Node indices 2, 3 and 5 from childIndices;
 ///     },
 ///     {
 ///         .property = slice of Sentence "SupportedGameVersion";
 ///         .value = slice of Sentence "Pre4";
-///         .comments = slice of Comment "bee";
+///     },
+///     {
+///         .property = slice of Sentence "IconFile";
+///         .value = slice of Sentence "ContentFile";
+///         .comments = slice of Comments "bar" and "baz" from comments;
+///         .children = slice of child Node index 4 from childIndices;
+///     },
+///     {
+///         .property = slice of Sentence "FilePath";
+///         .value = slice of Sentence "foo.png";
+///         .comments = slice of Comment "bee" from comments;
+///     },
+///     {
+///         .property = slice of Sentence "Description";
+///         .value = slice of Sentence "lol";
 ///     }
 /// };
 ///
-/// // The Node at index 0 owns index 0, 1 and 2
+/// // The Node at index 0 owns indices 0, 1 and 2
 /// comments: ArrayList([]const u8) = {
-///     "foo", "foo2", "foo3", "bar", "baz", "bee"
+///     "foo1", "foo2", "foo3", "bar", "baz", "bee"
+/// };
+///
+/// // The Node at index 1 owns the values 2, 3 and 5
+/// childIndices: ArrayList(u32) = {
+///     2, 3, 5, 4
+/// };
+///
+/// // The Node at index 1 owns the value 3
+/// // This array is created by looping over all of the file's text,
+/// // and having an ArrayList stack of the line numbers who own which indentation depth
+/// childIndexCounts: ArrayList(u32) = {
+///     0, 3, 0, 1, 0, 0
 /// };
 const Token = struct {
     type: Type,
