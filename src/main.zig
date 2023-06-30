@@ -1,7 +1,18 @@
 const std = @import("std");
-
+const ArrayList = std.ArrayList;
+const ArenaAllocator = std.heap.ArenaAllocator;
+const page_allocator = std.heap.page_allocator;
+const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
+const realpath = std.fs.realpath;
+const openFileAbsolute = std.fs.openFileAbsolute;
+const bufferedReader = std.io.bufferedReader;
+const maxInt = std.math.maxInt;
+const MultiArrayList = std.MultiArrayList;
+const Allocator = std.mem.Allocator;
+const trim = std.mem.trim;
+const replacementSize = std.mem.replacementSize;
+const replace = std.mem.replace;
 // const test_allocator = std.testing.allocator;
-
 // const expect = std.testing.expect;
 // const expectEqualStrings = std.testing.expectEqualStrings;
 
@@ -87,10 +98,12 @@ const Token = struct {
     slice: []const u8,
 
     const Type = enum {
-        Comment,
+        SingleComment,
+        MultiComment,
         Tabs,
         Spaces,
         Equals,
+        Newline,
         Sentence,
     };
 };
@@ -98,98 +111,66 @@ const Token = struct {
 const Node = struct {
     property: ?[]const u8 = null,
     value: ?[]const u8 = null,
-    comments: std.ArrayList([]const u8),
-    children: std.ArrayList(*Node),
+    comments: ArrayList([]const u8),
+    children: ArrayList(Node),
 };
 
 pub fn main() !void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var path_buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
-    const path = try std.fs.realpath("src/test.ini", &path_buf);
+    var path_buf: [MAX_PATH_BYTES]u8 = undefined;
+    const path = try realpath("src/test.ini", &path_buf);
 
-    var file = try std.fs.openFileAbsolute(path, .{});
+    var file = try openFileAbsolute(path, .{});
     defer file.close();
 
-    var buf_reader = std.io.bufferedReader(file.reader());
+    var buf_reader = bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
 
-    var text = try in_stream.readAllAlloc(allocator, std.math.maxInt(usize));
+    const text = try in_stream.readAllAlloc(allocator, maxInt(usize));
     defer allocator.free(text);
 
     var in_multiline_comment = false;
 
-    const NodeList = std.MultiArrayList(Node);
+    const NodeList = MultiArrayList(Node);
     var nodes = NodeList{};
     defer nodes.deinit(allocator);
 
-    var lines = std.mem.split(u8, text, "\n");
-    while (lines.next()) |line| {
-        // std.debug.print("'{s}'\n", .{line});
+    // Replace CRLF with LF
+    // CRLF is the default for .ini files on Windows
+    const replacement_size = replacementSize(u8, text, "\r\n", "\n");
+    var lf_text = try allocator.alloc(u8, replacement_size);
+    defer allocator.free(lf_text);
+    _ = replace(u8, text, "\r\n", "\n", lf_text);
 
-        var line_slice: []const u8 = line;
+    var slice: []const u8 = lf_text;
 
-        var node = Node{
-            .comments = std.ArrayList([]const u8).init(allocator),
-            .children = std.ArrayList(*Node).init(allocator),
-        };
+    var ast = try get_ast(&slice, &in_multiline_comment, -1, &allocator);
 
-        const States = enum {
-            Start,
-            Property,
-            Equals,
-            Value,
-        };
-
-        var seen: States = .Start;
-
-        while (line_slice.len > 0) {
-            const token = getToken(&line_slice, &in_multiline_comment);
-
-            std.debug.print("'{s}' {}\n", .{ token.slice, token.type });
-
-            if (seen == .Start and token.type == .Sentence) {
-                node.property = token.slice;
-                seen = .Property;
-            }
-            if (seen == .Property and token.type == .Equals) {
-                seen = .Equals;
-            }
-            if (seen == .Equals and token.type == .Sentence) {
-                node.value = token.slice;
-                seen = .Value;
-            }
-            if (token.type == .Comment) {
-                try node.comments.append(token.slice);
-            }
-            if (token.type == .Tabs) {}
-        }
-
-        try nodes.append(allocator, node);
-    }
+    std.debug.print("{}\n", .{ast});
 
     // Print nodes
-    {
-        std.debug.print("Node count: {}\n", .{nodes.len});
+    // {
+    //     std.debug.print("Node count: {}\n", .{nodes.len});
 
-        var nodeIndex: usize = 0;
-        while (nodeIndex < nodes.len) : (nodeIndex += 1) {
-            const node = nodes.get(nodeIndex);
+    //     var nodeIndex: usize = 0;
+    //     while (nodeIndex < nodes.len) : (nodeIndex += 1) {
+    //         const node = nodes.get(nodeIndex);
 
-            // std.debug.print("{}\n", .{node});
-            std.debug.print("Property = '{?s}'\n", .{node.property});
-            std.debug.print("Value = '{?s}'\n", .{node.value});
+    //         // std.debug.print("{}\n", .{node});
+    //         std.debug.print("Property = '{?s}'\n", .{node.property});
+    //         std.debug.print("Value = '{?s}'\n", .{node.value});
 
-            var commentIndex: usize = 0;
-            while (commentIndex < node.comments.items.len) : (commentIndex += 1) {
-                std.debug.print("Comment [{d}] = '{s}'\n", .{ commentIndex, node.comments.items[commentIndex] });
-            }
+    //         var commentIndex: usize = 0;
+    //         while (commentIndex < node.comments.items.len) : (commentIndex += 1) {
+    //             std.debug.print("Comment [{d}] = '{d}'\n", .{ commentIndex, node.comments.items[commentIndex] });
+    //         }
 
-            std.debug.print("Child count: {}\n", .{node.children.items.len});
-        }
-    }
+    //         std.debug.print("Child count: {}\n", .{node.children.items.len});
+    //     }
+    // }
 
     // Print comments
     // std.debug.print("{}\n", .{comments});
@@ -200,56 +181,49 @@ pub fn main() !void {
     // }
 }
 
-test "ast" {
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Tabs);
-    // try expectEqualStrings("\t", token.slice);
-    // try expectEqualStrings("w xy = /v z /* a b */// c d ", line_slice);
+fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocator: *Allocator) !Node {
+    const States = enum {
+        Start,
+        Property,
+        Equals,
+        Value,
+    };
 
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Sentence);
-    // try expectEqualStrings("w xy", token.slice);
-    // try expectEqualStrings(" = /v z /* a b */// c d ", line_slice);
+    var seen: States = .Start;
 
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Spaces);
-    // try expectEqualStrings(" ", token.slice);
-    // try expectEqualStrings("= /v z /* a b */// c d ", line_slice);
+    var node = Node{
+        .comments = ArrayList([]const u8).init(allocator.*),
+        .children = ArrayList(Node).init(allocator.*),
+    };
 
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Equals);
-    // try expectEqualStrings("=", token.slice);
-    // try expectEqualStrings(" /v z /* a b */// c d ", line_slice);
+    while (slice.len > 0) {
+        const token = getToken(slice, in_multiline_comment);
 
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Spaces);
-    // try expectEqualStrings(" ", token.slice);
-    // try expectEqualStrings("/v z /* a b */// c d ", line_slice);
+        std.debug.print("'{s}' {}\n", .{ token.slice, token.type });
 
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Sentence);
-    // try expectEqualStrings("/v z", token.slice);
-    // try expectEqualStrings(" /* a b */// c d ", line_slice);
+        if (seen == .Start and token.type == .Sentence) {
+            node.property = token.slice;
+            seen = .Property;
+        } else if (seen == .Start and token.type == .Tabs) {
+            if (token.slice.len > depth) {
+                const child_node = try get_ast(slice, in_multiline_comment, depth + 1, allocator);
+                try node.children.append(child_node);
+            }
+        } else if (seen == .Property and token.type == .Equals) {
+            seen = .Equals;
+        } else if (seen == .Equals and token.type == .Sentence) {
+            node.value = token.slice;
+            seen = .Value;
+        } else if (token.type == .SingleComment) {
+            try node.comments.append(trim(u8, token.slice[2 .. token.slice.len - 2], " "));
+        } else if (token.type == .MultiComment) {
+            try node.comments.append(trim(u8, token.slice[2..], " "));
+        } else if (token.type == .Spaces) {} else {
+            unreachable;
+        }
+    }
 
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Spaces);
-    // try expectEqualStrings(" ", token.slice);
-    // try expectEqualStrings("/* a b */// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Comment);
-    // try expectEqualStrings("/* a b */", token.slice);
-    // try expectEqualStrings("// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Comment);
-    // try expectEqualStrings("// c d ", token.slice);
-    // try expectEqualStrings("", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Comment);
-    // try expectEqualStrings("// c d ", token.slice);
-    // try expectEqualStrings("", line_slice);
+    return node;
 }
 
 fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
@@ -262,7 +236,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             }
         }
 
-        const token = Token{ .type = .Comment, .slice = slice.*[0 .. i + 2] };
+        const token = Token{ .type = .MultiComment, .slice = slice.*[0 .. i + 2] };
         slice.* = slice.*[i + 2 ..];
         return token;
     }
@@ -271,7 +245,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         '/' => {
             return switch (slice.*[1]) {
                 '/' => {
-                    const token = Token{ .type = .Comment, .slice = slice.* };
+                    const token = Token{ .type = .SingleComment, .slice = slice.* };
                     slice.* = slice.*[slice.len..];
                     return token;
                 },
@@ -288,7 +262,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                         }
                     }
 
-                    const token = Token{ .type = .Comment, .slice = slice.*[0..i] };
+                    const token = Token{ .type = .MultiComment, .slice = slice.*[0..i] };
                     slice.* = slice.*[i..];
                     return token;
                 },
@@ -341,6 +315,13 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         },
         '=' => {
             const token = Token{ .type = .Equals, .slice = slice.*[0..1] };
+            // TODO: Check what happens if a line ends with an =, since I don't know if slice ends with '\0'
+            // TODO: The same question goes for the comment parsing code that reads 2 characters
+            slice.* = slice.*[1..];
+            return token;
+        },
+        '\n' => {
+            const token = Token{ .type = .Newline, .slice = slice.*[0..1] };
             slice.* = slice.*[1..];
             return token;
         },
@@ -364,4 +345,58 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             return token;
         },
     };
+}
+
+test "ast" {
+    // TODO: Use test_allocator
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Tabs);
+    // try expectEqualStrings("\t", token.slice);
+    // try expectEqualStrings("w xy = /v z /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Sentence);
+    // try expectEqualStrings("w xy", token.slice);
+    // try expectEqualStrings(" = /v z /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Spaces);
+    // try expectEqualStrings(" ", token.slice);
+    // try expectEqualStrings("= /v z /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Equals);
+    // try expectEqualStrings("=", token.slice);
+    // try expectEqualStrings(" /v z /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Spaces);
+    // try expectEqualStrings(" ", token.slice);
+    // try expectEqualStrings("/v z /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Sentence);
+    // try expectEqualStrings("/v z", token.slice);
+    // try expectEqualStrings(" /* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .Spaces);
+    // try expectEqualStrings(" ", token.slice);
+    // try expectEqualStrings("/* a b */// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .MultiComment);
+    // try expectEqualStrings("/* a b */", token.slice);
+    // try expectEqualStrings("// c d ", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .SingleComment);
+    // try expectEqualStrings("// c d ", token.slice);
+    // try expectEqualStrings("", line_slice);
+
+    // token = getToken(&line_slice, &in_multiline_comment);
+    // try expect(token.type == .SingleComment);
+    // try expectEqualStrings("// c d ", token.slice);
+    // try expectEqualStrings("", line_slice);
 }
