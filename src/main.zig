@@ -51,53 +51,36 @@ const std = @import("std");
 ///     }
 /// }
 ///
-/// The actual way it is stored tries to use very few memory allocations:
+/// This is how it is actually stored:
 ///
 /// // Not using ArrayList, since we don't want padding
 /// nodes: MultiArrayList(Node) = {
 ///     {
-///         .comments = slice of Comments "foo1", "foo2", "foo3" from comments;
+///         .comments = "foo1", "foo2", "foo3";
 ///     },
 ///     {
-///         .property = slice of Sentence "DataModule";
-///         .children = slice of child Node indices 2, 3 and 5 from childIndices;
+///         .property = "DataModule";
+///         .children = 2, 3 and 5;
 ///     },
 ///     {
-///         .property = slice of Sentence "SupportedGameVersion";
-///         .value = slice of Sentence "Pre4";
+///         .property = "SupportedGameVersion";
+///         .value = "Pre4";
 ///     },
 ///     {
-///         .property = slice of Sentence "IconFile";
-///         .value = slice of Sentence "ContentFile";
-///         .comments = slice of Comments "bar" and "baz" from comments;
-///         .children = slice of child Node index 4 from childIndices;
+///         .property = "IconFile";
+///         .value = "ContentFile";
+///         .comments = "bar" and "baz";
+///         .children = 4;
 ///     },
 ///     {
-///         .property = slice of Sentence "FilePath";
-///         .value = slice of Sentence "foo.png";
-///         .comments = slice of Comment "bee" from comments;
+///         .property = "FilePath";
+///         .value = "foo.png";
+///         .comments = "bee";
 ///     },
 ///     {
-///         .property = slice of Sentence "Description";
-///         .value = slice of Sentence "lol";
+///         .property = "Description";
+///         .value = "lol";
 ///     }
-/// };
-///
-/// // The Node at index 0 owns indices 0, 1 and 2
-/// comments: ArrayList([]const u8) = {
-///     "foo1", "foo2", "foo3", "bar", "baz", "bee"
-/// };
-///
-/// // The Node at index 1 owns the values 2, 3 and 5
-/// childIndices: ArrayList(u32) = {
-///     2, 3, 5, 4
-/// };
-///
-/// // The Node at index 1 owns the value 3
-/// // This array is created by looping over all of the file's text,
-/// // and having an ArrayList stack of the line numbers who own which indentation depth
-/// childIndexCounts: ArrayList(u32) = {
-///     0, 3, 0, 1, 0, 0
 /// };
 const Token = struct {
     type: Type,
@@ -145,8 +128,8 @@ pub fn main() !void {
     var nodes = NodeList{};
     defer nodes.deinit(allocator);
 
-    var comments = std.ArrayList([]const u8).init(allocator);
-    defer comments.deinit();
+    // var comments = std.ArrayList([]const u8).init(allocator);
+    // defer comments.deinit();
 
     var lines = std.mem.split(u8, text, "\n");
     while (lines.next()) |line| {
@@ -182,7 +165,7 @@ pub fn main() !void {
                 seen = .Value;
             }
             if (token.type == .Comment) {
-                try comments.append(token.slice);
+                // try comments.append(token.slice);
             }
             if (token.type == .Tabs) {}
         }
@@ -201,12 +184,12 @@ pub fn main() !void {
     }
 
     // Print comments
-    std.debug.print("{}\n", .{comments});
-    var i: usize = 0;
-    while (i < comments.items.len) : (i += 1) {
-        const comment = comments.items[i];
-        std.debug.print("'{s}'\n", .{comment});
-    }
+    // std.debug.print("{}\n", .{comments});
+    // var i: usize = 0;
+    // while (i < comments.items.len) : (i += 1) {
+    //     const comment = comments.items[i];
+    //     std.debug.print("'{s}'\n", .{comment});
+    // }
 }
 
 test "ast" {
