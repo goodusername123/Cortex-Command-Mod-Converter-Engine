@@ -115,7 +115,7 @@ pub fn main() !void {
     while (lines.next()) |line| {
         var line_slice: []const u8 = line;
 
-        std.debug.print("'{s}'\n", .{line});
+        // std.debug.print("'{s}'\n", .{line});
 
         var node = Node{};
 
@@ -151,6 +151,24 @@ pub fn main() !void {
         }
 
         try nodes.append(allocator, node);
+    }
+
+    // Print nodes
+    {
+        std.debug.print("{}\n", .{nodes});
+        var i: usize = 0;
+        while (i < nodes.len) : (i += 1) {
+            const node = nodes.get(i);
+            std.debug.print("{}\n", .{node});
+        }
+    }
+
+    // Print comments
+    std.debug.print("{}\n", .{comments});
+    var i: usize = 0;
+    while (i < comments.items.len) : (i += 1) {
+        const comment = comments.items[i];
+        std.debug.print("'{s}'\n", .{comment});
     }
 }
 
