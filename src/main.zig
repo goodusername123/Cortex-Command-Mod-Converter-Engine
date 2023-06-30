@@ -99,7 +99,7 @@ const Node = struct {
     property: ?[]const u8 = null,
     value: ?[]const u8 = null,
     comments: std.ArrayList([]const u8),
-    children: ?[]Node = null,
+    children: std.ArrayList(*Node),
 };
 
 pub fn main() !void {
@@ -115,9 +115,6 @@ pub fn main() !void {
 
     var buf_reader = std.io.bufferedReader(file.reader());
     var in_stream = buf_reader.reader();
-
-    var tokens = std.ArrayList(Token).init(allocator);
-    defer tokens.deinit();
 
     var text = try in_stream.readAllAlloc(allocator, std.math.maxInt(usize));
     defer allocator.free(text);
@@ -136,6 +133,7 @@ pub fn main() !void {
 
         var node = Node{
             .comments = std.ArrayList([]const u8).init(allocator),
+            .children = std.ArrayList(*Node).init(allocator),
         };
 
         const States = enum {
@@ -164,7 +162,7 @@ pub fn main() !void {
                 seen = .Value;
             }
             if (token.type == .Comment) {
-                // try comments.append(token.slice);
+                try node.comments.append(token.slice);
             }
             if (token.type == .Tabs) {}
         }
@@ -174,11 +172,22 @@ pub fn main() !void {
 
     // Print nodes
     {
-        std.debug.print("{}\n", .{nodes});
-        var i: usize = 0;
-        while (i < nodes.len) : (i += 1) {
-            const node = nodes.get(i);
-            std.debug.print("{}\n", .{node});
+        std.debug.print("Node count: {}\n", .{nodes.len});
+
+        var nodeIndex: usize = 0;
+        while (nodeIndex < nodes.len) : (nodeIndex += 1) {
+            const node = nodes.get(nodeIndex);
+
+            // std.debug.print("{}\n", .{node});
+            std.debug.print("Property = '{?s}'\n", .{node.property});
+            std.debug.print("Value = '{?s}'\n", .{node.value});
+
+            var commentIndex: usize = 0;
+            while (commentIndex < node.comments.items.len) : (commentIndex += 1) {
+                std.debug.print("Comment [{d}] = '{s}'\n", .{ commentIndex, node.comments.items[commentIndex] });
+            }
+
+            std.debug.print("Child count: {}\n", .{node.children.items.len});
         }
     }
 
