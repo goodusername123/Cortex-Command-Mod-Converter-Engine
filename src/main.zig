@@ -171,7 +171,8 @@ fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocato
     while (slice.len > 0) {
         const token = getToken(slice, in_multiline_comment);
 
-        std.debug.print("'{s}' {}\n", .{ token.slice, token.type });
+        // TODO: Figure out why {s: <42} doesn't work
+        std.debug.print("'{s}'\t\t{}\n", .{ std.fmt.fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
             node.property = token.slice;
@@ -190,7 +191,9 @@ fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocato
             try node.comments.append(trim(u8, token.slice[2 .. token.slice.len - 2], " "));
         } else if (token.type == .MultiComment) {
             try node.comments.append(trim(u8, token.slice[2..], " "));
-        } else if (token.type == .Spaces) {} else {
+        } else if (token.type == .Spaces) {} else if (token.type == .Newline) {
+            seen = .Start;
+        } else {
             unreachable;
         }
     }
@@ -217,8 +220,10 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         '/' => {
             return switch (slice.*[1]) {
                 '/' => {
-                    const token = Token{ .type = .SingleComment, .slice = slice.* };
-                    slice.* = slice.*[slice.len..];
+                    const index = std.mem.indexOf(u8, slice.*[2..], "\n");
+                    const newline_index = if (index != null) index.? + 2 else slice.len;
+                    const token = Token{ .type = .SingleComment, .slice = slice.*[0..newline_index] };
+                    slice.* = slice.*[newline_index..];
                     return token;
                 },
                 '*' => {
@@ -245,7 +250,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                     var end_index: usize = 2;
                     var sentence_end_index: usize = end_index;
                     while (end_index < slice.len) : (end_index += 1) {
-                        if (slice.*[end_index] == '=' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
+                        if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
                             break;
                         }
                         if (slice.*[end_index] != ' ') {
@@ -304,7 +309,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             var end_index: usize = 1;
             var sentence_end_index: usize = end_index;
             while (end_index < slice.len) : (end_index += 1) {
-                if (slice.*[end_index] == '=' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
+                if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and slice.*[end_index + 1] == '*')) {
                     break;
                 }
                 if (slice.*[end_index] != ' ') {
