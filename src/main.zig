@@ -11,6 +11,7 @@ const Allocator = std.mem.Allocator;
 const trim = std.mem.trim;
 const replacementSize = std.mem.replacementSize;
 const replace = std.mem.replace;
+const fmtSliceEscapeUpper = std.fmt.fmtSliceEscapeUpper;
 // const test_allocator = std.testing.allocator;
 // const expect = std.testing.expect;
 // const expectEqualStrings = std.testing.expectEqualStrings;
@@ -108,6 +109,7 @@ const Token = struct {
 };
 
 const Node = struct {
+    tabs: ?[]const u8 = null,
     property: ?[]const u8 = null,
     value: ?[]const u8 = null,
     comments: ArrayList([]const u8),
@@ -150,7 +152,13 @@ pub fn main() !void {
     const output_file = try cwd.createFile("src/output.ini", .{});
     defer output_file.close();
 
+    std.debug.print("{}\n", .{ast});
+
     try write_ast(&ast, &output_file);
+
+    // for (ast.children.items) |*child| {
+    //     try write_ast(child, &output_file);
+    // }
 }
 
 fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocator: *Allocator) !Node {
@@ -171,13 +179,14 @@ fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocato
     while (slice.len > 0) {
         const token = getToken(slice, in_multiline_comment);
 
-        // TODO: Figure out why {s: <42} doesn't work
-        std.debug.print("'{s}'\t\t{}\n", .{ std.fmt.fmtSliceEscapeUpper(token.slice), token.type });
+        // TODO: Figure out why {s: <42} doesn't set the width to 42
+        std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
             node.property = token.slice;
             seen = .Property;
         } else if (seen == .Start and token.type == .Tabs) {
+            node.tabs = token.slice;
             if (token.slice.len > depth) {
                 const child_node = try get_ast(slice, in_multiline_comment, depth + 1, allocator);
                 try node.children.append(child_node);
@@ -188,9 +197,9 @@ fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocato
             node.value = token.slice;
             seen = .Value;
         } else if (token.type == .SingleComment) {
-            try node.comments.append(trim(u8, token.slice[2 .. token.slice.len - 2], " "));
-        } else if (token.type == .MultiComment) {
             try node.comments.append(trim(u8, token.slice[2..], " "));
+        } else if (token.type == .MultiComment) {
+            try node.comments.append(trim(u8, token.slice[2 .. token.slice.len - 2], " "));
         } else if (token.type == .Spaces) {} else if (token.type == .Newline) {
             seen = .Start;
         } else {
@@ -244,7 +253,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
                     return token;
                 },
                 else => {
-                    // std.log.warn("foo", .{});
+                    // std.debug.print("foo", .{});
 
                     // A Sentence ends with a word, or the start of a comment
                     var end_index: usize = 2;
@@ -303,7 +312,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             return token;
         },
         else => {
-            // std.log.warn("bar", .{});
+            // std.debug.print("bar", .{});
 
             // A Sentence ends with a word, or the start of a comment
             var end_index: usize = 1;
@@ -325,11 +334,43 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
 }
 
 fn write_ast(node: *Node, file: *const std.fs.File) !void {
-    // std.debug.print("{}\n\n", .{node});
+    // Write tabs to file
+    if (node.tabs != null) std.debug.print("'{s}'\n", .{fmtSliceEscapeUpper(node.tabs.?)});
+    if (node.tabs != null) try file.writeAll(node.tabs.?);
+
+    // Write property to file
+    if (node.property != null) std.debug.print("'{s}'\n", .{node.property.?});
     if (node.property != null) {
         try file.writeAll(node.property.?);
     }
 
+    // Write equals to file
+    std.debug.print("' = '\n", .{});
+    try file.writeAll(" = ");
+
+    // Write value to file
+    if (node.value != null) std.debug.print("'{s}'\n", .{node.value.?});
+    if (node.value != null) {
+        try file.writeAll(node.value.?);
+    }
+
+    // Write comments to file
+    if (node.comments.items.len > 0) {
+        try file.writeAll(" //");
+
+        for (node.comments.items) |comment| {
+            std.debug.print("'{s}'\n", .{comment});
+            try file.writeAll(" ");
+            try file.writeAll(comment);
+        }
+    }
+
+    // Write newline to file
+    std.debug.print("'\\n'\n", .{});
+    try file.writeAll("\n");
+
+    // Recursively enter child nodes
+    std.debug.print("Recursing into child\n", .{});
     for (node.children.items) |*child| {
         try write_ast(child, file);
     }
