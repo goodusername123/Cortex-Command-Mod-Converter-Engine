@@ -4,7 +4,6 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const page_allocator = std.heap.page_allocator;
 const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
 const realpath = std.fs.realpath;
-const openFileAbsolute = std.fs.openFileAbsolute;
 const bufferedReader = std.io.bufferedReader;
 const maxInt = std.math.maxInt;
 const MultiArrayList = std.MultiArrayList;
@@ -120,13 +119,12 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var path_buf: [MAX_PATH_BYTES]u8 = undefined;
-    const path = try realpath("src/test.ini", &path_buf);
+    const cwd = std.fs.cwd();
 
-    var file = try openFileAbsolute(path, .{});
-    defer file.close();
+    var input_file = try cwd.openFile("src/test.ini", .{});
+    defer input_file.close();
 
-    var buf_reader = bufferedReader(file.reader());
+    var buf_reader = bufferedReader(input_file.reader());
     var in_stream = buf_reader.reader();
 
     const text = try in_stream.readAllAlloc(allocator, maxInt(usize));
@@ -149,36 +147,10 @@ pub fn main() !void {
 
     var ast = try get_ast(&slice, &in_multiline_comment, -1, &allocator);
 
-    std.debug.print("{}\n", .{ast});
+    const output_file = try cwd.createFile("src/output.ini", .{});
+    defer output_file.close();
 
-    // Print nodes
-    // {
-    //     std.debug.print("Node count: {}\n", .{nodes.len});
-
-    //     var nodeIndex: usize = 0;
-    //     while (nodeIndex < nodes.len) : (nodeIndex += 1) {
-    //         const node = nodes.get(nodeIndex);
-
-    //         // std.debug.print("{}\n", .{node});
-    //         std.debug.print("Property = '{?s}'\n", .{node.property});
-    //         std.debug.print("Value = '{?s}'\n", .{node.value});
-
-    //         var commentIndex: usize = 0;
-    //         while (commentIndex < node.comments.items.len) : (commentIndex += 1) {
-    //             std.debug.print("Comment [{d}] = '{d}'\n", .{ commentIndex, node.comments.items[commentIndex] });
-    //         }
-
-    //         std.debug.print("Child count: {}\n", .{node.children.items.len});
-    //     }
-    // }
-
-    // Print comments
-    // std.debug.print("{}\n", .{comments});
-    // var i: usize = 0;
-    // while (i < comments.items.len) : (i += 1) {
-    //     const comment = comments.items[i];
-    //     std.debug.print("'{s}'\n", .{comment});
-    // }
+    try write_ast(&ast, &output_file);
 }
 
 fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocator: *Allocator) !Node {
@@ -345,6 +317,46 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
             return token;
         },
     };
+}
+
+fn write_ast(node: *Node, file: *const std.fs.File) !void {
+    // std.debug.print("{}\n\n", .{node});
+    if (node.property != null) {
+        try file.writeAll(node.property.?);
+    }
+
+    for (node.children.items) |*child| {
+        try write_ast(child, file);
+    }
+
+    // Print nodes
+    // {
+    //     std.debug.print("Node count: {}\n", .{nodes.len});
+
+    //     var nodeIndex: usize = 0;
+    //     while (nodeIndex < nodes.len) : (nodeIndex += 1) {
+    //         const node = nodes.get(nodeIndex);
+
+    //         // std.debug.print("{}\n", .{node});
+    //         std.debug.print("Property = '{?s}'\n", .{node.property});
+    //         std.debug.print("Value = '{?s}'\n", .{node.value});
+
+    //         var commentIndex: usize = 0;
+    //         while (commentIndex < node.comments.items.len) : (commentIndex += 1) {
+    //             std.debug.print("Comment [{d}] = '{d}'\n", .{ commentIndex, node.comments.items[commentIndex] });
+    //         }
+
+    //         std.debug.print("Child count: {}\n", .{node.children.items.len});
+    //     }
+    // }
+
+    // Print comments
+    // std.debug.print("{}\n", .{comments});
+    // var i: usize = 0;
+    // while (i < comments.items.len) : (i += 1) {
+    //     const comment = comments.items[i];
+    //     std.debug.print("'{s}'\n", .{comment});
+    // }
 }
 
 test "ast" {
