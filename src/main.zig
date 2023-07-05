@@ -132,8 +132,6 @@ pub fn main() !void {
     const text = try in_stream.readAllAlloc(allocator, maxInt(usize));
     defer allocator.free(text);
 
-    var in_multiline_comment = false;
-
     const NodeList = MultiArrayList(Node);
     var nodes = NodeList{};
     defer nodes.deinit(allocator);
@@ -147,15 +145,7 @@ pub fn main() !void {
 
     var slice: []const u8 = lf_text;
 
-    var ast = Node{
-        .comments = ArrayList([]const u8).init(allocator),
-        .children = ArrayList(Node).init(allocator),
-    };
-
-    while (slice.len > 0) {
-        const node = try get_ast(&slice, &in_multiline_comment, -1, &allocator);
-        try ast.children.append(node);
-    }
+    var ast = try get_ast(&slice, &allocator);
 
     const output_file = try cwd.createFile("src/output.ini", .{});
     defer output_file.close();
@@ -169,7 +159,23 @@ pub fn main() !void {
     // }
 }
 
-fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocator: *Allocator) !Node {
+fn get_ast(slice: *[]const u8, allocator: *Allocator) !Node {
+    var ast = Node{
+        .comments = ArrayList([]const u8).init(allocator.*),
+        .children = ArrayList(Node).init(allocator.*),
+    };
+
+    var in_multiline_comment = false;
+
+    while (slice.len > 0) {
+        const node = try get_node(slice, &in_multiline_comment, -1, allocator);
+        try ast.children.append(node);
+    }
+
+    return ast;
+}
+
+fn get_node(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocator: *Allocator) !Node {
     const States = enum {
         Start,
         Property,
@@ -196,7 +202,7 @@ fn get_ast(slice: *[]const u8, in_multiline_comment: *bool, depth: i32, allocato
         } else if (seen == .Start and token.type == .Tabs) {
             node.tabs = token.slice;
             if (token.slice.len > depth) {
-                const child_node = try get_ast(slice, in_multiline_comment, depth + 1, allocator);
+                const child_node = try get_node(slice, in_multiline_comment, depth + 1, allocator);
                 try node.children.append(child_node);
             }
         } else if (seen == .Property and token.type == .Equals) {
