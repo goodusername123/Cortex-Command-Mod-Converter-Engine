@@ -161,7 +161,7 @@ pub fn main() !void {
     // }
 }
 
-fn getTokens(lf_text: []const u8, allocator: *Allocator) ArrayList(Token) {
+fn getTokens(lf_text: []const u8, allocator: *Allocator) !ArrayList(Token) {
     var slice: []const u8 = lf_text;
 
     var tokens = ArrayList(Token).init(allocator.*);
@@ -170,7 +170,7 @@ fn getTokens(lf_text: []const u8, allocator: *Allocator) ArrayList(Token) {
 
     while (slice.len > 0) {
         const token = getToken(slice, &in_multiline_comment);
-        tokens.append(token);
+        try tokens.append(token);
 
         slice = slice[token.slice.len..];
     }
@@ -300,7 +300,7 @@ fn getAst(tokens: *ArrayList(Token), allocator: *Allocator) !Node {
 
     var token_index: usize = 0;
 
-    while (token_index < tokens.len) {
+    while (token_index < tokens.items.len) {
         const node = try getNode(tokens, &token_index, 0, allocator);
         try ast.children.append(node);
     }
@@ -323,8 +323,8 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         .children = ArrayList(Node).init(allocator.*),
     };
 
-    while (token_index < tokens.len) {
-        const token = tokens[token_index];
+    while (token_index.* < tokens.items.len) {
+        const token = tokens.items[token_index.*];
 
         // TODO: Figure out why {s: <42} doesn't set the width to 42
         std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
@@ -332,9 +332,10 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         if (seen == .Start and token.type == .Sentence) {
             node.property = token.slice;
             seen = .Property;
-            token_index += 1;
+            token_index.* += 1;
         } else if (seen == .Start and token.type == .Tabs) {
             node.tabs = token.slice;
+            token_index.* += 1;
 
             if (token.slice.len > depth) {
                 const child_node = try getNode(tokens, token_index, depth + 1, allocator);
@@ -345,20 +346,22 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             }
         } else if (seen == .Property and token.type == .Equals) {
             seen = .Equals;
-            token_index += 1;
+            token_index.* += 1;
         } else if (seen == .Equals and token.type == .Sentence) {
             node.value = token.slice;
             seen = .Value;
-            token_index += 1;
+            token_index.* += 1;
         } else if (token.type == .SingleComment) {
             try node.comments.append(trim(u8, token.slice[2..], " "));
-            token_index += 1;
+            token_index.* += 1;
         } else if (token.type == .MultiComment) {
             try node.comments.append(trim(u8, token.slice[2 .. token.slice.len - 2], " "));
-            token_index += 1;
-        } else if (token.type == .Spaces) {} else if (token.type == .Newline) {
+            token_index.* += 1;
+        } else if (token.type == .Spaces) {
+            token_index.* += 1;
+        } else if (token.type == .Newline) {
             seen = .Start;
-            token_index += 1;
+            token_index.* += 1;
         } else {
             unreachable;
         }
