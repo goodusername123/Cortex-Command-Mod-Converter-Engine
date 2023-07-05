@@ -147,7 +147,15 @@ pub fn main() !void {
 
     var slice: []const u8 = lf_text;
 
-    var ast = try get_ast(&slice, &in_multiline_comment, -1, &allocator);
+    var ast = Node{
+        .comments = ArrayList([]const u8).init(allocator),
+        .children = ArrayList(Node).init(allocator),
+    };
+
+    while (slice.len > 0) {
+        const node = try get_ast(&slice, &in_multiline_comment, -1, &allocator);
+        try ast.children.append(node);
+    }
 
     const output_file = try cwd.createFile("src/output.ini", .{});
     defer output_file.close();
@@ -335,22 +343,23 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
 
 fn write_ast(node: *Node, file: *const std.fs.File) !void {
     // Write tabs to file
-    if (node.tabs != null) std.debug.print("'{s}'\n", .{fmtSliceEscapeUpper(node.tabs.?)});
-    if (node.tabs != null) try file.writeAll(node.tabs.?);
+    if (node.tabs != null) {
+        std.debug.print("'{s}'\n", .{fmtSliceEscapeUpper(node.tabs.?)});
+        try file.writeAll(node.tabs.?);
+    }
 
     // Write property to file
-    if (node.property != null) std.debug.print("'{s}'\n", .{node.property.?});
     if (node.property != null) {
+        std.debug.print("'{s}'\n", .{node.property.?});
         try file.writeAll(node.property.?);
     }
 
-    // Write equals to file
-    std.debug.print("' = '\n", .{});
-    try file.writeAll(" = ");
-
-    // Write value to file
-    if (node.value != null) std.debug.print("'{s}'\n", .{node.value.?});
+    // Write value and equals to file
     if (node.value != null) {
+        std.debug.print("' = '\n", .{});
+        std.debug.print("'{s}'\n", .{node.value.?});
+
+        try file.writeAll(" = ");
         try file.writeAll(node.value.?);
     }
 
