@@ -323,6 +323,8 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         .children = ArrayList(Node).init(allocator.*),
     };
 
+    var first = true;
+
     while (token_index.* < tokens.items.len) {
         const token = tokens.items[token_index.*];
 
@@ -335,13 +337,14 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             token_index.* += 1;
         } else if (seen == .Start and token.type == .Tabs) {
             node.tabs = token.slice;
-            token_index.* += 1;
 
             if (token.slice.len > depth) {
                 const child_node = try getNode(tokens, token_index, depth + 1, allocator);
                 try node.children.append(child_node);
+            } else if (token.slice.len == depth and first) {
+                first = false;
+                token_index.* += 1;
             } else {
-                // TODO: This shouldn't be reached with the first encountered tab!
                 return node;
             }
         } else if (seen == .Property and token.type == .Equals) {
