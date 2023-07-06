@@ -142,12 +142,8 @@ fn convert(input_path: []const u8, output_path: []const u8, allocator: Allocator
     var nodes = NodeList{};
     defer nodes.deinit(allocator);
 
-    // Replace CRLF with LF
-    // CRLF is the default for .ini files on Windows
-    const replacement_size = replacementSize(u8, text, "\r\n", "\n");
-    var lf_text = try allocator.alloc(u8, replacement_size);
+    var lf_text = try crlfToLf(text, allocator);
     defer allocator.free(lf_text);
-    _ = replace(u8, text, "\r\n", "\n", lf_text);
 
     // TODO: Should I stop passing the address of allocator, tokens, and ast everywhere?
 
@@ -166,6 +162,13 @@ fn convert(input_path: []const u8, output_path: []const u8, allocator: Allocator
             try output_file.writeAll("\n");
         }
     }
+}
+
+fn crlfToLf(text: []const u8, allocator: Allocator) ![]const u8 {
+    const replacement_size = replacementSize(u8, text, "\r\n", "\n");
+    var lf_text = try allocator.alloc(u8, replacement_size);
+    _ = replace(u8, text, "\r\n", "\n", lf_text);
+    return lf_text;
 }
 
 fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
@@ -432,12 +435,7 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
 
 test "basic" {
     var tmpdir = tmpDir(.{});
-    // defer tmpdir.cleanup();
-
-    // var file = try tmpdir.dir.createFile("output.txt", .{});
-    // file.close();
-
-    // try tmpdir.dir.deleteFile("output.txt");
+    defer tmpdir.cleanup();
 
     var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
     var path = try tmpdir.dir.realpath(".", &out_buffer);
@@ -447,7 +445,7 @@ test "basic" {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var input_path = "src/test.ini";
+    var input_path = "tests/ini_test_files/token_and_cst/simple/in.ini";
 
     var output_path = try join(allocator, &.{ path, "output.ini" });
     defer allocator.free(output_path);
@@ -456,27 +454,25 @@ test "basic" {
 
     const cwd = std.fs.cwd();
 
-    var expected_path = "src/expected.ini";
+    var expected_path = "tests/ini_test_files/token_and_cst/simple/out.ini";
 
     var expected_file = try cwd.openFile(expected_path, .{});
     defer expected_file.close();
     var expected_buf_reader = bufferedReader(expected_file.reader());
     var expected_stream = expected_buf_reader.reader();
-    const expected_text = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+    const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+    defer allocator.free(expected_text_crlf);
+    var expected_text = try crlfToLf(expected_text_crlf, allocator);
     defer allocator.free(expected_text);
-    // std.debug.print("{s}\n", .{expected_text});
 
     var output_file = try cwd.openFile(output_path, .{});
     defer output_file.close();
     var output_buf_reader = bufferedReader(output_file.reader());
     var output_stream = output_buf_reader.reader();
-    const output_text = try output_stream.readAllAlloc(allocator, maxInt(usize));
+    const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
+    defer allocator.free(output_text_crlf);
+    var output_text = try crlfToLf(output_text_crlf, allocator);
     defer allocator.free(output_text);
-    // std.debug.print("{s}\n", .{output_text});
 
     try expectEqualStrings(expected_text, output_text);
-
-    // std.debug.print("{s}\n", .{path});
-    // std.debug.print("{s}\n", .{joined});
-    // std.debug.print("{s}\n", .{tmpdir.sub_path});
 }
