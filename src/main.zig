@@ -95,26 +95,7 @@ const fmtSliceEscapeUpper = std.fmt.fmtSliceEscapeUpper;
 /// };
 pub fn main() !void {
     return convert();
-    // var result = foo(1) catch |err| {
-    //     std.debug.print("{}\n", .{err});
-    //     return;
-    // };
-    // _ = result;
 }
-
-// const FooError = error{
-//     Bar,
-// };
-
-// fn foo(nbr: u32) error{ Bar, OutOfMe }!u32 {
-//     if (nbr > 3) {
-//         return FooError.Bar;
-//     }
-//     if (nbr > 3) {
-//         return error.OutOfMe;
-//     }
-//     return foo(nbr + 1);
-// }
 
 const Token = struct {
     type: Type,
@@ -177,8 +158,13 @@ fn convert() !void {
     const output_file = try cwd.createFile("src/output.ini", .{});
     defer output_file.close();
 
-    for (ast.items) |*child| {
+    for (ast.items) |*child, index| {
         try writeAst(child, &output_file);
+
+        // Don't add a trailing newline here, since writeAst() already adds it
+        if (index < ast.items.len - 1) {
+            try output_file.writeAll("\n");
+        }
     }
 }
 
@@ -350,16 +336,17 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
-            node.property = token.slice;
-            seen = .Property;
-            token_index.* += 1;
+            // if ((depth == 0 and first) or !first) { // (node.tabs != null and first)) {
+            if (node.property == null) {
+                node.property = token.slice;
+                seen = .Property;
+                token_index.* += 1;
+            } else {
+                return node;
+            }
         } else if (seen == .Start and token.type == .Tabs) {
             if (token.slice.len > depth) {
                 const child_node = try getNode(tokens, token_index, depth + 1, allocator);
-                // const child_node = getNode(tokens, token_index, depth + 1, allocator) catch |err| {
-                //     std.debug.print("BAAAAAAAAAAAAAR\n", .{});
-                //     return err;
-                // };
                 try node.children.append(child_node);
             } else if (token.slice.len == depth and first) {
                 node.tabs = token.slice;
@@ -387,7 +374,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             seen = .Start;
             token_index.* += 1;
         } else {
-            std.debug.print("FOOOOOOOOOOOOOOOO\n", .{});
             return GetNodeError.Unexpected;
         }
     }
@@ -396,6 +382,10 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 }
 
 fn writeAst(node: *Node, file: *const std.fs.File) !void {
+    if (node.property == null and node.comments.items.len == 0) {
+        return;
+    }
+
     // Write tabs to file
     if (node.tabs != null) {
         std.debug.print("'{s}'\n", .{fmtSliceEscapeUpper(node.tabs.?)});
