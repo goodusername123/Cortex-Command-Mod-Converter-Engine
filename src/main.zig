@@ -218,8 +218,6 @@ fn getToken(slice: []const u8, in_multiline_comment: *bool) Token {
                     return token;
                 },
                 else => {
-                    // std.debug.print("foo", .{});
-
                     // A Sentence ends with a word, or the start of a comment
                     var end_index: usize = 2;
                     var sentence_end_index: usize = end_index;
@@ -272,8 +270,6 @@ fn getToken(slice: []const u8, in_multiline_comment: *bool) Token {
             return token;
         },
         else => {
-            // std.debug.print("bar", .{});
-
             // A Sentence ends with a word, or the start of a comment
             var end_index: usize = 1;
             var sentence_end_index: usize = end_index;
@@ -332,46 +328,36 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
-            // std.debug.print("'a'\n", .{});
             node.property = token.slice;
             seen = .Property;
             token_index.* += 1;
         } else if (seen == .Start and token.type == .Tabs) {
             if (token.slice.len > depth) {
-                // std.debug.print("'b'\n", .{});
                 const child_node = try getNode(tokens, token_index, depth + 1, allocator);
                 try node.children.append(child_node);
             } else if (token.slice.len == depth and first) {
-                // std.debug.print("'c'\n", .{});
                 node.tabs = token.slice;
                 first = false;
                 token_index.* += 1;
             } else {
-                // std.debug.print("'d'\n", .{});
                 return node;
             }
         } else if (seen == .Property and token.type == .Equals) {
-            // std.debug.print("'e'\n", .{});
             seen = .Equals;
             token_index.* += 1;
         } else if (seen == .Equals and token.type == .Sentence) {
-            // std.debug.print("'f'\n", .{});
             node.value = token.slice;
             seen = .Value;
             token_index.* += 1;
         } else if (token.type == .SingleComment) {
-            // std.debug.print("'g'\n", .{});
             try node.comments.append(trim(u8, token.slice[2..], " "));
             token_index.* += 1;
         } else if (token.type == .MultiComment) {
-            // std.debug.print("'h'\n", .{});
             try node.comments.append(trim(u8, token.slice[2 .. token.slice.len - 2], " "));
             token_index.* += 1;
         } else if (token.type == .Spaces) {
-            // std.debug.print("'i'\n", .{});
             token_index.* += 1;
         } else if (token.type == .Newline) {
-            // std.debug.print("'j'\n", .{});
             seen = .Start;
             token_index.* += 1;
         } else {
