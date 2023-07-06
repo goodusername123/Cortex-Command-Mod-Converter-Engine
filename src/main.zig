@@ -154,11 +154,9 @@ pub fn main() !void {
     const output_file = try cwd.createFile("src/output.ini", .{});
     defer output_file.close();
 
-    try writeAst(&ast, &output_file);
-
-    // for (ast.children.items) |*child| {
-    //     try writeAst(child, &output_file);
-    // }
+    for (ast.items) |*child| {
+        try writeAst(child, &output_file);
+    }
 }
 
 fn getTokens(lf_text: []const u8, allocator: *Allocator) !ArrayList(Token) {
@@ -288,17 +286,14 @@ fn getToken(slice: []const u8, in_multiline_comment: *bool) Token {
     };
 }
 
-fn getAst(tokens: *ArrayList(Token), allocator: *Allocator) !Node {
-    var ast = Node{
-        .comments = ArrayList([]const u8).init(allocator.*),
-        .children = ArrayList(Node).init(allocator.*),
-    };
+fn getAst(tokens: *ArrayList(Token), allocator: *Allocator) !ArrayList(Node) {
+    var ast = ArrayList(Node).init(allocator.*);
 
     var token_index: usize = 0;
 
     while (token_index < tokens.items.len) {
         const node = try getNode(tokens, &token_index, 0, allocator);
-        try ast.children.append(node);
+        try ast.append(node);
     }
 
     return ast;
@@ -410,6 +405,7 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
     std.debug.print("Recursing into child\n", .{});
     for (node.children.items) |*child| {
         // std.debug.print("child: {}\n", .{child});
+
         try writeAst(child, file);
     }
 
