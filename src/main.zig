@@ -150,10 +150,8 @@ fn convert() !void {
     // TODO: Should I stop passing the address of allocator, tokens, and ast everywhere?
 
     var tokens = try getTokens(lf_text, &allocator);
-    // std.debug.print("{}\n", .{tokens});
 
     var ast = try getAst(&tokens, &allocator);
-    // std.debug.print("{}\n", .{ast});
 
     const output_file = try cwd.createFile("src/output.ini", .{});
     defer output_file.close();
@@ -161,7 +159,7 @@ fn convert() !void {
     for (ast.items) |*child, index| {
         try writeAst(child, &output_file);
 
-        // Don't add a trailing newline here, since writeAst() already adds it
+        // Don't add a trailing newline, since writeAst() already adds it
         if (index < ast.items.len - 1) {
             try output_file.writeAll("\n");
         }
@@ -336,7 +334,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
-            // if ((depth == 0 and first) or !first) { // (node.tabs != null and first)) {
             if (node.property == null) {
                 node.property = token.slice;
                 seen = .Property;
@@ -382,6 +379,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 }
 
 fn writeAst(node: *Node, file: *const std.fs.File) !void {
+    // Don't add an empty line
     if (node.property == null and node.comments.items.len == 0) {
         return;
     }
@@ -426,91 +424,10 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
     // Recursively enter child nodes
     std.debug.print("Recursing into child\n", .{});
     for (node.children.items) |*child| {
-        // std.debug.print("child: {}\n", .{child});
-
         try writeAst(child, file);
     }
-
-    // Print nodes
-    // {
-    //     std.debug.print("Node count: {}\n", .{nodes.len});
-
-    //     var nodeIndex: usize = 0;
-    //     while (nodeIndex < nodes.len) : (nodeIndex += 1) {
-    //         const node = nodes.get(nodeIndex);
-
-    //         // std.debug.print("{}\n", .{node});
-    //         std.debug.print("Property = '{?s}'\n", .{node.property});
-    //         std.debug.print("Value = '{?s}'\n", .{node.value});
-
-    //         var commentIndex: usize = 0;
-    //         while (commentIndex < node.comments.items.len) : (commentIndex += 1) {
-    //             std.debug.print("Comment [{d}] = '{d}'\n", .{ commentIndex, node.comments.items[commentIndex] });
-    //         }
-
-    //         std.debug.print("Child count: {}\n", .{node.children.items.len});
-    //     }
-    // }
-
-    // Print comments
-    // std.debug.print("{}\n", .{comments});
-    // var i: usize = 0;
-    // while (i < comments.items.len) : (i += 1) {
-    //     const comment = comments.items[i];
-    //     std.debug.print("'{s}'\n", .{comment});
-    // }
 }
 
 test "ast" {
     // TODO: Use test_allocator
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Tabs);
-    // try expectEqualStrings("\t", token.slice);
-    // try expectEqualStrings("w xy = /v z /* a b */// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Sentence);
-    // try expectEqualStrings("w xy", token.slice);
-    // try expectEqualStrings(" = /v z /* a b */// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Spaces);
-    // try expectEqualStrings(" ", token.slice);
-    // try expectEqualStrings("= /v z /* a b */// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Equals);
-    // try expectEqualStrings("=", token.slice);
-    // try expectEqualStrings(" /v z /* a b */// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Spaces);
-    // try expectEqualStrings(" ", token.slice);
-    // try expectEqualStrings("/v z /* a b */// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Sentence);
-    // try expectEqualStrings("/v z", token.slice);
-    // try expectEqualStrings(" /* a b */// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .Spaces);
-    // try expectEqualStrings(" ", token.slice);
-    // try expectEqualStrings("/* a b */// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .MultiComment);
-    // try expectEqualStrings("/* a b */", token.slice);
-    // try expectEqualStrings("// c d ", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .SingleComment);
-    // try expectEqualStrings("// c d ", token.slice);
-    // try expectEqualStrings("", line_slice);
-
-    // token = getToken(&line_slice, &in_multiline_comment);
-    // try expect(token.type == .SingleComment);
-    // try expectEqualStrings("// c d ", token.slice);
-    // try expectEqualStrings("", line_slice);
 }
