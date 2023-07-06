@@ -11,6 +11,16 @@
 			"label": "upload to pypi",
 			"command": "twine upload dist/*",
 			"type": "shell",
+		},
+		{
+			"label": "build zig",
+			"type": "shell",
+			"command": "zig build",
+			"problemMatcher": [],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
 		}
 	]
 }
