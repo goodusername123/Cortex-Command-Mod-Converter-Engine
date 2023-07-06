@@ -16,7 +16,7 @@ const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
 const join = std.fs.path.join;
 // const test_allocator = std.testing.allocator;
 // const expect = std.testing.expect;
-// const expectEqualStrings = std.testing.expectEqualStrings;
+const expectEqualStrings = std.testing.expectEqualStrings;
 
 /// This .ini input file:
 /// /* foo1   */ /* foo2*//*foo3*/
@@ -333,7 +333,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         const token = tokens.items[token_index.*];
 
         // TODO: Figure out why {s: <42} doesn't set the width to 42
-        std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
+        // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
             if (node.property == null) {
@@ -388,43 +388,43 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
 
     // Write tabs to file
     if (node.tabs != null) {
-        std.debug.print("'{s}'\n", .{fmtSliceEscapeUpper(node.tabs.?)});
+        // std.debug.print("'{s}'\n", .{fmtSliceEscapeUpper(node.tabs.?)});
         try file.writeAll(node.tabs.?);
     }
 
     // Write property to file
     if (node.property != null) {
-        std.debug.print("'{s}'\n", .{node.property.?});
+        // std.debug.print("'{s}'\n", .{node.property.?});
         try file.writeAll(node.property.?);
     }
 
     // Write value and equals to file
     if (node.value != null) {
-        std.debug.print("' = '\n", .{});
+        // std.debug.print("' = '\n", .{});
         try file.writeAll(" = ");
 
-        std.debug.print("'{s}'\n", .{node.value.?});
+        // std.debug.print("'{s}'\n", .{node.value.?});
         try file.writeAll(node.value.?);
     }
 
     // Write comments to file
     if (node.comments.items.len > 0) {
-        std.debug.print("' //'\n", .{});
+        // std.debug.print("' //'\n", .{});
         try file.writeAll(" //");
 
         for (node.comments.items) |comment| {
-            std.debug.print("' {s}'\n", .{comment});
+            // std.debug.print("' {s}'\n", .{comment});
             try file.writeAll(" ");
             try file.writeAll(comment);
         }
     }
 
     // Write newline to file
-    std.debug.print("'\\n'\n", .{});
+    // std.debug.print("'\\n'\n", .{});
     try file.writeAll("\n");
 
     // Recursively enter child nodes
-    std.debug.print("Recursing into child\n", .{});
+    // std.debug.print("Recursing into child\n", .{});
     for (node.children.items) |*child| {
         try writeAst(child, file);
     }
@@ -432,7 +432,7 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
 
 test "basic" {
     var tmpdir = tmpDir(.{});
-    defer tmpdir.cleanup();
+    // defer tmpdir.cleanup();
 
     // var file = try tmpdir.dir.createFile("output.txt", .{});
     // file.close();
@@ -447,10 +447,34 @@ test "basic" {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var joined = try join(allocator, &.{ path, "output.ini" });
-    defer allocator.free(joined);
+    var input_path = "src/test.ini";
 
-    try convert("src/test.ini", joined, allocator);
+    var output_path = try join(allocator, &.{ path, "output.ini" });
+    defer allocator.free(output_path);
+
+    try convert(input_path, output_path, allocator);
+
+    const cwd = std.fs.cwd();
+
+    var expected_path = "src/expected.ini";
+
+    var expected_file = try cwd.openFile(expected_path, .{});
+    defer expected_file.close();
+    var expected_buf_reader = bufferedReader(expected_file.reader());
+    var expected_stream = expected_buf_reader.reader();
+    const expected_text = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+    defer allocator.free(expected_text);
+    // std.debug.print("{s}\n", .{expected_text});
+
+    var output_file = try cwd.openFile(output_path, .{});
+    defer output_file.close();
+    var output_buf_reader = bufferedReader(output_file.reader());
+    var output_stream = output_buf_reader.reader();
+    const output_text = try output_stream.readAllAlloc(allocator, maxInt(usize));
+    defer allocator.free(output_text);
+    // std.debug.print("{s}\n", .{output_text});
+
+    try expectEqualStrings(expected_text, output_text);
 
     // std.debug.print("{s}\n", .{path});
     // std.debug.print("{s}\n", .{joined});
