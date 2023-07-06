@@ -2,7 +2,6 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const page_allocator = std.heap.page_allocator;
-const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
 const realpath = std.fs.realpath;
 const bufferedReader = std.io.bufferedReader;
 const maxInt = std.math.maxInt;
@@ -12,6 +11,9 @@ const trim = std.mem.trim;
 const replacementSize = std.mem.replacementSize;
 const replace = std.mem.replace;
 const fmtSliceEscapeUpper = std.fmt.fmtSliceEscapeUpper;
+const tmpDir = std.testing.tmpDir;
+const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
+const join = std.fs.path.join;
 // const test_allocator = std.testing.allocator;
 // const expect = std.testing.expect;
 // const expectEqualStrings = std.testing.expectEqualStrings;
@@ -94,7 +96,11 @@ const fmtSliceEscapeUpper = std.fmt.fmtSliceEscapeUpper;
 ///     }
 /// };
 pub fn main() !void {
-    return convert();
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
+
+    return convert("src/test.ini", "src/output.ini", allocator);
 }
 
 const Token = struct {
@@ -120,14 +126,10 @@ const Node = struct {
     children: ArrayList(Node),
 };
 
-fn convert() !void {
-    var arena = ArenaAllocator.init(page_allocator);
-    defer arena.deinit();
-    var allocator = arena.allocator();
-
+fn convert(input_path: []const u8, output_path: []const u8, allocator: Allocator) !void {
     const cwd = std.fs.cwd();
 
-    var input_file = try cwd.openFile("src/test.ini", .{});
+    var input_file = try cwd.openFile(input_path, .{});
     defer input_file.close();
 
     var buf_reader = bufferedReader(input_file.reader());
@@ -149,11 +151,11 @@ fn convert() !void {
 
     // TODO: Should I stop passing the address of allocator, tokens, and ast everywhere?
 
-    var tokens = try getTokens(lf_text, &allocator);
+    var tokens = try getTokens(lf_text, allocator);
 
-    var ast = try getAst(&tokens, &allocator);
+    var ast = try getAst(&tokens, allocator);
 
-    const output_file = try cwd.createFile("src/output.ini", .{});
+    const output_file = try cwd.createFile(output_path, .{});
     defer output_file.close();
 
     for (ast.items) |*child, index| {
@@ -166,10 +168,10 @@ fn convert() !void {
     }
 }
 
-fn getTokens(lf_text: []const u8, allocator: *Allocator) !ArrayList(Token) {
+fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
     var slice: []const u8 = lf_text;
 
-    var tokens = ArrayList(Token).init(allocator.*);
+    var tokens = ArrayList(Token).init(allocator);
 
     var in_multiline_comment = false;
 
@@ -293,8 +295,8 @@ fn getToken(slice: []const u8, in_multiline_comment: *bool) Token {
     };
 }
 
-fn getAst(tokens: *ArrayList(Token), allocator: *Allocator) !ArrayList(Node) {
-    var ast = ArrayList(Node).init(allocator.*);
+fn getAst(tokens: *ArrayList(Token), allocator: Allocator) !ArrayList(Node) {
+    var ast = ArrayList(Node).init(allocator);
 
     var token_index: usize = 0;
 
@@ -310,7 +312,7 @@ const GetNodeError = error{
     Unexpected,
 };
 
-fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator: *Allocator) error{ Unexpected, OutOfMemory }!Node {
+fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator: Allocator) error{ Unexpected, OutOfMemory }!Node {
     const States = enum {
         Start,
         Property,
@@ -321,8 +323,8 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
     var seen: States = .Start;
 
     var node = Node{
-        .comments = ArrayList([]const u8).init(allocator.*),
-        .children = ArrayList(Node).init(allocator.*),
+        .comments = ArrayList([]const u8).init(allocator),
+        .children = ArrayList(Node).init(allocator),
     };
 
     var first = true;
@@ -428,6 +430,29 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
     }
 }
 
-test "ast" {
+test "basic" {
+    var tmpdir = tmpDir(.{});
+    defer tmpdir.cleanup();
+
+    // var file = try tmpdir.dir.createFile("output.txt", .{});
+    // file.close();
+
+    // try tmpdir.dir.deleteFile("output.txt");
+
+    var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    var path = try tmpdir.dir.realpath(".", &out_buffer);
+
     // TODO: Use test_allocator
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
+
+    var joined = try join(allocator, &.{ path, "output.ini" });
+    defer allocator.free(joined);
+
+    try convert("src/test.ini", joined, allocator);
+
+    // std.debug.print("{s}\n", .{path});
+    // std.debug.print("{s}\n", .{joined});
+    // std.debug.print("{s}\n", .{tmpdir.sub_path});
 }
