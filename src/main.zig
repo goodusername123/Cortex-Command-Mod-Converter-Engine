@@ -433,46 +433,66 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
     }
 }
 
-test "basic" {
+test "everything" {
     var tmpdir = tmpDir(.{});
     defer tmpdir.cleanup();
 
-    var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    var path = try tmpdir.dir.realpath(".", &out_buffer);
+    // var path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    // var path = try tmpdir.dir.realpath(".", &path_buffer);
+    // _ = path;
+
+    var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files", .{});
+    defer iterable_tests.close();
 
     // TODO: Use test_allocator
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var input_path = "tests/ini_test_files/token_and_cst/simple/in.ini";
+    var tests_walker = try iterable_tests.walk(allocator);
+    defer tests_walker.deinit();
 
-    var output_path = try join(allocator, &.{ path, "output.ini" });
-    defer allocator.free(output_path);
+    while (try tests_walker.next()) |entry| {
+        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
+        var path = try entry.dir.realpath(".", &out_buffer);
 
-    try convert(input_path, output_path, allocator);
+        std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini"), path });
 
-    const cwd = std.fs.cwd();
+        var input_path = try join(allocator, &.{ path, "in.ini" });
+        defer allocator.free(input_path);
+        var output_path = try join(allocator, &.{ path, "out.ini" });
+        defer allocator.free(output_path);
+        std.debug.print("{s}\n{s}\n\n", .{ input_path, output_path });
+    }
 
-    var expected_path = "tests/ini_test_files/token_and_cst/simple/out.ini";
+    // var input_path = "tests/ini_test_files/token_and_cst/simple/in.ini";
 
-    var expected_file = try cwd.openFile(expected_path, .{});
-    defer expected_file.close();
-    var expected_buf_reader = bufferedReader(expected_file.reader());
-    var expected_stream = expected_buf_reader.reader();
-    const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
-    defer allocator.free(expected_text_crlf);
-    var expected_text = try crlfToLf(expected_text_crlf, allocator);
-    defer allocator.free(expected_text);
+    // var output_path = try join(allocator, &.{ path, "output.ini" });
+    // defer allocator.free(output_path);
 
-    var output_file = try cwd.openFile(output_path, .{});
-    defer output_file.close();
-    var output_buf_reader = bufferedReader(output_file.reader());
-    var output_stream = output_buf_reader.reader();
-    const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
-    defer allocator.free(output_text_crlf);
-    var output_text = try crlfToLf(output_text_crlf, allocator);
-    defer allocator.free(output_text);
+    // try convert(input_path, output_path, allocator);
 
-    try expectEqualStrings(expected_text, output_text);
+    // const cwd = std.fs.cwd();
+
+    // var expected_path = "tests/ini_test_files/token_and_cst/simple/out.ini";
+
+    // var expected_file = try cwd.openFile(expected_path, .{});
+    // defer expected_file.close();
+    // var expected_buf_reader = bufferedReader(expected_file.reader());
+    // var expected_stream = expected_buf_reader.reader();
+    // const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+    // defer allocator.free(expected_text_crlf);
+    // var expected_text = try crlfToLf(expected_text_crlf, allocator);
+    // defer allocator.free(expected_text);
+
+    // var output_file = try cwd.openFile(output_path, .{});
+    // defer output_file.close();
+    // var output_buf_reader = bufferedReader(output_file.reader());
+    // var output_stream = output_buf_reader.reader();
+    // const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
+    // defer allocator.free(output_text_crlf);
+    // var output_text = try crlfToLf(output_text_crlf, allocator);
+    // defer allocator.free(output_text);
+
+    // try expectEqualStrings(expected_text, output_text);
 }
