@@ -157,7 +157,7 @@ fn convert(input_path: []const u8, output_path: []const u8, allocator: Allocator
         try writeAst(child, &output_file);
 
         // Don't add a trailing newline, since writeAst() already adds it
-        if (index < ast.items.len - 1) {
+        if (child.property != null and index < ast.items.len - 1) {
             try output_file.writeAll("\n");
         }
     }
@@ -197,7 +197,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         while (i < slice.len) : (i += 1) {
             if (slice.*[i] == '\n') {
                 break;
-            } else if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
+            } else if (slice.*[i] == '*' and slice.*[i + 1] == '/') {
                 in_multiline_comment.* = false;
                 i += 2;
                 break;
@@ -209,33 +209,31 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         const token = Token{ .type = .Comment, .slice = comment };
         slice.* = slice.*[i..];
         return token;
-    } else if (slice.*[0] == '/') {
-        if (slice.*[1] == '/') {
-            const index = std.mem.indexOf(u8, slice.*[2..], "\n");
-            const newline_index = if (index != null) index.? + 2 else slice.len;
-            const token = Token{ .type = .Comment, .slice = trim(u8, slice.*[2..newline_index], " ") };
-            slice.* = slice.*[newline_index..];
-            return token;
-        } else if (slice.*[1] == '*') {
-            in_multiline_comment.* = true;
+    } else if (slice.*[0] == '/' and slice.*[1] == '/') {
+        const index = std.mem.indexOf(u8, slice.*[2..], "\n");
+        const newline_index = if (index != null) index.? + 2 else slice.len;
+        const token = Token{ .type = .Comment, .slice = trim(u8, slice.*[2..newline_index], " ") };
+        slice.* = slice.*[newline_index..];
+        return token;
+    } else if (slice.*[0] == '/' and slice.*[1] == '*') {
+        in_multiline_comment.* = true;
 
-            var i: usize = 2;
-            while (i < slice.len) : (i += 1) {
-                if (slice.*[i] == '\n') {
-                    break;
-                } else if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
-                    in_multiline_comment.* = false;
-                    i += 2;
-                    break;
-                }
+        var i: usize = 2;
+        while (i < slice.len) : (i += 1) {
+            if (slice.*[i] == '\n') {
+                break;
+            } else if (slice.*[i] == '*' and slice.*[i + 1] == '/') {
+                in_multiline_comment.* = false;
+                i += 2;
+                break;
             }
-
-            const comment_end_index = if (in_multiline_comment.*) i else i - 2;
-            const comment = trim(u8, slice.*[2..comment_end_index], " ");
-            const token = Token{ .type = .Comment, .slice = comment };
-            slice.* = slice.*[i..];
-            return token;
         }
+
+        const comment_end_index = if (in_multiline_comment.*) i else i - 2;
+        const comment = trim(u8, slice.*[2..comment_end_index], " ");
+        const token = Token{ .type = .Comment, .slice = comment };
+        slice.* = slice.*[i..];
+        return token;
     } else if (slice.*[0] == '\t') {
         var i: usize = 1;
         for (slice.*[1..]) |character| {
@@ -273,7 +271,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
     var sentence_end_index: usize = end_index;
     while (end_index < slice.len) : (end_index += 1) {
         // TODO: This doesn't handle an = being part of the value correctly
-        if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
+        if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
             break;
         }
         if (slice.*[end_index] != ' ') {
@@ -299,16 +297,18 @@ fn getAst(tokens: *ArrayList(Token), allocator: Allocator) !ArrayList(Node) {
     return ast;
 }
 
-const GetNodeError = error{
+const NodeError = error{
+    TooManyTabs,
     Unexpected,
 };
 
-fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator: Allocator) error{ Unexpected, OutOfMemory }!Node {
+fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator: Allocator) error{ TooManyTabs, Unexpected, OutOfMemory }!Node {
     const States = enum {
         Start,
         Property,
         Equals,
         Value,
+        Newline,
     };
 
     var seen: States = .Start;
@@ -318,8 +318,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         .children = ArrayList(Node).init(allocator),
     };
 
-    var first = true;
-
     while (token_index.* < tokens.items.len) {
         const token = tokens.items[token_index.*];
 
@@ -327,21 +325,24 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
-            if (node.property == null) {
-                node.property = token.slice;
-                seen = .Property;
+            node.property = token.slice;
+            seen = .Property;
+            token_index.* += 1;
+        } else if (seen == .Start and token.type == .Tabs) {
+            if (token.slice.len > depth) {
+                return NodeError.TooManyTabs;
+            } else if (token.slice.len == depth) {
+                node.tabs = token.slice;
                 token_index.* += 1;
             } else {
                 return node;
             }
-        } else if (seen == .Start and token.type == .Tabs) {
-            if (token.slice.len > depth) {
+        } else if (seen == .Newline and token.type == .Tabs) {
+            if (token.slice.len > depth + 1) {
+                return NodeError.TooManyTabs;
+            } else if (token.slice.len == depth + 1) {
                 const child_node = try getNode(tokens, token_index, depth + 1, allocator);
                 try node.children.append(child_node);
-            } else if (token.slice.len == depth and first) {
-                node.tabs = token.slice;
-                first = false;
-                token_index.* += 1;
             } else {
                 return node;
             }
@@ -352,16 +353,18 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             node.value = token.slice;
             seen = .Value;
             token_index.* += 1;
+        } else if (seen == .Newline) {
+            return node;
         } else if (token.type == .Comment) {
             try node.comments.append(token.slice);
             token_index.* += 1;
         } else if (token.type == .Spaces) {
             token_index.* += 1;
         } else if (token.type == .Newline) {
-            seen = .Start;
+            seen = .Newline;
             token_index.* += 1;
         } else {
-            return GetNodeError.Unexpected;
+            return NodeError.Unexpected;
         }
     }
 
