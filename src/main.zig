@@ -100,7 +100,7 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    return convert("src/test.ini", "src/output.ini", allocator);
+    return convert("tests/ini_test_files/general/comments/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
 }
 
 const Token = struct {
@@ -108,8 +108,7 @@ const Token = struct {
     slice: []const u8,
 
     const Type = enum {
-        SingleComment,
-        MultiComment,
+        Comment,
         Tabs,
         Spaces,
         Equals,
@@ -179,52 +178,69 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
     var in_multiline_comment = false;
 
     while (slice.len > 0) {
-        const token = getToken(slice, &in_multiline_comment);
+        const token = getToken(&slice, &in_multiline_comment);
         try tokens.append(token);
-
-        slice = slice[token.slice.len..];
     }
 
     return tokens;
 }
 
-fn getToken(slice: []const u8, in_multiline_comment: *bool) Token {
+fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
+    // TODO: Consistently use either while-loops or for-loops everywhere in this function
+
+    if (slice.*[0] == '\n') {
+        const token = Token{ .type = .Newline, .slice = slice.*[0..1] };
+        slice.* = slice.*[1..];
+        return token;
+    }
+
     if (in_multiline_comment.*) {
         var i: usize = 0;
         while (i < slice.len) : (i += 1) {
-            if (slice[i] == '*' and i + 1 < slice.len and slice[i + 1] == '/') {
+            if (slice.*[i] == '\n') {
+                break;
+            } else if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
                 in_multiline_comment.* = false;
+                i += 2;
                 break;
             }
         }
 
-        const token = Token{ .type = .MultiComment, .slice = slice[0 .. i + 2] };
+        const comment_end_index = if (in_multiline_comment.*) i else i - 2;
+        const comment = trim(u8, slice.*[0..comment_end_index], " ");
+        const token = Token{ .type = .Comment, .slice = comment };
+        slice.* = slice.*[i..];
         return token;
     }
 
-    return switch (slice[0]) {
+    return switch (slice.*[0]) {
         '/' => {
-            return switch (slice[1]) {
+            return switch (slice.*[1]) {
                 '/' => {
-                    const index = std.mem.indexOf(u8, slice[2..], "\n");
+                    const index = std.mem.indexOf(u8, slice.*[2..], "\n");
                     const newline_index = if (index != null) index.? + 2 else slice.len;
-                    const token = Token{ .type = .SingleComment, .slice = slice[0..newline_index] };
+                    const token = Token{ .type = .Comment, .slice = trim(u8, slice.*[2..newline_index], " ") };
+                    slice.* = slice.*[newline_index..];
                     return token;
                 },
                 '*' => {
                     in_multiline_comment.* = true;
 
                     var i: usize = 2;
-                    // TODO: Either use while-loops or for-loops everywhere in this function
                     while (i < slice.len) : (i += 1) {
-                        if (slice[i] == '*' and i + 1 < slice.len and slice[i + 1] == '/') {
+                        if (slice.*[i] == '\n') {
+                            break;
+                        } else if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
                             in_multiline_comment.* = false;
                             i += 2;
                             break;
                         }
                     }
 
-                    const token = Token{ .type = .MultiComment, .slice = slice[0..i] };
+                    const comment_end_index = if (in_multiline_comment.*) i else i - 2;
+                    const comment = trim(u8, slice.*[2..comment_end_index], " ");
+                    const token = Token{ .type = .Comment, .slice = comment };
+                    slice.* = slice.*[i..];
                     return token;
                 },
                 else => {
@@ -232,51 +248,51 @@ fn getToken(slice: []const u8, in_multiline_comment: *bool) Token {
                     var end_index: usize = 2;
                     var sentence_end_index: usize = end_index;
                     while (end_index < slice.len) : (end_index += 1) {
-                        if (slice[end_index] == '=' or slice[end_index] == '\n' or (slice[end_index] == '/' and end_index + 1 < slice.len and slice[end_index + 1] == '*')) {
+                        if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
                             break;
                         }
-                        if (slice[end_index] != ' ') {
+                        if (slice.*[end_index] != ' ') {
                             sentence_end_index = end_index + 1;
                         }
                     }
 
-                    const token = Token{ .type = .Sentence, .slice = slice[0..sentence_end_index] };
+                    const token = Token{ .type = .Sentence, .slice = slice.*[0..sentence_end_index] };
+                    slice.* = slice.*[sentence_end_index..];
                     return token;
                 },
             };
         },
         '\t' => {
             var i: usize = 1;
-            for (slice[1..]) |character| {
+            for (slice.*[1..]) |character| {
                 if (character != '\t') {
                     break;
                 }
                 i += 1;
             }
 
-            const token = Token{ .type = .Tabs, .slice = slice[0..i] };
+            const token = Token{ .type = .Tabs, .slice = slice.*[0..i] };
+            slice.* = slice.*[i..];
             return token;
         },
         ' ' => {
             var i: usize = 1;
-            for (slice[1..]) |character| {
+            for (slice.*[1..]) |character| {
                 if (character != ' ') {
                     break;
                 }
                 i += 1;
             }
 
-            const token = Token{ .type = .Spaces, .slice = slice[0..i] };
+            const token = Token{ .type = .Spaces, .slice = slice.*[0..i] };
+            slice.* = slice.*[i..];
             return token;
         },
         '=' => {
-            const token = Token{ .type = .Equals, .slice = slice[0..1] };
+            const token = Token{ .type = .Equals, .slice = slice.*[0..1] };
             // TODO: Check what happens if a line ends with an =, since I don't know if slice ends with '\0'
             // TODO: The same question goes for the comment parsing code that reads 2 characters
-            return token;
-        },
-        '\n' => {
-            const token = Token{ .type = .Newline, .slice = slice[0..1] };
+            slice.* = slice.*[1..];
             return token;
         },
         else => {
@@ -284,15 +300,16 @@ fn getToken(slice: []const u8, in_multiline_comment: *bool) Token {
             var end_index: usize = 1;
             var sentence_end_index: usize = end_index;
             while (end_index < slice.len) : (end_index += 1) {
-                if (slice[end_index] == '=' or slice[end_index] == '\n' or (slice[end_index] == '/' and end_index + 1 < slice.len and slice[end_index + 1] == '*')) {
+                if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
                     break;
                 }
-                if (slice[end_index] != ' ') {
+                if (slice.*[end_index] != ' ') {
                     sentence_end_index = end_index + 1;
                 }
             }
 
-            const token = Token{ .type = .Sentence, .slice = slice[0..sentence_end_index] };
+            const token = Token{ .type = .Sentence, .slice = slice.*[0..sentence_end_index] };
+            slice.* = slice.*[sentence_end_index..];
             return token;
         },
     };
@@ -336,7 +353,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         const token = tokens.items[token_index.*];
 
         // TODO: Figure out why {s: <42} doesn't set the width to 42
-        // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
+        std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
             if (node.property == null) {
@@ -364,11 +381,8 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             node.value = token.slice;
             seen = .Value;
             token_index.* += 1;
-        } else if (token.type == .SingleComment) {
-            try node.comments.append(trim(u8, token.slice[2..], " "));
-            token_index.* += 1;
-        } else if (token.type == .MultiComment) {
-            try node.comments.append(trim(u8, token.slice[2 .. token.slice.len - 2], " "));
+        } else if (token.type == .Comment) {
+            try node.comments.append(token.slice);
             token_index.* += 1;
         } else if (token.type == .Spaces) {
             token_index.* += 1;
@@ -413,7 +427,12 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
     // Write comments to file
     if (node.comments.items.len > 0) {
         // std.debug.print("' //'\n", .{});
-        try file.writeAll(" //");
+
+        if (node.tabs != null or node.property != null) {
+            try file.writeAll(" ");
+        }
+
+        try file.writeAll("//");
 
         for (node.comments.items) |comment| {
             // std.debug.print("' {s}'\n", .{comment});
