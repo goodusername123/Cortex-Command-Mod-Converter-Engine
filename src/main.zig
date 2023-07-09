@@ -192,9 +192,7 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         const token = Token{ .type = .Newline, .slice = slice.*[0..1] };
         slice.* = slice.*[1..];
         return token;
-    }
-
-    if (in_multiline_comment.*) {
+    } else if (in_multiline_comment.*) {
         var i: usize = 0;
         while (i < slice.len) : (i += 1) {
             if (slice.*[i] == '\n') {
@@ -211,108 +209,81 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         const token = Token{ .type = .Comment, .slice = comment };
         slice.* = slice.*[i..];
         return token;
+    } else if (slice.*[0] == '/') {
+        if (slice.*[1] == '/') {
+            const index = std.mem.indexOf(u8, slice.*[2..], "\n");
+            const newline_index = if (index != null) index.? + 2 else slice.len;
+            const token = Token{ .type = .Comment, .slice = trim(u8, slice.*[2..newline_index], " ") };
+            slice.* = slice.*[newline_index..];
+            return token;
+        } else if (slice.*[1] == '*') {
+            in_multiline_comment.* = true;
+
+            var i: usize = 2;
+            while (i < slice.len) : (i += 1) {
+                if (slice.*[i] == '\n') {
+                    break;
+                } else if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
+                    in_multiline_comment.* = false;
+                    i += 2;
+                    break;
+                }
+            }
+
+            const comment_end_index = if (in_multiline_comment.*) i else i - 2;
+            const comment = trim(u8, slice.*[2..comment_end_index], " ");
+            const token = Token{ .type = .Comment, .slice = comment };
+            slice.* = slice.*[i..];
+            return token;
+        }
+    } else if (slice.*[0] == '\t') {
+        var i: usize = 1;
+        for (slice.*[1..]) |character| {
+            if (character != '\t') {
+                break;
+            }
+            i += 1;
+        }
+
+        const token = Token{ .type = .Tabs, .slice = slice.*[0..i] };
+        slice.* = slice.*[i..];
+        return token;
+    } else if (slice.*[0] == ' ') {
+        var i: usize = 1;
+        for (slice.*[1..]) |character| {
+            if (character != ' ') {
+                break;
+            }
+            i += 1;
+        }
+
+        const token = Token{ .type = .Spaces, .slice = slice.*[0..i] };
+        slice.* = slice.*[i..];
+        return token;
+    } else if (slice.*[0] == '=') {
+        const token = Token{ .type = .Equals, .slice = slice.*[0..1] };
+        // TODO: Check what happens if a line ends with an =, since I don't know if slice ends with '\0'
+        // TODO: The same question goes for the comment parsing code that reads 2 characters
+        slice.* = slice.*[1..];
+        return token;
     }
 
-    return switch (slice.*[0]) {
-        '/' => {
-            return switch (slice.*[1]) {
-                '/' => {
-                    const index = std.mem.indexOf(u8, slice.*[2..], "\n");
-                    const newline_index = if (index != null) index.? + 2 else slice.len;
-                    const token = Token{ .type = .Comment, .slice = trim(u8, slice.*[2..newline_index], " ") };
-                    slice.* = slice.*[newline_index..];
-                    return token;
-                },
-                '*' => {
-                    in_multiline_comment.* = true;
+    // A Sentence ends with a word, or the start of a comment
+    var end_index: usize = 1;
+    var sentence_end_index: usize = end_index;
+    while (end_index < slice.len) : (end_index += 1) {
+        // TODO: This doesn't handle an = being part of the value correctly
+        if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
+            break;
+        }
+        if (slice.*[end_index] != ' ') {
+            sentence_end_index = end_index + 1;
+        }
+    }
 
-                    var i: usize = 2;
-                    while (i < slice.len) : (i += 1) {
-                        if (slice.*[i] == '\n') {
-                            break;
-                        } else if (slice.*[i] == '*' and i + 1 < slice.len and slice.*[i + 1] == '/') {
-                            in_multiline_comment.* = false;
-                            i += 2;
-                            break;
-                        }
-                    }
-
-                    const comment_end_index = if (in_multiline_comment.*) i else i - 2;
-                    const comment = trim(u8, slice.*[2..comment_end_index], " ");
-                    const token = Token{ .type = .Comment, .slice = comment };
-                    slice.* = slice.*[i..];
-                    return token;
-                },
-                else => {
-                    // A Sentence ends with a word, or the start of a comment
-                    var end_index: usize = 2;
-                    var sentence_end_index: usize = end_index;
-                    while (end_index < slice.len) : (end_index += 1) {
-                        if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
-                            break;
-                        }
-                        if (slice.*[end_index] != ' ') {
-                            sentence_end_index = end_index + 1;
-                        }
-                    }
-
-                    const token = Token{ .type = .Sentence, .slice = slice.*[0..sentence_end_index] };
-                    slice.* = slice.*[sentence_end_index..];
-                    return token;
-                },
-            };
-        },
-        '\t' => {
-            var i: usize = 1;
-            for (slice.*[1..]) |character| {
-                if (character != '\t') {
-                    break;
-                }
-                i += 1;
-            }
-
-            const token = Token{ .type = .Tabs, .slice = slice.*[0..i] };
-            slice.* = slice.*[i..];
-            return token;
-        },
-        ' ' => {
-            var i: usize = 1;
-            for (slice.*[1..]) |character| {
-                if (character != ' ') {
-                    break;
-                }
-                i += 1;
-            }
-
-            const token = Token{ .type = .Spaces, .slice = slice.*[0..i] };
-            slice.* = slice.*[i..];
-            return token;
-        },
-        '=' => {
-            const token = Token{ .type = .Equals, .slice = slice.*[0..1] };
-            // TODO: Check what happens if a line ends with an =, since I don't know if slice ends with '\0'
-            // TODO: The same question goes for the comment parsing code that reads 2 characters
-            slice.* = slice.*[1..];
-            return token;
-        },
-        else => {
-            // A Sentence ends with a word, or the start of a comment
-            var end_index: usize = 1;
-            var sentence_end_index: usize = end_index;
-            while (end_index < slice.len) : (end_index += 1) {
-                if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and end_index + 1 < slice.len and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
-                    break;
-                }
-                if (slice.*[end_index] != ' ') {
-                    sentence_end_index = end_index + 1;
-                }
-            }
-
-            const token = Token{ .type = .Sentence, .slice = slice.*[0..sentence_end_index] };
-            slice.* = slice.*[sentence_end_index..];
-            return token;
-        },
-    };
+    const token = Token{ .type = .Sentence, .slice = slice.*[0..sentence_end_index] };
+    slice.* = slice.*[sentence_end_index..];
+    return token;
 }
 
 fn getAst(tokens: *ArrayList(Token), allocator: Allocator) !ArrayList(Node) {
