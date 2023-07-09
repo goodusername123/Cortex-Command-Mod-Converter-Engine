@@ -353,7 +353,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             node.value = token.slice;
             seen = .Value;
             token_index.* += 1;
-        } else if (seen == .Newline) {
+        } else if (seen == .Newline and (depth == 0 or token.type == .Tabs or token.type == .Equals or token.type == .Sentence)) {
             return node;
         } else if (token.type == .Comment) {
             try node.comments.append(token.slice);
@@ -449,7 +449,7 @@ test "everything" {
         var dir_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini")) {
-            std.debug.print("\nSubtest '{s}'\n", .{entry.path});
+            std.debug.print("\nSubtest '{s}'", .{entry.path});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini"), dir_path });
 
             var input_path = try join(allocator, &.{ dir_path, "in.ini" });
@@ -485,6 +485,7 @@ test "everything" {
             defer allocator.free(output_text);
 
             try expectEqualStrings(expected_text, output_text);
+            std.debug.print(" succeeded!", .{});
         }
     }
 }
