@@ -118,7 +118,7 @@ const Token = struct {
 };
 
 const Node = struct {
-    tabs: ?[]const u8 = null,
+    tabs: usize,
     property: ?[]const u8 = null,
     value: ?[]const u8 = null,
     comments: ArrayList([]const u8),
@@ -314,6 +314,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
     var seen: States = .Start;
 
     var node = Node{
+        .tabs = 0,
         .comments = ArrayList([]const u8).init(allocator),
         .children = ArrayList(Node).init(allocator),
     };
@@ -342,7 +343,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             if (token.slice.len > depth) {
                 return NodeError.TooManyTabs;
             } else if (token.slice.len == depth) {
-                node.tabs = token.slice;
+                node.tabs = token.slice.len;
                 token_index.* += 1;
             } else {
                 return node;
@@ -430,9 +431,10 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
     }
 
     // Write tabs to file
-    if (node.tabs != null) {
-        // std.debug.print("'{s}'\n", .{fmtSliceEscapeUpper(node.tabs.?)});
-        try file.writeAll(node.tabs.?);
+    var i: usize = 0;
+    while (i < node.tabs) : (i += 1) {
+        // std.debug.print("'\t'\n", .{});
+        try file.writeAll("\t");
     }
 
     // Write property to file
@@ -454,7 +456,7 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
     if (node.comments.items.len > 0) {
         // std.debug.print("' //'\n", .{});
 
-        if (node.tabs != null or node.property != null) {
+        if (node.property != null) {
             try file.writeAll(" ");
         }
 
