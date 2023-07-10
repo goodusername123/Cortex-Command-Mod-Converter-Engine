@@ -103,7 +103,8 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    return convert("tests/ini_test_files/general/comments/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+    return convert("tests/ini_test_files/foo/multiline_comment_between_tabs/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+    // return convert("tests/ini_test_files/general/comments/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
 }
 
 const Token = struct {
@@ -138,10 +139,6 @@ fn convert(input_path: []const u8, output_path: []const u8, allocator: Allocator
 
     const text = try in_stream.readAllAlloc(allocator, maxInt(usize));
     defer allocator.free(text);
-
-    const NodeList = MultiArrayList(Node);
-    var nodes = NodeList{};
-    defer nodes.deinit(allocator);
 
     var lf_text = try crlfToLf(text, allocator);
     defer allocator.free(lf_text);
@@ -319,6 +316,8 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 
     var seen: States = .Start;
 
+    var used_line_depth = false;
+
     var node = Node{
         .comments = ArrayList([]const u8).init(allocator),
         .children = ArrayList(Node).init(allocator),
@@ -345,17 +344,24 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             // } else if ((seen == .Start or seen == .Newline) and token.type == .Tabs and token_index.* + 1 < tokens.items.len and (tokens.items[token_index.* + 1].type == .Spaces or tokens.items[token_index.* + 1].type == .Equals or tokens.items[token_index.* + 1].type == .Sentence)) {
             //     return NodeError.Unexpected;
         } else if (seen == .Start and token.type == .Tabs) {
-            if (token.slice.len > depth) {
+            const line_depth = getLineDepth(tokens, token_index.*);
+            // TODO: Handle line_depth == -1
+
+            if (line_depth > depth) {
                 return NodeError.TooManyTabs;
-            } else if (token.slice.len == depth) {
+            } else if (line_depth == depth or used_line_depth) {
+                used_line_depth = true;
                 token_index.* += 1;
             } else {
                 return node;
             }
         } else if (seen == .Newline and token.type == .Tabs) {
-            if (token.slice.len > depth + 1) {
+            const line_depth = getLineDepth(tokens, token_index.*);
+            // TODO: Handle line_depth == -1
+
+            if (line_depth > depth + 1) {
                 return NodeError.TooManyTabs;
-            } else if (token.slice.len == depth + 1) {
+            } else if (line_depth == depth + 1) {
                 const child_node = try getNode(tokens, token_index, depth + 1, allocator);
                 try node.children.append(child_node);
             } else {
@@ -388,43 +394,50 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 
 // TODO: New method:
 // 1. If a line containing only a comment is detected, place it in a depth equal to the next line containing a property
+//    Do this using a new getNextDepth() function
 //
 // Old method:
 // 1. Let node.tabs be ?u32, instead of a slice
-// 2. Use getDepth() everywhere
-// 3. When getDepth() returns .OnlyWhitespace, throw the entire line away
-//    When getDepth() returns .OnlyComments, recursively add its comments as a child line
+// 2. Use getLineDepth() everywhere
+// 3. When getLineDepth() returns .OnlyComments, recursively add its comments as a child line
+//    When getLineDepth() returns .OnlyWhitespace, throw the entire line away
 // 4. Once the AST is built, iterate over all .OnlyComments nodes, and initialize their .tabs value
-//    Do this by copying the .tabs value of the next closest node that contains a property
-//
-// fn getDepth(token, tokens, next_token_idx) {
-//     if (token.type == .Newline) {
-//         return -1;
-//     } else if (token.type == .Sentence) {
-//         return 0;
-//     } else if (token.type == .Tabs) {
-//         tabs_seen = len(token["content"]);
-//     } else {
-//         tabs_seen = 0;
-//     }
+//    Do this by copying the .tabs value of the next node containing a property
 
-//     while (next_token_idx < len(tokens)) {
-//         next_token = tokens[next_token_idx];
+fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
+    var token_index = token_index_;
 
-//         if (next_token.type == .Newline) {
-//             return -1;
-//         } else if (next_token.type == .Sentence) {
-//             return tabs_seen;
-//         } else if (next_token.type == .Tabs) {
-//             tabs_seen += len(next_token["content"]);
-//         }
+    var token = tokens.items[token_index];
 
-//         next_token_idx += 1;
-//     }
+    if (token.type == .Newline) {
+        return -1;
+    } else if (token.type == .Sentence) {
+        return 0;
+    }
 
-//     // When the while-loop read the last character of the file and didn't return
-//     return -1;
-// }
+    var tabs_seen: i32 = if (token.type == .Tabs) @intCast(i32, token.slice.len) else 0;
+
+    token_index += 1;
+
+    while (token_index < tokens.items.len) {
+        token = tokens.items[token_index];
+
+        if (token.type == .Newline) {
+            return -1;
+        } else if (token.type == .Sentence) {
+            return tabs_seen;
+        }
+
+        if (token.type == .Tabs) {
+            tabs_seen += @intCast(i32, token.slice.len);
+        }
+
+        token_index += 1;
+    }
+
+    // If the while-loop read the last character of the file and didn't return
+    return -1;
+}
 
 fn writeAst(node: *Node, buffered_writer: anytype, depth: usize) !void {
     // Don't add an empty line
@@ -493,6 +506,7 @@ test "everything" {
     var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
     var tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
 
+    // var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files/foo", .{});
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files/general", .{});
     defer iterable_tests.close();
 
