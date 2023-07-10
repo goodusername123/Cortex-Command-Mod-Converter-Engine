@@ -1,4 +1,6 @@
 const std = @import("std");
+
+// TODO: Remove ALL of these?
 const ArrayList = std.ArrayList;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const page_allocator = std.heap.page_allocator;
@@ -10,6 +12,7 @@ const Allocator = std.mem.Allocator;
 const trim = std.mem.trim;
 const replacementSize = std.mem.replacementSize;
 const replace = std.mem.replace;
+const bufferedWriter = std.io.bufferedWriter;
 const fmtSliceEscapeUpper = std.fmt.fmtSliceEscapeUpper;
 const tmpDir = std.testing.tmpDir;
 const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
@@ -118,7 +121,6 @@ const Token = struct {
 };
 
 const Node = struct {
-    tabs: usize,
     property: ?[]const u8 = null,
     value: ?[]const u8 = null,
     comments: ArrayList([]const u8),
@@ -152,15 +154,19 @@ fn convert(input_path: []const u8, output_path: []const u8, allocator: Allocator
 
     const output_file = try cwd.createFile(output_path, .{});
     defer output_file.close();
+    var buffered = bufferedWriter(output_file.writer());
+    const buffered_writer = buffered.writer();
 
     for (ast.items) |*child, index| {
-        try writeAst(child, &output_file);
+        try writeAst(child, buffered_writer, 0);
 
-        // Don't add a trailing newline, since writeAst() already adds it
+        // Doesn't add a trailing newline, because writeAst() already adds it
         if (child.property != null and index < ast.items.len - 1) {
-            try output_file.writeAll("\n");
+            try writeBuffered(buffered_writer, "\n");
         }
     }
+
+    try buffered.flush();
 }
 
 fn crlfToLf(text: []const u8, allocator: Allocator) ![]const u8 {
@@ -314,7 +320,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
     var seen: States = .Start;
 
     var node = Node{
-        .tabs = 0,
         .comments = ArrayList([]const u8).init(allocator),
         .children = ArrayList(Node).init(allocator),
     };
@@ -343,7 +348,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             if (token.slice.len > depth) {
                 return NodeError.TooManyTabs;
             } else if (token.slice.len == depth) {
-                node.tabs = token.slice.len;
                 token_index.* += 1;
             } else {
                 return node;
@@ -383,9 +387,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 }
 
 // TODO: New method:
-// 1. Get entirely rid of the .tabs property, cause the depth can be tracked by how deep writeAst() has recursed
-//    Just write "\t" in a for-loop
-// 2. If a line containing only a comment is detected, place it in a depth equal to the next line containing a property
+// 1. If a line containing only a comment is detected, place it in a depth equal to the next line containing a property
 //
 // Old method:
 // 1. Let node.tabs be ?u32, instead of a slice
@@ -424,7 +426,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 //     return -1;
 // }
 
-fn writeAst(node: *Node, file: *const std.fs.File) !void {
+fn writeAst(node: *Node, buffered_writer: anytype, depth: usize) !void {
     // Don't add an empty line
     if (node.property == null and node.comments.items.len == 0) {
         return;
@@ -432,24 +434,24 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
 
     // Write tabs to file
     var i: usize = 0;
-    while (i < node.tabs) : (i += 1) {
+    while (i < depth) : (i += 1) {
         // std.debug.print("'\t'\n", .{});
-        try file.writeAll("\t");
+        try writeBuffered(buffered_writer, "\t");
     }
 
     // Write property to file
     if (node.property != null) {
         // std.debug.print("'{s}'\n", .{node.property.?});
-        try file.writeAll(node.property.?);
+        try writeBuffered(buffered_writer, node.property.?);
     }
 
     // Write value and equals to file
     if (node.value != null) {
         // std.debug.print("' = '\n", .{});
-        try file.writeAll(" = ");
+        try writeBuffered(buffered_writer, " = ");
 
         // std.debug.print("'{s}'\n", .{node.value.?});
-        try file.writeAll(node.value.?);
+        try writeBuffered(buffered_writer, node.value.?);
     }
 
     // Write comments to file
@@ -457,27 +459,31 @@ fn writeAst(node: *Node, file: *const std.fs.File) !void {
         // std.debug.print("' //'\n", .{});
 
         if (node.property != null) {
-            try file.writeAll(" ");
+            try writeBuffered(buffered_writer, " ");
         }
 
-        try file.writeAll("//");
+        try writeBuffered(buffered_writer, "//");
 
         for (node.comments.items) |comment| {
             // std.debug.print("' {s}'\n", .{comment});
-            try file.writeAll(" ");
-            try file.writeAll(comment);
+            try writeBuffered(buffered_writer, " ");
+            try writeBuffered(buffered_writer, comment);
         }
     }
 
     // Write newline to file
     // std.debug.print("'\\n'\n", .{});
-    try file.writeAll("\n");
+    try writeBuffered(buffered_writer, "\n");
 
     // Recursively enter child nodes
     // std.debug.print("Recursing into child\n", .{});
     for (node.children.items) |*child| {
-        try writeAst(child, file);
+        try writeAst(child, buffered_writer, depth + 1);
     }
+}
+
+fn writeBuffered(buffered_writer: anytype, string: []const u8) !void {
+    try buffered_writer.print("{s}", .{string});
 }
 
 test "everything" {
