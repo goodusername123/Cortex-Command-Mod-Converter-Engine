@@ -322,12 +322,22 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         const token = tokens.items[token_index.*];
 
         // TODO: Figure out why {s: <42} doesn't set the width to 42
-        std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
+        // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
             node.property = token.slice;
             seen = .Property;
             token_index.* += 1;
+            // } else if (seen == .Start and token.type == .Comment) {
+            // node.property = token.slice;
+            // seen = .Property;
+            // token_index.* += 1;
+            // TODO: The below elif doesn't work if the next line is "\t/*a*/b = c", so recreate the Python get_depth()
+            // } else if ((seen == .Start or seen == .Newline) and token.type == .Tabs and token_index.* + 1 < tokens.items.len and (tokens.items[token_index.* + 1].type == .Comment or tokens.items[token_index.* + 1].type == .Newline)) {
+            // node.tabs = token.slice;
+            // token_index.* += 1;
+            // } else if ((seen == .Start or seen == .Newline) and token.type == .Tabs and token_index.* + 1 < tokens.items.len and (tokens.items[token_index.* + 1].type == .Spaces or tokens.items[token_index.* + 1].type == .Equals or tokens.items[token_index.* + 1].type == .Sentence)) {
+            //     return NodeError.Unexpected;
         } else if (seen == .Start and token.type == .Tabs) {
             if (token.slice.len > depth) {
                 return NodeError.TooManyTabs;
@@ -346,6 +356,8 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             } else {
                 return node;
             }
+        } else if (seen == .Newline and (depth == 0 or token.type == .Equals or token.type == .Sentence)) {
+            return node;
         } else if (seen == .Property and token.type == .Equals) {
             seen = .Equals;
             token_index.* += 1;
@@ -353,8 +365,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             node.value = token.slice;
             seen = .Value;
             token_index.* += 1;
-        } else if (seen == .Newline and (depth == 0 or token.type == .Tabs or token.type == .Equals or token.type == .Sentence)) {
-            return node;
         } else if (token.type == .Comment) {
             try node.comments.append(token.slice);
             token_index.* += 1;
@@ -370,6 +380,48 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 
     return node;
 }
+
+// TODO: New method:
+// 1. Get entirely rid of the .tabs property, cause the depth can be tracked by how deep writeAst() has recursed
+//    Just write "\t" in a for-loop
+// 2. If a line containing only a comment is detected, place it in a depth equal to the next line containing a property
+//
+// Old method:
+// 1. Let node.tabs be ?u32, instead of a slice
+// 2. Use getDepth() everywhere
+// 3. When getDepth() returns .OnlyWhitespace, throw the entire line away
+//    When getDepth() returns .OnlyComments, recursively add its comments as a child line
+// 4. Once the AST is built, iterate over all .OnlyComments nodes, and initialize their .tabs value
+//    Do this by copying the .tabs value of the next closest node that contains a property
+//
+// fn getDepth(token, tokens, next_token_idx) {
+//     if (token.type == .Newline) {
+//         return -1;
+//     } else if (token.type == .Sentence) {
+//         return 0;
+//     } else if (token.type == .Tabs) {
+//         tabs_seen = len(token["content"]);
+//     } else {
+//         tabs_seen = 0;
+//     }
+
+//     while (next_token_idx < len(tokens)) {
+//         next_token = tokens[next_token_idx];
+
+//         if (next_token.type == .Newline) {
+//             return -1;
+//         } else if (next_token.type == .Sentence) {
+//             return tabs_seen;
+//         } else if (next_token.type == .Tabs) {
+//             tabs_seen += len(next_token["content"]);
+//         }
+
+//         next_token_idx += 1;
+//     }
+
+//     // When the while-loop read the last character of the file and didn't return
+//     return -1;
+// }
 
 fn writeAst(node: *Node, file: *const std.fs.File) !void {
     // Don't add an empty line
