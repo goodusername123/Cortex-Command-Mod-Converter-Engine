@@ -103,7 +103,7 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    return convert("tests/ini_test_files/foo/multiline_comment_between_tabs/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+    return convert("tests/ini_test_files/foo/comment_last/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
     // return convert("tests/ini_test_files/general/comments/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
 }
 
@@ -413,11 +413,11 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
         return -1;
     } else if (token.type == .Sentence) {
         return 0;
+    } else if (lineIsSentenceless(tokens, token_index)) {
+        return getNextSentenceDepth(tokens, token_index);
     }
 
-    var tabs_seen: i32 = if (token.type == .Tabs) @intCast(i32, token.slice.len) else 0;
-
-    token_index += 1;
+    var tabs_seen: i32 = 0;
 
     while (token_index < tokens.items.len) {
         token = tokens.items[token_index];
@@ -435,8 +435,51 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
         token_index += 1;
     }
 
-    // If the while-loop read the last character of the file and didn't return
+    // If the end of the file is reached
     return -1;
+}
+
+fn lineIsSentenceless(tokens: *ArrayList(Token), token_index_: usize) bool {
+    var token_index = token_index_;
+
+    while (token_index < tokens.items.len) {
+        const token = tokens.items[token_index];
+
+        if (token.type == .Newline) {
+            return true;
+        } else if (token.type == .Sentence) {
+            return false;
+        }
+
+        token_index += 1;
+    }
+
+    return true;
+}
+
+fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
+    var token_index = token_index_;
+
+    var tabs_seen: i32 = 0;
+
+    while (token_index < tokens.items.len) {
+        const token = tokens.items[token_index];
+
+        if (token.type == .Newline) {
+            tabs_seen = 0;
+        } else if (token.type == .Sentence) {
+            return tabs_seen;
+        }
+
+        if (token.type == .Tabs) {
+            tabs_seen += @intCast(i32, token.slice.len);
+        }
+
+        token_index += 1;
+    }
+
+    // If the end of the file is reached
+    return tabs_seen;
 }
 
 fn writeAst(node: *Node, buffered_writer: anytype, depth: usize) !void {
