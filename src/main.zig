@@ -70,7 +70,7 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    return convert("tests/ini_test_files/general/too_many_tabs/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+    return parseFile("tests/ini_test_files/invalid/unclosed_multiline_comment.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
 }
 
 const Token = struct {
@@ -95,7 +95,7 @@ const Node = struct {
     children: ArrayList(Node),
 };
 
-fn convert(input_path: []const u8, output_path: []const u8, allocator: Allocator) !void {
+fn parseFile(input_path: []const u8, output_path: []const u8, allocator: Allocator) !void {
     const cwd = std.fs.cwd();
 
     var input_file = try cwd.openFile(input_path, .{});
@@ -551,7 +551,7 @@ test "everything" {
 
             // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
 
-            try convert(input_path, output_path, allocator);
+            try parseFile(input_path, output_path, allocator);
 
             const cwd = std.fs.cwd();
 
