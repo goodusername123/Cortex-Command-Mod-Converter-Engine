@@ -1,6 +1,5 @@
 const std = @import("std");
 
-// TODO: Remove ALL of these?
 const ArrayList = std.ArrayList;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const page_allocator = std.heap.page_allocator;
@@ -27,7 +26,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 /// \tSupportedGameVersion = Pre4
 /// \t/* bar */IconFile      = ContentFile /* baz
 /// bee */\t\tFilePath=foo.png
-/// \tDescription = lol
+/// \tDescription = bop
 ///
 /// Turns into this .ini output file:
 /// // foo1 foo2 foo3
@@ -35,9 +34,9 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 /// \tSupportedGameVersion = Pre4
 /// \tIconFile = ContentFile // bar baz
 /// \t\tFilePath = foo.png // bee
-/// \tDescription = lol
+/// \tDescription = bop
 ///
-/// That output file is stored roughly like so:
+/// The output file is the serialized form of the created Abstract Syntax Tree:
 /// {
 ///     {
 ///         .comments = { "foo1", "foo2", "foo3" };
@@ -61,43 +60,11 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 ///             },
 ///             {
 ///                 .property = "Description";
-///                 .value = "lol";
+///                 .value = "bop";
 ///             }
 ///         }
 ///     }
 /// }
-///
-/// This is how it is actually stored:
-///
-/// // Not using ArrayList, since we don't want padding
-/// nodes: MultiArrayList(Node) = {
-///     {
-///         .comments = "foo1", "foo2", "foo3";
-///     },
-///     {
-///         .property = "DataModule";
-///         .children = 2, 3 and 5;
-///     },
-///     {
-///         .property = "SupportedGameVersion";
-///         .value = "Pre4";
-///     },
-///     {
-///         .property = "IconFile";
-///         .value = "ContentFile";
-///         .comments = "bar" and "baz";
-///         .children = 4;
-///     },
-///     {
-///         .property = "FilePath";
-///         .value = "foo.png";
-///         .comments = "bee";
-///     },
-///     {
-///         .property = "Description";
-///         .value = "lol";
-///     }
-/// };
 pub fn main() !void {
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
@@ -456,7 +423,7 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
 
     // If the end of the file is reached
     // TODO: Find a way to return the same depth as the previous Sentence line
-    // It isn't as easy as return depth; since it can also be return depth + 1;
+    // It isn't as easy as "return depth", since it can also be "return depth + 1"
     return 0;
 }
 
@@ -483,7 +450,7 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
 
     // If the end of the file is reached
     // TODO: Find a way to return the same depth as the previous Sentence line
-    // It isn't as easy as return depth; since it can also be return depth + 1;
+    // It isn't as easy as "return depth", since it can also be "return depth + 1"
     return 0;
 }
 
