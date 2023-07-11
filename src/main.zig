@@ -399,7 +399,9 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             seen = .Value;
             token_index.* += 1;
         } else if (token.type == .Comment) {
-            try node.comments.append(token.slice);
+            if (token.slice.len > 0) {
+                try node.comments.append(token.slice);
+            }
             token_index.* += 1;
         } else if (token.type == .Tabs or token.type == .Spaces) {
             token_index.* += 1;
@@ -415,18 +417,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 
     return node;
 }
-
-// TODO: New method:
-// 1. If a line containing only a comment is detected, place it in a depth equal to the next line containing a property
-//    Do this using a new getNextDepth() function
-//
-// Old method:
-// 1. Let node.tabs be ?u32, instead of a slice
-// 2. Use getLineDepth() everywhere
-// 3. When getLineDepth() returns .OnlyComments, recursively add its comments as a child line
-//    When getLineDepth() returns .OnlyWhitespace, throw the entire line away
-// 4. Once the AST is built, iterate over all .OnlyComments nodes, and initialize their .tabs value
-//    Do this by copying the .tabs value of the next node containing a property
 
 fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     var token_index = token_index_;
