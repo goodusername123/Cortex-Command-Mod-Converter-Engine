@@ -103,7 +103,7 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    return convert("tests/ini_test_files/foo/comment_last/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+    return convert("tests/ini_test_files/foo/complex/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
     // return convert("tests/ini_test_files/general/comments/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
 }
 
@@ -114,6 +114,7 @@ const Token = struct {
     const Type = enum {
         Comment,
         Tabs,
+        // TODO: Get rid of Spaces token entirely
         Spaces,
         Equals,
         Newline,
@@ -316,15 +317,25 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 
     var seen: States = .Start;
 
-    var used_line_depth = false;
-
     var node = Node{
         .comments = ArrayList([]const u8).init(allocator),
         .children = ArrayList(Node).init(allocator),
     };
 
+    var token = tokens.items[token_index.*];
+
+    var line_depth = getLineDepth(tokens, token_index.*);
+    // std.debug.print("a {}\n", .{line_depth});
+    if (line_depth > depth) {
+        return NodeError.TooManyTabs;
+    } else if (line_depth < depth) {
+        return node;
+    }
+
+    var checked_line_depth = true;
+
     while (token_index.* < tokens.items.len) {
-        const token = tokens.items[token_index.*];
+        token = tokens.items[token_index.*];
 
         // TODO: Figure out why {s: <42} doesn't set the width to 42
         // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
@@ -333,42 +344,21 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             node.property = token.slice;
             seen = .Property;
             token_index.* += 1;
-            // } else if (seen == .Start and token.type == .Comment) {
-            // node.property = token.slice;
-            // seen = .Property;
-            // token_index.* += 1;
-            // TODO: The below elif doesn't work if the next line is "\t/*a*/b = c", so recreate the Python get_depth()
-            // } else if ((seen == .Start or seen == .Newline) and token.type == .Tabs and token_index.* + 1 < tokens.items.len and (tokens.items[token_index.* + 1].type == .Comment or tokens.items[token_index.* + 1].type == .Newline)) {
-            // node.tabs = token.slice;
-            // token_index.* += 1;
-            // } else if ((seen == .Start or seen == .Newline) and token.type == .Tabs and token_index.* + 1 < tokens.items.len and (tokens.items[token_index.* + 1].type == .Spaces or tokens.items[token_index.* + 1].type == .Equals or tokens.items[token_index.* + 1].type == .Sentence)) {
-            //     return NodeError.Unexpected;
-        } else if (seen == .Start and token.type == .Tabs) {
-            const line_depth = getLineDepth(tokens, token_index.*);
-            // TODO: Handle line_depth == -1
+        } else if (seen == .Newline and !checked_line_depth) {
+            checked_line_depth = true;
 
-            if (line_depth > depth) {
-                return NodeError.TooManyTabs;
-            } else if (line_depth == depth or used_line_depth) {
-                used_line_depth = true;
-                token_index.* += 1;
-            } else {
-                return node;
-            }
-        } else if (seen == .Newline and token.type == .Tabs) {
-            const line_depth = getLineDepth(tokens, token_index.*);
-            // TODO: Handle line_depth == -1
+            line_depth = getLineDepth(tokens, token_index.*);
+            // std.debug.print("b {}\n", .{line_depth});
 
             if (line_depth > depth + 1) {
                 return NodeError.TooManyTabs;
             } else if (line_depth == depth + 1) {
                 const child_node = try getNode(tokens, token_index, depth + 1, allocator);
                 try node.children.append(child_node);
+                checked_line_depth = false;
             } else {
                 return node;
             }
-        } else if (seen == .Newline and (depth == 0 or token.type == .Equals or token.type == .Sentence)) {
-            return node;
         } else if (seen == .Property and token.type == .Equals) {
             seen = .Equals;
             token_index.* += 1;
@@ -379,12 +369,14 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         } else if (token.type == .Comment) {
             try node.comments.append(token.slice);
             token_index.* += 1;
-        } else if (token.type == .Spaces) {
+        } else if (token.type == .Tabs or token.type == .Spaces) {
             token_index.* += 1;
         } else if (token.type == .Newline) {
             seen = .Newline;
             token_index.* += 1;
+            checked_line_depth = false;
         } else {
+            // std.debug.print("{}\n", .{token});
             return NodeError.Unexpected;
         }
     }
@@ -409,9 +401,7 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
 
     var token = tokens.items[token_index];
 
-    if (token.type == .Newline) {
-        return -1;
-    } else if (token.type == .Sentence) {
+    if (token.type == .Sentence) {
         return 0;
     } else if (lineIsSentenceless(tokens, token_index)) {
         return getNextSentenceDepth(tokens, token_index);
@@ -422,9 +412,7 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     while (token_index < tokens.items.len) {
         token = tokens.items[token_index];
 
-        if (token.type == .Newline) {
-            return -1;
-        } else if (token.type == .Sentence) {
+        if (token.type == .Sentence) {
             return tabs_seen;
         }
 
@@ -436,7 +424,9 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     }
 
     // If the end of the file is reached
-    return -1;
+    // TODO: Find a way to return the same depth as the previous Sentence line
+    // It isn't as easy as return depth; since it can also be return depth + 1;
+    return 0;
 }
 
 fn lineIsSentenceless(tokens: *ArrayList(Token), token_index_: usize) bool {
@@ -479,7 +469,9 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     }
 
     // If the end of the file is reached
-    return tabs_seen;
+    // TODO: Find a way to return the same depth as the previous Sentence line
+    // It isn't as easy as return depth; since it can also be return depth + 1;
+    return 0;
 }
 
 fn writeAst(node: *Node, buffered_writer: anytype, depth: usize) !void {
