@@ -103,8 +103,7 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    return convert("tests/ini_test_files/foo/complex/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
-    // return convert("tests/ini_test_files/general/comments/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+    return convert("tests/ini_test_files/general/too_many_tabs/in.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
 }
 
 const Token = struct {
@@ -174,6 +173,10 @@ fn crlfToLf(text: []const u8, allocator: Allocator) ![]const u8 {
     return lf_text;
 }
 
+const TokenError = error{
+    UnclosedMultiComment,
+};
+
 fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
     var slice: []const u8 = lf_text;
 
@@ -184,6 +187,10 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
     while (slice.len > 0) {
         const token = getToken(&slice, &in_multiline_comment);
         try tokens.append(token);
+    }
+
+    if (in_multiline_comment) {
+        return TokenError.UnclosedMultiComment;
     }
 
     return tokens;
@@ -371,7 +378,9 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 
         // TODO: Figure out why {s: <42} doesn't set the width to 42
         // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
+        // std.debug.print("{}\n", .{token.slice.len});
 
+        // TODO: This if-statement does belong here! It can set .property twice!
         if (seen == .Start and token.type == .Sentence) {
             node.property = token.slice;
             seen = .Property;
@@ -601,4 +610,6 @@ test "everything" {
             std.debug.print(" succeeded!", .{});
         }
     }
+
+    std.debug.print("\n\n", .{});
 }
