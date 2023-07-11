@@ -70,7 +70,7 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    return parseFile("tests/ini_test_files/invalid/unclosed_multiline_comment.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+    return parseFile("tests/ini_test_files/invalid/opened_and_closed_multiline_bug.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
 }
 
 const Token = struct {
@@ -149,40 +149,49 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
 
     var tokens = ArrayList(Token).init(allocator);
 
-    var in_multiline_comment = false;
+    var multiline_comment_depth: i32 = 0;
 
     while (slice.len > 0) {
-        const token = getToken(&slice, &in_multiline_comment);
+        const token = getToken(&slice, &multiline_comment_depth);
         try tokens.append(token);
     }
 
-    if (in_multiline_comment) {
+    if (multiline_comment_depth > 0) {
         return TokenError.UnclosedMultiComment;
     }
 
     return tokens;
 }
 
-fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
+fn getToken(slice: *[]const u8, multiline_comment_depth: *i32) Token {
     // TODO: Consistently use either while-loops or for-loops everywhere in this function
 
     if (slice.*[0] == '\n') {
         const token = Token{ .type = .Newline, .slice = slice.*[0..1] };
         slice.* = slice.*[1..];
         return token;
-    } else if (in_multiline_comment.*) {
+    } else if (multiline_comment_depth.* > 0) {
+        var found_comment_marker = false;
         var i: usize = 0;
-        while (i < slice.len) : (i += 1) {
+        while (i < slice.len) {
             if (slice.*[i] == '\n') {
                 break;
-            } else if (slice.*[i] == '*' and slice.*[i + 1] == '/') {
-                in_multiline_comment.* = false;
+            } else if (slice.*[i] == '/' and slice.*[i + 1] == '*') {
+                multiline_comment_depth.* += 1;
                 i += 2;
+                found_comment_marker = true;
                 break;
+            } else if (slice.*[i] == '*' and slice.*[i + 1] == '/') {
+                multiline_comment_depth.* -= 1;
+                i += 2;
+                found_comment_marker = true;
+                break;
+            } else {
+                i += 1;
             }
         }
 
-        const comment_end_index = if (in_multiline_comment.*) i else i - 2;
+        const comment_end_index = if (found_comment_marker) i - 2 else i;
         const comment = trim(u8, slice.*[0..comment_end_index], " ");
         const token = Token{ .type = .Comment, .slice = comment };
         slice.* = slice.*[i..];
@@ -194,20 +203,29 @@ fn getToken(slice: *[]const u8, in_multiline_comment: *bool) Token {
         slice.* = slice.*[newline_index..];
         return token;
     } else if (slice.*[0] == '/' and slice.*[1] == '*') {
-        in_multiline_comment.* = true;
+        multiline_comment_depth.* += 1;
 
+        var found_comment_marker = false;
         var i: usize = 2;
-        while (i < slice.len) : (i += 1) {
+        while (i < slice.len) {
             if (slice.*[i] == '\n') {
                 break;
-            } else if (slice.*[i] == '*' and slice.*[i + 1] == '/') {
-                in_multiline_comment.* = false;
+            } else if (slice.*[i] == '/' and slice.*[i + 1] == '*') {
+                multiline_comment_depth.* += 1;
                 i += 2;
+                found_comment_marker = true;
                 break;
+            } else if (slice.*[i] == '*' and slice.*[i + 1] == '/') {
+                multiline_comment_depth.* -= 1;
+                i += 2;
+                found_comment_marker = true;
+                break;
+            } else {
+                i += 1;
             }
         }
 
-        const comment_end_index = if (in_multiline_comment.*) i else i - 2;
+        const comment_end_index = if (found_comment_marker) i - 2 else i;
         const comment = trim(u8, slice.*[2..comment_end_index], " ");
         const token = Token{ .type = .Comment, .slice = comment };
         slice.* = slice.*[i..];
