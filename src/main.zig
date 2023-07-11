@@ -293,12 +293,44 @@ fn getAst(tokens: *ArrayList(Token), allocator: Allocator) !ArrayList(Node) {
 
     var token_index: usize = 0;
 
+    if (lineHasSentence(tokens, token_index)) {
+        token_index = leftTrimFirstLine(tokens);
+    }
+
     while (token_index < tokens.items.len) {
         const node = try getNode(tokens, &token_index, 0, allocator);
         try ast.append(node);
     }
 
     return ast;
+}
+
+fn lineHasSentence(tokens: *ArrayList(Token), token_index_: usize) bool {
+    var token_index = token_index_;
+
+    while (token_index < tokens.items.len) {
+        const token = tokens.items[token_index];
+
+        if (token.type == .Newline) {
+            return false;
+        } else if (token.type == .Sentence) {
+            return true;
+        }
+
+        token_index += 1;
+    }
+
+    return false;
+}
+
+fn leftTrimFirstLine(tokens: *ArrayList(Token)) usize {
+    var token_index: usize = 0;
+
+    while (tokens.items[token_index].type != .Sentence) {
+        token_index += 1;
+    }
+
+    return token_index;
 }
 
 const NodeError = error{
@@ -403,7 +435,7 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
 
     if (token.type == .Sentence) {
         return 0;
-    } else if (lineIsSentenceless(tokens, token_index)) {
+    } else if (!lineHasSentence(tokens, token_index)) {
         return getNextSentenceDepth(tokens, token_index);
     }
 
@@ -427,24 +459,6 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     // TODO: Find a way to return the same depth as the previous Sentence line
     // It isn't as easy as return depth; since it can also be return depth + 1;
     return 0;
-}
-
-fn lineIsSentenceless(tokens: *ArrayList(Token), token_index_: usize) bool {
-    var token_index = token_index_;
-
-    while (token_index < tokens.items.len) {
-        const token = tokens.items[token_index];
-
-        if (token.type == .Newline) {
-            return true;
-        } else if (token.type == .Sentence) {
-            return false;
-        }
-
-        token_index += 1;
-    }
-
-    return true;
 }
 
 fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
