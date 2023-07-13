@@ -593,7 +593,7 @@ test "general" {
             defer allocator.free(output_text);
 
             try expectEqualStrings(expected_text, output_text);
-            std.debug.print(" succeeded!", .{});
+            std.debug.print(" passed", .{});
         }
     }
 
@@ -650,6 +650,7 @@ test "invalid" {
             } else |err| {
                 try expectEqualStrings(@errorName(err), error_text);
             }
+            std.debug.print(" passed", .{});
         }
     }
 
