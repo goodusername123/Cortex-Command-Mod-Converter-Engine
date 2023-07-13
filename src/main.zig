@@ -20,7 +20,37 @@ const join = std.fs.path.join;
 // const expect = std.testing.expect;
 const expectEqualStrings = std.testing.expectEqualStrings;
 
-/// This .ini input file:
+pub fn main() !void {
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
+
+    return parseFile("tests/ini_test_files/invalid/carriage_return.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+}
+
+const Token = struct {
+    type: Type,
+    slice: []const u8,
+
+    const Type = enum {
+        Comment,
+        Tabs,
+        // TODO: Get rid of Spaces token entirely
+        Spaces,
+        Equals,
+        Newline,
+        Sentence,
+    };
+};
+
+const Node = struct {
+    property: ?[]const u8 = null,
+    value: ?[]const u8 = null,
+    comments: ArrayList([]const u8),
+    children: ArrayList(Node),
+};
+
+/// This function converts this .ini input file:
 /// /* foo1   */ /* foo2*//*foo3*/
 /// DataModule
 /// \tSupportedGameVersion = Pre4
@@ -28,7 +58,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 /// bee */\t\tFilePath=foo.png
 /// \tDescription = bop
 ///
-/// Turns into this .ini output file:
+/// into this .ini output file:
 /// // foo1 foo2 foo3
 /// DataModule
 /// \tSupportedGameVersion = Pre4
@@ -36,7 +66,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 /// \t\tFilePath = foo.png // bee
 /// \tDescription = bop
 ///
-/// The output file is the serialized form of the created Abstract Syntax Tree:
+/// and returns it as this Abstract Syntax Tree:
 /// {
 ///     {
 ///         .comments = { "foo1", "foo2", "foo3" };
@@ -65,36 +95,6 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 ///         }
 ///     }
 /// }
-pub fn main() !void {
-    var arena = ArenaAllocator.init(page_allocator);
-    defer arena.deinit();
-    var allocator = arena.allocator();
-
-    return parseFile("tests/ini_test_files/invalid/opened_and_closed_multiline_bug.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
-}
-
-const Token = struct {
-    type: Type,
-    slice: []const u8,
-
-    const Type = enum {
-        Comment,
-        Tabs,
-        // TODO: Get rid of Spaces token entirely
-        Spaces,
-        Equals,
-        Newline,
-        Sentence,
-    };
-};
-
-const Node = struct {
-    property: ?[]const u8 = null,
-    value: ?[]const u8 = null,
-    comments: ArrayList([]const u8),
-    children: ArrayList(Node),
-};
-
 fn parseFile(input_path: []const u8, output_path: []const u8, allocator: Allocator) !void {
     const cwd = std.fs.cwd();
 
@@ -153,6 +153,7 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
 
     while (slice.len > 0) {
         const token = getToken(&slice, &multiline_comment_depth);
+        // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
         try tokens.append(token);
     }
 
@@ -363,10 +364,10 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 
         // TODO: Figure out why {s: <42} doesn't set the width to 42
         // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
-        // std.debug.print("{}\n", .{token.slice.len});
 
-        // TODO: This if-statement does belong here! It can set .property twice!
         if (seen == .Start and token.type == .Sentence) {
+            // This if-statement is deliberately in a loop,
+            // since whitespace and multiline comments may come before it
             node.property = token.slice;
             seen = .Property;
             token_index.* += 1;
@@ -532,7 +533,7 @@ fn writeBuffered(buffered_writer: anytype, string: []const u8) !void {
     try buffered_writer.print("{s}", .{string});
 }
 
-test "everything" {
+test "general" {
     var tmpdir = tmpDir(.{});
     defer tmpdir.cleanup();
 
@@ -556,7 +557,7 @@ test "everything" {
         var dir_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini")) {
-            std.debug.print("\nSubtest '{s}'", .{entry.path});
+            std.debug.print("\nSubtest 'general/{s}'", .{entry.path});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini"), dir_path });
 
             var input_path = try join(allocator, &.{ dir_path, "in.ini" });
@@ -593,6 +594,62 @@ test "everything" {
 
             try expectEqualStrings(expected_text, output_text);
             std.debug.print(" succeeded!", .{});
+        }
+    }
+
+    std.debug.print("\n\n", .{});
+}
+
+test "invalid" {
+    var tmpdir = tmpDir(.{});
+    defer tmpdir.cleanup();
+
+    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    var tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
+    _ = tmpdir_path;
+
+    // var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files/foo", .{});
+    var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files/invalid", .{});
+    defer iterable_tests.close();
+
+    // TODO: Use test_allocator
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
+
+    var tests_walker = try iterable_tests.walk(allocator);
+    defer tests_walker.deinit();
+
+    while (try tests_walker.next()) |entry| {
+        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
+        var dir_path = try entry.dir.realpath(".", &out_buffer);
+
+        if (entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini")) {
+            std.debug.print("\nSubtest 'invalid/{s}'", .{entry.path});
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini"), dir_path });
+
+            var input_path = try join(allocator, &.{ dir_path, "in.ini" });
+            defer allocator.free(input_path);
+            var error_path = try join(allocator, &.{ dir_path, "error.txt" });
+            defer allocator.free(error_path);
+
+            // std.debug.print("{s}\n{s}\n\n", .{ input_path, error_path });
+
+            const cwd = std.fs.cwd();
+            var error_file = try cwd.openFile(error_path, .{});
+            defer error_file.close();
+            var error_buf_reader = bufferedReader(error_file.reader());
+            var error_stream = error_buf_reader.reader();
+            const error_text_crlf = try error_stream.readAllAlloc(allocator, maxInt(usize));
+            defer allocator.free(error_text_crlf);
+            var error_text = try crlfToLf(error_text_crlf, allocator);
+            defer allocator.free(error_text);
+
+            if (parseFile(input_path, "", allocator)) {
+                unreachable;
+            } else |err| {
+                try expectEqualStrings(@errorName(err), error_text);
+            }
         }
     }
 
