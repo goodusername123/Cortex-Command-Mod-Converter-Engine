@@ -23,7 +23,7 @@
 			}
 		},
 		{
-			"label": "test zig",
+			"label": "build test zig",
 			"type": "shell",
 			"command": "zig build test",
 			"problemMatcher": [],
