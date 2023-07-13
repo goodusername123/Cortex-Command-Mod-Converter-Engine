@@ -25,7 +25,7 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    return parseFile("tests/ini_test_files/invalid/carriage_return.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
+    return parseFile("tests/invalid/carriage_return.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
 }
 
 const Token = struct {
@@ -540,8 +540,7 @@ test "general" {
     var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
     var tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
 
-    // var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files/foo", .{});
-    var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files/general", .{});
+    var iterable_tests = try std.fs.cwd().openIterableDir("tests/general", .{});
     defer iterable_tests.close();
 
     // TODO: Use test_allocator
@@ -601,15 +600,7 @@ test "general" {
 }
 
 test "invalid" {
-    var tmpdir = tmpDir(.{});
-    defer tmpdir.cleanup();
-
-    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    var tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
-    _ = tmpdir_path;
-
-    // var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files/foo", .{});
-    var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_test_files/invalid", .{});
+    var iterable_tests = try std.fs.cwd().openIterableDir("tests/invalid", .{});
     defer iterable_tests.close();
 
     // TODO: Use test_allocator

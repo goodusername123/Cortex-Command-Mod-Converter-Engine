@@ -5,43 +5,14 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "rebuild & test",
-			"type": "python",
-			"request": "launch",
-			"program": "test.py",
-			"console": "integratedTerminal",
-			"justMyCode": false,
-			"preLaunchTask": "rebuild"
-		},
-		{
-			"name": "test",
-			"type": "python",
-			"request": "launch",
-			"program": "test.py",
-			"console": "integratedTerminal",
-			"justMyCode": false
-		},
-		{
 			"name": "zig",
 			"type": "cppvsdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/zig-out/bin/Cortex-Command-Mod-Converter-Engine",
 			"args": [],
-			// "stopAtEntry": true,
 			"cwd": "${workspaceFolder}",
-			// "environment": [],
 			"console": "integratedTerminal",
-			// "MIMode": "gdb",
-			"preLaunchTask": "build zig",
-			// "setupCommands": [
-			// 	{
-			// 		"description": "Enable pretty-printing for gdb",
-			// 		"text": "-enable-pretty-printing",
-			// 		"ignoreFailures": true
-			// 	}
-			// ]
-			// "console": "integratedTerminal",
-			// "justMyCode": false
+			"preLaunchTask": "build zig"
 		}
 	]
 }

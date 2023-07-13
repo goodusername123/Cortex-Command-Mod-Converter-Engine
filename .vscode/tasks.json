@@ -2,17 +2,6 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "rebuild",
-			"command": "py -m build && pip install dist/*.tar.gz",
-			"type": "shell",
-			"group": "build"
-		},
-		{
-			"label": "upload to pypi",
-			"command": "twine upload dist/*",
-			"type": "shell",
-		},
-		{
 			"label": "build zig",
 			"type": "shell",
 			"command": "zig build",
