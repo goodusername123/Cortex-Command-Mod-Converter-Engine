@@ -20,37 +20,7 @@ const join = std.fs.path.join;
 // const expect = std.testing.expect;
 const expectEqualStrings = std.testing.expectEqualStrings;
 
-pub fn main() !void {
-    var arena = ArenaAllocator.init(page_allocator);
-    defer arena.deinit();
-    var allocator = arena.allocator();
-
-    return parseFile("tests/invalid/carriage_return.ini", "C:/Users/welfj/Desktop/out.ini", allocator);
-}
-
-const Token = struct {
-    type: Type,
-    slice: []const u8,
-
-    const Type = enum {
-        Comment,
-        Tabs,
-        // TODO: Get rid of Spaces token entirely
-        Spaces,
-        Equals,
-        Newline,
-        Sentence,
-    };
-};
-
-const Node = struct {
-    property: ?[]const u8 = null,
-    value: ?[]const u8 = null,
-    comments: ArrayList([]const u8),
-    children: ArrayList(Node),
-};
-
-/// This function converts this .ini input file:
+/// The purpose of the converter engine is to take an .ini input file like this:
 /// /* foo1   */ /* foo2*//*foo3*/
 /// DataModule
 /// \tSupportedGameVersion = Pre4
@@ -58,7 +28,7 @@ const Node = struct {
 /// bee */\t\tFilePath=foo.png
 /// \tDescription = bop
 ///
-/// into this .ini output file:
+/// and to turn it into this .ini output file:
 /// // foo1 foo2 foo3
 /// DataModule
 /// \tSupportedGameVersion = Pre4
@@ -66,7 +36,7 @@ const Node = struct {
 /// \t\tFilePath = foo.png // bee
 /// \tDescription = bop
 ///
-/// and returns it as this Abstract Syntax Tree:
+/// returned in the form of this Abstract Syntax Tree:
 /// {
 ///     {
 ///         .comments = { "foo1", "foo2", "foo3" };
@@ -95,7 +65,47 @@ const Node = struct {
 ///         }
 ///     }
 /// }
-fn parseFile(input_path: []const u8, output_path: []const u8, allocator: Allocator) !void {
+pub fn main() !void {
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
+
+    const text = try readFile("tests/general/simple/in.ini", allocator);
+    defer allocator.free(text);
+
+    var tokens = try getTokens(text, allocator);
+    defer tokens.deinit();
+
+    // TODO: Should I stop passing the address of tokens and ast everywhere?
+
+    var ast = try getAstFromTokens(&tokens, allocator);
+    defer ast.deinit();
+
+    try writeAst(&ast, "zig-cache/tmp/out.ini");
+}
+
+const Token = struct {
+    type: Type,
+    slice: []const u8,
+
+    const Type = enum {
+        Comment,
+        Tabs,
+        Spaces,
+        Equals,
+        Newline,
+        Sentence,
+    };
+};
+
+const Node = struct {
+    property: ?[]const u8 = null,
+    value: ?[]const u8 = null,
+    comments: ArrayList([]const u8),
+    children: ArrayList(Node),
+};
+
+fn readFile(input_path: []const u8, allocator: Allocator) ![]const u8 {
     const cwd = std.fs.cwd();
 
     var input_file = try cwd.openFile(input_path, .{});
@@ -107,30 +117,9 @@ fn parseFile(input_path: []const u8, output_path: []const u8, allocator: Allocat
     const text = try in_stream.readAllAlloc(allocator, maxInt(usize));
     defer allocator.free(text);
 
-    var lf_text = try crlfToLf(text, allocator);
-    defer allocator.free(lf_text);
+    const lf_text = try crlfToLf(text, allocator);
 
-    // TODO: Should I stop passing the address of allocator, tokens, and ast everywhere?
-
-    var tokens = try getTokens(lf_text, allocator);
-
-    var ast = try getAst(&tokens, allocator);
-
-    const output_file = try cwd.createFile(output_path, .{});
-    defer output_file.close();
-    var buffered = bufferedWriter(output_file.writer());
-    const buffered_writer = buffered.writer();
-
-    for (ast.items) |*child, index| {
-        try writeAst(child, buffered_writer, 0);
-
-        // Doesn't add a trailing newline, because writeAst() already adds it
-        if (child.property != null and index < ast.items.len - 1) {
-            try writeBuffered(buffered_writer, "\n");
-        }
-    }
-
-    try buffered.flush();
+    return lf_text;
 }
 
 fn crlfToLf(text: []const u8, allocator: Allocator) ![]const u8 {
@@ -281,7 +270,7 @@ fn getToken(slice: *[]const u8, multiline_comment_depth: *i32) Token {
     return token;
 }
 
-fn getAst(tokens: *ArrayList(Token), allocator: Allocator) !ArrayList(Node) {
+fn getAstFromTokens(tokens: *ArrayList(Token), allocator: Allocator) !ArrayList(Node) {
     var ast = ArrayList(Node).init(allocator);
 
     var token_index: usize = 0;
@@ -473,7 +462,26 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
-fn writeAst(node: *Node, buffered_writer: anytype, depth: usize) !void {
+fn writeAst(ast: *ArrayList(Node), output_path: []const u8) !void {
+    const cwd = std.fs.cwd();
+    const output_file = try cwd.createFile(output_path, .{});
+    defer output_file.close();
+    var buffered = bufferedWriter(output_file.writer());
+    const buffered_writer = buffered.writer();
+
+    for (ast.items) |*child, index| {
+        try writeAstRecursively(child, buffered_writer, 0);
+
+        // Doesn't add a trailing newline, because writeAstRecursively() already adds it
+        if (child.property != null and index < ast.items.len - 1) {
+            try writeBuffered(buffered_writer, "\n");
+        }
+    }
+
+    try buffered.flush();
+}
+
+fn writeAstRecursively(node: *Node, buffered_writer: anytype, depth: usize) !void {
     // Don't add an empty line
     if (node.property == null and node.comments.items.len == 0) {
         return;
@@ -525,7 +533,7 @@ fn writeAst(node: *Node, buffered_writer: anytype, depth: usize) !void {
     // Recursively enter child nodes
     // std.debug.print("Recursing into child\n", .{});
     for (node.children.items) |*child| {
-        try writeAst(child, buffered_writer, depth + 1);
+        try writeAstRecursively(child, buffered_writer, depth + 1);
     }
 }
 
@@ -538,7 +546,7 @@ test "general" {
     defer tmpdir.cleanup();
 
     var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    var tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
+    const tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
 
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/general", .{});
     defer iterable_tests.close();
@@ -546,49 +554,58 @@ test "general" {
     // TODO: Use test_allocator
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
-    var allocator = arena.allocator();
+    const allocator = arena.allocator();
 
     var tests_walker = try iterable_tests.walk(allocator);
     defer tests_walker.deinit();
 
     while (try tests_walker.next()) |entry| {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        var dir_path = try entry.dir.realpath(".", &out_buffer);
+        const dir_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'general/{s}'", .{entry.path});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini"), dir_path });
 
-            var input_path = try join(allocator, &.{ dir_path, "in.ini" });
+            const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             defer allocator.free(input_path);
-            var expected_path = try join(allocator, &.{ dir_path, "out.ini" });
+            const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
             defer allocator.free(expected_path);
 
-            var output_path = try join(allocator, &.{ tmpdir_path, "output.ini" });
+            const output_path = try join(allocator, &.{ tmpdir_path, "output.ini" });
             defer allocator.free(output_path);
 
             // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
 
-            try parseFile(input_path, output_path, allocator);
+            const text = try readFile(input_path, allocator);
+            defer allocator.free(text);
+
+            var tokens = try getTokens(text, allocator);
+            defer tokens.deinit();
+
+            var ast = try getAstFromTokens(&tokens, allocator);
+            defer ast.deinit();
+
+            try writeAst(&ast, output_path);
 
             const cwd = std.fs.cwd();
 
-            var expected_file = try cwd.openFile(expected_path, .{});
+            const expected_file = try cwd.openFile(expected_path, .{});
             defer expected_file.close();
             var expected_buf_reader = bufferedReader(expected_file.reader());
-            var expected_stream = expected_buf_reader.reader();
+            const expected_stream = expected_buf_reader.reader();
             const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
             defer allocator.free(expected_text_crlf);
-            var expected_text = try crlfToLf(expected_text_crlf, allocator);
+            const expected_text = try crlfToLf(expected_text_crlf, allocator);
             defer allocator.free(expected_text);
 
-            var output_file = try cwd.openFile(output_path, .{});
+            const output_file = try cwd.openFile(output_path, .{});
             defer output_file.close();
             var output_buf_reader = bufferedReader(output_file.reader());
-            var output_stream = output_buf_reader.reader();
+            const output_stream = output_buf_reader.reader();
             const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
             defer allocator.free(output_text_crlf);
-            var output_text = try crlfToLf(output_text_crlf, allocator);
+            const output_text = try crlfToLf(output_text_crlf, allocator);
             defer allocator.free(output_text);
 
             try expectEqualStrings(expected_text, output_text);
@@ -606,44 +623,57 @@ test "invalid" {
     // TODO: Use test_allocator
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
-    var allocator = arena.allocator();
+    const allocator = arena.allocator();
 
     var tests_walker = try iterable_tests.walk(allocator);
     defer tests_walker.deinit();
 
     while (try tests_walker.next()) |entry| {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        var dir_path = try entry.dir.realpath(".", &out_buffer);
+        const dir_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'invalid/{s}'", .{entry.path});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini"), dir_path });
 
-            var input_path = try join(allocator, &.{ dir_path, "in.ini" });
+            const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             defer allocator.free(input_path);
-            var error_path = try join(allocator, &.{ dir_path, "error.txt" });
+            const error_path = try join(allocator, &.{ dir_path, "error.txt" });
             defer allocator.free(error_path);
 
             // std.debug.print("{s}\n{s}\n\n", .{ input_path, error_path });
 
             const cwd = std.fs.cwd();
-            var error_file = try cwd.openFile(error_path, .{});
+            const error_file = try cwd.openFile(error_path, .{});
             defer error_file.close();
             var error_buf_reader = bufferedReader(error_file.reader());
-            var error_stream = error_buf_reader.reader();
+            const error_stream = error_buf_reader.reader();
             const error_text_crlf = try error_stream.readAllAlloc(allocator, maxInt(usize));
             defer allocator.free(error_text_crlf);
-            var error_text = try crlfToLf(error_text_crlf, allocator);
+            const error_text = try crlfToLf(error_text_crlf, allocator);
             defer allocator.free(error_text);
 
-            if (parseFile(input_path, "", allocator)) {
-                unreachable;
-            } else |err| {
+            const text = try readFile(input_path, allocator);
+            defer allocator.free(text);
+
+            verifyInvalidTestThrowsError(&text, allocator) catch |err| {
                 try expectEqualStrings(@errorName(err), error_text);
-            }
+            };
+
             std.debug.print(" passed", .{});
         }
     }
 
     std.debug.print("\n\n", .{});
+}
+
+fn verifyInvalidTestThrowsError(text: *const []const u8, allocator: Allocator) !void {
+    var tokens = try getTokens(text.*, allocator);
+    defer tokens.deinit();
+
+    var ast = try getAstFromTokens(&tokens, allocator);
+    defer ast.deinit();
+
+    // Tests from the invalid/ folder should always return an error from this function before reaching this
+    unreachable;
 }
