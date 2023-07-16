@@ -18,6 +18,7 @@ const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
 const join = std.fs.path.join;
 const basename = std.fs.path.basename;
 const StringHashMap = std.hash_map.StringHashMap;
+const eql = std.mem.eql;
 // const test_allocator = std.testing.allocator;
 // const expect = std.testing.expect;
 const expectEqualStrings = std.testing.expectEqualStrings;
@@ -525,7 +526,7 @@ fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
     try addProperties(file_tree, &properties, allocator);
 
-    try updateSupportedGameVersion(file_tree, &properties, allocator);
+    try updateSupportedGameVersion(&properties, allocator);
 }
 
 fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
@@ -556,26 +557,34 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
     }
 }
 
-fn updateSupportedGameVersion(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    _ = file_tree;
+fn updateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
     const err = error{
         MoreThanOneSupportedGameVersion,
+        NoSupportedGameVersionValue,
         MissingDataModule,
         MoreThanOneDataModule,
     };
 
     var supported_game_version = properties.get("SupportedGameVersion");
     if (supported_game_version) |nodes| {
+        // Update the SupportedGameVersion, if necessary
         if (nodes.items.len == 1) {
             var node = nodes.items[0];
 
-            // TODO: Update the SupportedGameVersion (if necessary)
-
-            std.debug.print("{}\n", .{node});
+            if (node.*.value) |value| {
+                // TODO: Maybe add a check that the input version isn't newer
+                // than the version this engine thinks is the latest?
+                if (!eql(u8, value, "Pre-Release 5.0")) {
+                    node.*.value = "Pre-Release 5.0";
+                }
+            } else {
+                return err.NoSupportedGameVersionValue;
+            }
         } else {
             return err.MoreThanOneSupportedGameVersion;
         }
     } else {
+        // Add the SupportedGameVersion
         var data_module = properties.get("DataModule");
         if (data_module) |nodes| {
             if (nodes.items.len == 1) {
@@ -722,9 +731,9 @@ test "general" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'general/{s}'", .{entry.path});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
@@ -780,9 +789,9 @@ test "invalid" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'invalid/{s}'", .{entry.path});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and std.mem.eql(u8, entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const error_path = try join(allocator, &.{ dir_path, "error.txt" });
