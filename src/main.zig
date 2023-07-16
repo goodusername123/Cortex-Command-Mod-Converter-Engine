@@ -122,55 +122,6 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8) !void {
     try writeFileTree(&file_tree, output_mod_path, allocator);
 }
 
-fn modifyFileTree(file_tree: *Folder, allocator: Allocator) !void {
-    // Create hashmap, where the key is a property,
-    // and the value is a list of Nodes that have this property
-    var properties = StringHashMap(ArrayList(*Node)).init(allocator);
-    try addProperties(file_tree, &properties, allocator);
-    std.debug.print("{}\n", .{properties.contains("A")});
-    std.debug.print("{}\n", .{properties.contains("B")});
-    std.debug.print("{}\n", .{properties.contains("C")});
-    std.debug.print("{}\n", .{properties.contains("D")});
-
-    var a = properties.get("A");
-    if (a) |b| {
-        for (b.items) |item| {
-            std.debug.print("{}\n", .{item});
-        }
-    }
-
-    // fn modifySupportedGameVersion() void {}
-    // modifySupportedGameVersion();
-}
-
-fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    for (file_tree.files.items) |file| {
-        for (file.ast.items) |*node| {
-            try addFileProperties(node, properties, allocator);
-        }
-    }
-
-    for (file_tree.folders.items) |*folder| {
-        try addProperties(folder, properties, allocator);
-    }
-}
-
-fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    if (node.property) |property| {
-        var result = try properties.getOrPut(property);
-
-        if (!result.found_existing) {
-            result.value_ptr.* = ArrayList(*Node).init(allocator);
-        }
-
-        try result.value_ptr.*.append(node);
-    }
-
-    for (node.children.items) |*child| {
-        try addFileProperties(child, properties, allocator);
-    }
-}
-
 fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
     // std.debug.print("folder_path: '{s}'\n", .{folder_path});
 
@@ -566,6 +517,55 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     // TODO: Find a way to return the same depth as the previous Sentence line
     // It isn't as easy as "return depth", since it can also be "return depth + 1"
     return 0;
+}
+
+fn modifyFileTree(file_tree: *Folder, allocator: Allocator) !void {
+    // Create hashmap, where the key is a property,
+    // and the value is a list of Nodes that have this property
+    var properties = StringHashMap(ArrayList(*Node)).init(allocator);
+    try addProperties(file_tree, &properties, allocator);
+    std.debug.print("{}\n", .{properties.contains("A")});
+    std.debug.print("{}\n", .{properties.contains("B")});
+    std.debug.print("{}\n", .{properties.contains("C")});
+    std.debug.print("{}\n", .{properties.contains("D")});
+
+    var a = properties.get("A");
+    if (a) |b| {
+        for (b.items) |item| {
+            std.debug.print("{}\n", .{item});
+        }
+    }
+
+    // fn modifySupportedGameVersion() void {}
+    // modifySupportedGameVersion();
+}
+
+fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try addFileProperties(node, properties, allocator);
+        }
+    }
+
+    for (file_tree.folders.items) |*folder| {
+        try addProperties(folder, properties, allocator);
+    }
+}
+
+fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    if (node.property) |property| {
+        var result = try properties.getOrPut(property);
+
+        if (!result.found_existing) {
+            result.value_ptr.* = ArrayList(*Node).init(allocator);
+        }
+
+        try result.value_ptr.*.append(node);
+    }
+
+    for (node.children.items) |*child| {
+        try addFileProperties(child, properties, allocator);
+    }
 }
 
 fn writeFileTree(file_tree: *const Folder, output_mod_path: []const u8, allocator: Allocator) !void {
