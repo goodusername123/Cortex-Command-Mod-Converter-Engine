@@ -119,32 +119,8 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8) !void {
     try writeFileTree(&file_tree, output_mod_path, allocator);
 }
 
-fn writeFileTree(file_tree: *const Folder, output_mod_path: []const u8, allocator: Allocator) !void {
-    std.fs.makeDirAbsolute(output_mod_path) catch |err| switch (err) {
-        error.PathAlreadyExists => {},
-        else => |e| return e,
-    };
-
-    for (file_tree.files.items) |file| {
-        std.debug.print("output_mod_path: '{s}', file.name: '{s}'\n", .{ output_mod_path, file.name });
-        const file_path = try join(allocator, &.{ output_mod_path, file.name });
-        std.debug.print("file_path: '{s}'\n", .{file_path});
-        try writeAst(&file.ast, file_path);
-    }
-
-    for (file_tree.folders.items) |folder| {
-        const child_output_mod_path = try join(allocator, &.{ output_mod_path, folder.name });
-        std.debug.print("{s}\n", .{child_output_mod_path});
-        try writeFileTree(&folder, child_output_mod_path, allocator);
-    }
-}
-
-// fn getFileTree(input_mod_path: []const u8, allocator: Allocator) !Folder {
-//     return try getFileTreeRecursively(input_mod_path, allocator);
-// }
-
 fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
-    std.debug.print("folder_path: '{s}'\n", .{folder_path});
+    // std.debug.print("folder_path: '{s}'\n", .{folder_path});
 
     var folder = Folder{
         .name = basename(folder_path),
@@ -157,7 +133,7 @@ fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
 
     var dir_iterator = dir.iterate();
     while (try dir_iterator.next()) |entry| {
-        std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
+        // std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
         if (entry.kind == std.fs.File.Kind.File) {
             var file = File{
                 .name = try allocator.dupe(u8, entry.name),
@@ -538,6 +514,26 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     // TODO: Find a way to return the same depth as the previous Sentence line
     // It isn't as easy as "return depth", since it can also be "return depth + 1"
     return 0;
+}
+
+fn writeFileTree(file_tree: *const Folder, output_mod_path: []const u8, allocator: Allocator) !void {
+    std.fs.makeDirAbsolute(output_mod_path) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => |e| return e,
+    };
+
+    for (file_tree.files.items) |file| {
+        // std.debug.print("output_mod_path: '{s}', file.name: '{s}'\n", .{ output_mod_path, file.name });
+        const file_path = try join(allocator, &.{ output_mod_path, file.name });
+        // std.debug.print("file_path: '{s}'\n", .{file_path});
+        try writeAst(&file.ast, file_path);
+    }
+
+    for (file_tree.folders.items) |folder| {
+        const child_output_mod_path = try join(allocator, &.{ output_mod_path, folder.name });
+        // std.debug.print("{s}\n", .{child_output_mod_path});
+        try writeFileTree(&folder, child_output_mod_path, allocator);
+    }
 }
 
 fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
