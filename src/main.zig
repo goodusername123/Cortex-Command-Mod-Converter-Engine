@@ -520,20 +520,12 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
 }
 
 fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
-    // Create hashmap, where the key is a property,
+    // Create a hashmap, where the key is a property,
     // and the value is a list of Nodes that have this property
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
     try addProperties(file_tree, &properties, allocator);
-    // std.debug.print("{}\n", .{properties.contains("A")});
-    // std.debug.print("{}\n", .{properties.contains("B")});
-    // std.debug.print("{}\n", .{properties.contains("C")});
-    // std.debug.print("{}\n", .{properties.contains("D")});
 
     try updateSupportedGameVersion(file_tree, &properties, allocator);
-
-    // std.debug.print("{any}\n", .{properties.get("SupportedGameVersion")});
-    // std.debug.print("{}\n", .{properties.get("SupportedGameVersion").?.items[0]});
-    // std.debug.print("{}\n", .{file_tree.files.items[0].ast.items[0].children.items[1]});
 }
 
 fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
@@ -565,6 +557,7 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
 }
 
 fn updateSupportedGameVersion(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    _ = file_tree;
     const err = error{
         MoreThanOneSupportedGameVersion,
         MissingDataModule,
@@ -595,29 +588,9 @@ fn updateSupportedGameVersion(file_tree: *Folder, properties: *StringHashMap(Arr
                     .children = ArrayList(Node).init(allocator),
                 });
 
-                for (children.items) |child| {
-                    if (child.property) |property| {
-                        std.debug.print("child after: {s}\n", .{property});
-                    }
-                }
-
                 var supported_list = ArrayList(*Node).init(allocator);
                 try supported_list.append(nodes.items[0]);
                 try properties.put("SupportedGameVersion", supported_list);
-
-                // TODO: REMOVE
-                // children.items[0].property = "lol";
-
-                std.debug.print("{*}\n", .{children.items});
-                std.debug.print("{*}\n", .{&children.items[0]});
-                std.debug.print("{s}\n", .{children.items[0].property.?});
-                std.debug.print("{}\n", .{children.items.len});
-
-                std.debug.print("{*}\n", .{file_tree.files.items[0].ast.items[0].children.items});
-                std.debug.print("{*}\n", .{&file_tree.files.items[0].ast.items[0].children.items[0]});
-                std.debug.print("{s}\n", .{file_tree.files.items[0].ast.items[0].children.items[0].property.?});
-                std.debug.print("{}\n", .{file_tree.files.items[0].ast.items[0].children.items.len});
-                // std.debug.print("{}\n", .{file_tree.files.items[0].ast.items[0].children.items[1]});
             } else {
                 return err.MoreThanOneDataModule;
             }
