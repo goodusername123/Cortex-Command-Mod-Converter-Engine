@@ -132,6 +132,13 @@ fn modifyFileTree(file_tree: *Folder, allocator: Allocator) !void {
     std.debug.print("{}\n", .{properties.contains("C")});
     std.debug.print("{}\n", .{properties.contains("D")});
 
+    var a = properties.get("A");
+    if (a) |b| {
+        for (b.items) |item| {
+            std.debug.print("{}\n", .{item});
+        }
+    }
+
     // fn modifySupportedGameVersion() void {}
     // modifySupportedGameVersion();
 }
@@ -149,8 +156,8 @@ fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)
 }
 
 fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    if (node.property != null) {
-        var result = try properties.getOrPut(node.property.?);
+    if (node.property) |property| {
+        var result = try properties.getOrPut(property);
 
         if (!result.found_existing) {
             result.value_ptr.* = ArrayList(*Node).init(allocator);
@@ -287,7 +294,7 @@ fn getToken(slice: *[]const u8, multiline_comment_depth: *i32) Token {
         return token;
     } else if (slice.*[0] == '/' and slice.*[1] == '/') {
         const index = std.mem.indexOf(u8, slice.*[2..], "\n");
-        const newline_index = if (index != null) index.? + 2 else slice.len;
+        const newline_index = if (index) |i| i + 2 else slice.len;
         const token = Token{ .type = .Comment, .slice = trim(u8, slice.*[2..newline_index], " ") };
         slice.* = slice.*[newline_index..];
         return token;
@@ -614,18 +621,18 @@ fn writeAstRecursively(node: *Node, buffered_writer: anytype, depth: usize) !voi
     }
 
     // Write property to file
-    if (node.property != null) {
-        // std.debug.print("'{s}'\n", .{node.property.?});
-        try writeBuffered(buffered_writer, node.property.?);
+    if (node.property) |property| {
+        // std.debug.print("'{s}'\n", .{property});
+        try writeBuffered(buffered_writer, property);
     }
 
     // Write value and equals to file
-    if (node.value != null) {
+    if (node.value) |value| {
         // std.debug.print("' = '\n", .{});
         try writeBuffered(buffered_writer, " = ");
 
-        // std.debug.print("'{s}'\n", .{node.value.?});
-        try writeBuffered(buffered_writer, node.value.?);
+        // std.debug.print("'{s}'\n", .{value});
+        try writeBuffered(buffered_writer, value);
     }
 
     // Write comments to file
