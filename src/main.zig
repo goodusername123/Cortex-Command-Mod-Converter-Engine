@@ -16,6 +16,7 @@ const fmtSliceEscapeUpper = std.fmt.fmtSliceEscapeUpper;
 const tmpDir = std.testing.tmpDir;
 const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
 const join = std.fs.path.join;
+const basename = std.fs.path.basename;
 // const test_allocator = std.testing.allocator;
 // const expect = std.testing.expect;
 const expectEqualStrings = std.testing.expectEqualStrings;
@@ -65,38 +66,12 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 ///         }
 ///     }
 /// }
-pub fn main() !void {
-    try convert("", "");
-}
-
-fn convert(input_mod_path: []const u8, output_folder_path: []const u8) !void {
-    _ = output_folder_path;
-    _ = input_mod_path;
-
-    var arena = ArenaAllocator.init(page_allocator);
-    defer arena.deinit();
-    var allocator = arena.allocator();
-
-    var ast = try getAst(allocator);
-
-    try writeAst(&ast, "zig-cache/tmp/out.ini");
-}
-
-fn getAst(allocator: Allocator) !ArrayList(Node) {
-    const text = try readFile("tests/general/simple/in.ini", allocator);
-
-    var tokens = try getTokens(text, allocator);
-
-    // TODO: Should I stop passing the address of tokens and ast everywhere?
-
-    var ast = try getAstFromTokens(&tokens, allocator);
-    return ast;
-}
-
 const Token = struct {
     type: Type,
     slice: []const u8,
 
+    // TODO: Can I turn this struct into a tagged union,
+    // in order to get rid of this Type enum definition?
     const Type = enum {
         Comment,
         Tabs,
@@ -113,6 +88,101 @@ const Node = struct {
     comments: ArrayList([]const u8),
     children: ArrayList(Node),
 };
+
+const File = struct {
+    name: []const u8,
+    ast: ArrayList(Node),
+};
+
+const Folder = struct {
+    name: []const u8,
+    files: ArrayList(File),
+    folders: ArrayList(Folder),
+};
+
+pub fn main() !void {
+    try convert(
+        "I:/Programming/Cortex-Command-Mod-Converter-Engine/tests/mod/in/mod.rte",
+        "I:/Programming/Cortex-Command-Mod-Converter-Engine/tests/mod/out",
+    );
+}
+
+fn convert(input_mod_path: []const u8, output_folder_path: []const u8) !void {
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    var allocator = arena.allocator();
+
+    var file_tree = try getFileTree(input_mod_path, allocator);
+
+    const output_mod_path = try join(allocator, &.{ output_folder_path, basename(input_mod_path) });
+
+    try writeFileTree(&file_tree, output_mod_path, allocator);
+}
+
+fn writeFileTree(file_tree: *const Folder, output_mod_path: []const u8, allocator: Allocator) !void {
+    std.fs.makeDirAbsolute(output_mod_path) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => |e| return e,
+    };
+
+    for (file_tree.files.items) |file| {
+        std.debug.print("output_mod_path: '{s}', file.name: '{s}'\n", .{ output_mod_path, file.name });
+        const file_path = try join(allocator, &.{ output_mod_path, file.name });
+        std.debug.print("file_path: '{s}'\n", .{file_path});
+        try writeAst(&file.ast, file_path);
+    }
+
+    for (file_tree.folders.items) |folder| {
+        const child_output_mod_path = try join(allocator, &.{ output_mod_path, folder.name });
+        std.debug.print("{s}\n", .{child_output_mod_path});
+        try writeFileTree(&folder, child_output_mod_path, allocator);
+    }
+}
+
+// fn getFileTree(input_mod_path: []const u8, allocator: Allocator) !Folder {
+//     return try getFileTreeRecursively(input_mod_path, allocator);
+// }
+
+fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
+    std.debug.print("folder_path: '{s}'\n", .{folder_path});
+
+    var folder = Folder{
+        .name = basename(folder_path),
+        .files = ArrayList(File).init(allocator),
+        .folders = ArrayList(Folder).init(allocator),
+    };
+
+    var dir = try std.fs.openIterableDirAbsolute(folder_path, .{});
+    defer dir.close();
+
+    var dir_iterator = dir.iterate();
+    while (try dir_iterator.next()) |entry| {
+        std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
+        if (entry.kind == std.fs.File.Kind.File) {
+            var file = File{
+                .name = try allocator.dupe(u8, entry.name),
+                .ast = try getFileAst(try join(allocator, &.{ folder_path, entry.name }), allocator),
+            };
+            try folder.files.append(file);
+        } else if (entry.kind == std.fs.File.Kind.Directory) {
+            var child_folder = try getFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator);
+            try folder.folders.append(child_folder);
+        }
+    }
+
+    return folder;
+}
+
+fn getFileAst(file_path: []const u8, allocator: Allocator) !ArrayList(Node) {
+    const text = try readFile(file_path, allocator);
+
+    var tokens = try getTokens(text, allocator);
+
+    // TODO: Should I stop passing the address of tokens and ast everywhere?
+
+    var ast = try getAstFromTokens(&tokens, allocator);
+    return ast;
+}
 
 fn readFile(input_path: []const u8, allocator: Allocator) ![]const u8 {
     const cwd = std.fs.cwd();
@@ -470,7 +540,7 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
-fn writeAst(ast: *ArrayList(Node), output_path: []const u8) !void {
+fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
     const cwd = std.fs.cwd();
     const output_file = try cwd.createFile(output_path, .{});
     defer output_file.close();

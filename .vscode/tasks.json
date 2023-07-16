@@ -4,7 +4,11 @@
 		{
 			"label": "build zig",
 			"type": "shell",
-			"command": "zig build",
+			"command": "zig",
+			"args": [
+				"build",
+				"-freference-trace",
+			],
 			"problemMatcher": [],
 			"group": {
 				"kind": "build",
@@ -14,7 +18,11 @@
 		{
 			"label": "build test zig",
 			"type": "shell",
-			"command": "zig build test",
+			"command": "zig",
+			"args": [
+				"build",
+				"test",
+			],
 			"problemMatcher": [],
 			"group": {
 				"kind": "build",
