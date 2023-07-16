@@ -17,6 +17,7 @@ const tmpDir = std.testing.tmpDir;
 const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
 const join = std.fs.path.join;
 const basename = std.fs.path.basename;
+const StringHashMap = std.hash_map.StringHashMap;
 // const test_allocator = std.testing.allocator;
 // const expect = std.testing.expect;
 const expectEqualStrings = std.testing.expectEqualStrings;
@@ -114,9 +115,53 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8) !void {
 
     var file_tree = try getFileTree(input_mod_path, allocator);
 
+    try modifyFileTree(&file_tree, allocator);
+
     const output_mod_path = try join(allocator, &.{ output_folder_path, basename(input_mod_path) });
 
     try writeFileTree(&file_tree, output_mod_path, allocator);
+}
+
+fn modifyFileTree(file_tree: *Folder, allocator: Allocator) !void {
+    // Create hashmap, where the key is a property,
+    // and the value is a list of Nodes that have this property
+    var properties = StringHashMap(ArrayList(*Node)).init(allocator);
+    try addProperties(file_tree, &properties, allocator);
+    std.debug.print("{}\n", .{properties.contains("A")});
+    std.debug.print("{}\n", .{properties.contains("B")});
+    std.debug.print("{}\n", .{properties.contains("C")});
+    std.debug.print("{}\n", .{properties.contains("D")});
+
+    // fn modifySupportedGameVersion() void {}
+    // modifySupportedGameVersion();
+}
+
+fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try addFileProperties(node, properties, allocator);
+        }
+    }
+
+    for (file_tree.folders.items) |*folder| {
+        try addProperties(folder, properties, allocator);
+    }
+}
+
+fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    if (node.property != null) {
+        var result = try properties.getOrPut(node.property.?);
+
+        if (!result.found_existing) {
+            result.value_ptr.* = ArrayList(*Node).init(allocator);
+        }
+
+        try result.value_ptr.*.append(node);
+    }
+
+    for (node.children.items) |*child| {
+        try addFileProperties(child, properties, allocator);
+    }
 }
 
 fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
@@ -543,11 +588,11 @@ fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
     var buffered = bufferedWriter(output_file.writer());
     const buffered_writer = buffered.writer();
 
-    for (ast.items) |*child, index| {
-        try writeAstRecursively(child, buffered_writer, 0);
+    for (ast.items) |*node, index| {
+        try writeAstRecursively(node, buffered_writer, 0);
 
         // Doesn't add a trailing newline, because writeAstRecursively() already adds it
-        if (child.property != null and index < ast.items.len - 1) {
+        if (node.property != null and index < ast.items.len - 1) {
             try writeBuffered(buffered_writer, "\n");
         }
     }
