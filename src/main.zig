@@ -115,7 +115,7 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8) !void {
 
     var file_tree = try getFileTree(input_mod_path, allocator);
 
-    try modifyFileTree(&file_tree, allocator);
+    try updateFileTree(&file_tree, allocator);
 
     const output_mod_path = try join(allocator, &.{ output_folder_path, basename(input_mod_path) });
 
@@ -186,11 +186,11 @@ fn crlfToLf(text: []const u8, allocator: Allocator) ![]const u8 {
     return lf_text;
 }
 
-const TokenError = error{
-    UnclosedMultiComment,
-};
-
 fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
+    const TokenError = error{
+        UnclosedMultiComment,
+    };
+
     var slice: []const u8 = lf_text;
 
     var tokens = ArrayList(Token).init(allocator);
@@ -372,11 +372,6 @@ fn leftTrimFirstLine(tokens: *ArrayList(Token)) usize {
     return token_index;
 }
 
-const NodeError = error{
-    TooManyTabs,
-    Unexpected,
-};
-
 fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator: Allocator) error{ TooManyTabs, Unexpected, OutOfMemory }!Node {
     const States = enum {
         Start,
@@ -384,6 +379,11 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         Equals,
         Value,
         Newline,
+    };
+
+    const NodeError = error{
+        TooManyTabs,
+        Unexpected,
     };
 
     var seen: States = .Start;
@@ -519,25 +519,21 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
-fn modifyFileTree(file_tree: *Folder, allocator: Allocator) !void {
+fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
     // Create hashmap, where the key is a property,
     // and the value is a list of Nodes that have this property
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
     try addProperties(file_tree, &properties, allocator);
-    std.debug.print("{}\n", .{properties.contains("A")});
-    std.debug.print("{}\n", .{properties.contains("B")});
-    std.debug.print("{}\n", .{properties.contains("C")});
-    std.debug.print("{}\n", .{properties.contains("D")});
+    // std.debug.print("{}\n", .{properties.contains("A")});
+    // std.debug.print("{}\n", .{properties.contains("B")});
+    // std.debug.print("{}\n", .{properties.contains("C")});
+    // std.debug.print("{}\n", .{properties.contains("D")});
 
-    var a = properties.get("A");
-    if (a) |b| {
-        for (b.items) |item| {
-            std.debug.print("{}\n", .{item});
-        }
-    }
+    try updateSupportedGameVersion(file_tree, &properties, allocator);
 
-    // fn modifySupportedGameVersion() void {}
-    // modifySupportedGameVersion();
+    // std.debug.print("{any}\n", .{properties.get("SupportedGameVersion")});
+    // std.debug.print("{}\n", .{properties.get("SupportedGameVersion").?.items[0]});
+    // std.debug.print("{}\n", .{file_tree.files.items[0].ast.items[0].children.items[1]});
 }
 
 fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
@@ -565,6 +561,69 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
 
     for (node.children.items) |*child| {
         try addFileProperties(child, properties, allocator);
+    }
+}
+
+fn updateSupportedGameVersion(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    const err = error{
+        MoreThanOneSupportedGameVersion,
+        MissingDataModule,
+        MoreThanOneDataModule,
+    };
+
+    var supported_game_version = properties.get("SupportedGameVersion");
+    if (supported_game_version) |nodes| {
+        if (nodes.items.len == 1) {
+            var node = nodes.items[0];
+
+            // TODO: Update the SupportedGameVersion (if necessary)
+
+            std.debug.print("{}\n", .{node});
+        } else {
+            return err.MoreThanOneSupportedGameVersion;
+        }
+    } else {
+        var data_module = properties.get("DataModule");
+        if (data_module) |nodes| {
+            if (nodes.items.len == 1) {
+                var children = &nodes.items[0].children;
+
+                try children.append(Node{
+                    .property = "SupportedGameVersion",
+                    .value = "Pre-Release 5.0",
+                    .comments = ArrayList([]const u8).init(allocator),
+                    .children = ArrayList(Node).init(allocator),
+                });
+
+                for (children.items) |child| {
+                    if (child.property) |property| {
+                        std.debug.print("child after: {s}\n", .{property});
+                    }
+                }
+
+                var supported_list = ArrayList(*Node).init(allocator);
+                try supported_list.append(nodes.items[0]);
+                try properties.put("SupportedGameVersion", supported_list);
+
+                // TODO: REMOVE
+                // children.items[0].property = "lol";
+
+                std.debug.print("{*}\n", .{children.items});
+                std.debug.print("{*}\n", .{&children.items[0]});
+                std.debug.print("{s}\n", .{children.items[0].property.?});
+                std.debug.print("{}\n", .{children.items.len});
+
+                std.debug.print("{*}\n", .{file_tree.files.items[0].ast.items[0].children.items});
+                std.debug.print("{*}\n", .{&file_tree.files.items[0].ast.items[0].children.items[0]});
+                std.debug.print("{s}\n", .{file_tree.files.items[0].ast.items[0].children.items[0].property.?});
+                std.debug.print("{}\n", .{file_tree.files.items[0].ast.items[0].children.items.len});
+                // std.debug.print("{}\n", .{file_tree.files.items[0].ast.items[0].children.items[1]});
+            } else {
+                return err.MoreThanOneDataModule;
+            }
+        } else {
+            return err.MissingDataModule;
+        }
     }
 }
 
@@ -608,6 +667,8 @@ fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
 }
 
 fn writeAstRecursively(node: *Node, buffered_writer: anytype, depth: usize) !void {
+    // std.debug.print("{}\n", .{node});
+
     // Don't add an empty line
     if (node.property == null and node.comments.items.len == 0) {
         return;
