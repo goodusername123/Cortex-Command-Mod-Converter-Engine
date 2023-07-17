@@ -556,7 +556,6 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
 fn updateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
     const err = error{
         MoreThanOneSupportedGameVersion,
-        NoSupportedGameVersionValue,
         MissingDataModule,
         MoreThanOneDataModule,
     };
@@ -574,7 +573,7 @@ fn updateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allo
                     node.*.value = "Pre-Release 5.0";
                 }
             } else {
-                return err.NoSupportedGameVersionValue;
+                node.*.value = "Pre-Release 5.0";
             }
         } else {
             return err.MoreThanOneSupportedGameVersion;
