@@ -18,6 +18,7 @@ const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
 const join = std.fs.path.join;
 const basename = std.fs.path.basename;
 const StringHashMap = std.hash_map.StringHashMap;
+const HashMap = std.hash_map.HashMap;
 const eql = std.mem.eql;
 // const test_allocator = std.testing.allocator;
 // const expect = std.testing.expect;
@@ -516,13 +517,41 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
+const PropertyValuePair = struct {
+    property: []const u8,
+    value: []const u8,
+};
+
+const PropertyValuePairContext = struct {
+    pub fn hash(self: PropertyValuePairContext, x: PropertyValuePair) u64 {
+        _ = self;
+        // TODO: XOR is shite; it returns 0 when the property and value are identical
+        // I tried replacing it with this one, but it panics with integer overflow:
+        // Source: https://stackoverflow.com/a/27952689/13279557
+        // var property_hash = std.hash_map.hashString(x.property);
+        // const value_hash = std.hash_map.hashString(x.value);
+        // property_hash ^= value_hash + 0x517cc1b727220a95 + (property_hash << 6) + (property_hash >> 2);
+        // return property_hash;
+        return std.hash_map.hashString(x.property) ^ std.hash_map.hashString(x.value);
+    }
+
+    pub fn eql(self: PropertyValuePairContext, a: PropertyValuePair, b: PropertyValuePair) bool {
+        _ = self;
+        return std.mem.eql(u8, a.property, b.property) and std.mem.eql(u8, a.value, b.value);
+    }
+};
+
 fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
     // Create a hashmap, where the key is a property,
     // and the value is a list of Nodes that have this property
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
     try addProperties(file_tree, &properties, allocator);
 
-    try updateSupportedGameVersion(&properties, allocator);
+    var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage).init(allocator);
+    try addPropertyValuePairs(file_tree, &property_value_pairs, allocator);
+
+    try addOrUpdateSupportedGameVersion(&properties, allocator);
+    try addGripStrength(&property_value_pairs, allocator);
 }
 
 fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
@@ -553,10 +582,42 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
     }
 }
 
-fn updateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+fn addPropertyValuePairs(file_tree: *Folder, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try addFilePropertyValuePairs(node, property_value_pairs, allocator);
+        }
+    }
+
+    for (file_tree.folders.items) |*folder| {
+        try addPropertyValuePairs(folder, property_value_pairs, allocator);
+    }
+}
+
+fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+    if (node.property != null and node.value != null) {
+        const property_value_pair = PropertyValuePair{
+            .property = node.property.?,
+            .value = node.value.?,
+        };
+        var result = try property_value_pairs.getOrPut(property_value_pair);
+
+        if (!result.found_existing) {
+            result.value_ptr.* = ArrayList(*Node).init(allocator);
+        }
+
+        try result.value_ptr.*.append(node);
+    }
+
+    for (node.children.items) |*child| {
+        try addFilePropertyValuePairs(child, property_value_pairs, allocator);
+    }
+}
+
+fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
     const err = error{
         MoreThanOneSupportedGameVersion,
-        MissingDataModule,
+        // MissingDataModule,
         MoreThanOneDataModule,
     };
 
@@ -599,7 +660,47 @@ fn updateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allo
                 return err.MoreThanOneDataModule;
             }
         } else {
-            return err.MissingDataModule;
+            // TODO: Maybe bring this back?
+            // return err.MissingDataModule;
+        }
+    }
+}
+
+fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+    var pair = PropertyValuePair{
+        .property = "AddActor",
+        .value = "Arm",
+    };
+
+    var arm = property_value_pairs.get(pair);
+
+    if (arm) |nodes| {
+        // Add GripStrength to any Arm that is missing it
+        outer: for (nodes.items) |node| {
+            var children = &node.children;
+
+            for (children.items) |child| {
+                if (child.property) |property| {
+                    if (eql(u8, property, "GripStrength")) {
+                        continue :outer;
+                    }
+                }
+            }
+
+            try children.append(Node{
+                .property = "GripStrength",
+                .value = "424242",
+                .comments = ArrayList([]const u8).init(allocator),
+                .children = ArrayList(Node).init(allocator),
+            });
+
+            var result = try property_value_pairs.getOrPut(pair);
+
+            if (!result.found_existing) {
+                result.value_ptr.* = ArrayList(*Node).init(allocator);
+            }
+
+            try result.value_ptr.*.append(node);
         }
     }
 }
