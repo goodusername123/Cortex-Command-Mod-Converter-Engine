@@ -557,9 +557,10 @@ fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
     var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage).init(allocator);
     try addPropertyValuePairs(file_tree, &property_value_pairs, allocator);
 
-    try addOrUpdateSupportedGameVersion(&properties, allocator);
     try addGripStrength(&property_value_pairs, allocator);
-    try maxThrottleRangeToNegativeThrottleMultiplier(&properties, allocator);
+    try addOrUpdateSupportedGameVersion(&properties, allocator);
+    try maxMassToMaxInventoryMass(&properties, allocator);
+    try maxThrottleRangeToPositiveThrottleMultiplier(&properties, allocator);
     try minThrottleRangeToNegativeThrottleMultiplier(&properties, allocator);
 }
 
@@ -623,6 +624,45 @@ fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(Propert
     }
 }
 
+fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+    var pair = PropertyValuePair{
+        .property = "AddActor",
+        .value = "Arm",
+    };
+
+    var arm = property_value_pairs.get(pair);
+
+    if (arm) |nodes| {
+        // Add GripStrength to any Arm that is missing it
+        outer: for (nodes.items) |node| {
+            var children = &node.children;
+
+            for (children.items) |child| {
+                if (child.property) |property| {
+                    if (eql(u8, property, "GripStrength")) {
+                        continue :outer;
+                    }
+                }
+            }
+
+            try children.append(Node{
+                .property = "GripStrength",
+                .value = "424242",
+                .comments = ArrayList([]const u8).init(allocator),
+                .children = ArrayList(Node).init(allocator),
+            });
+
+            var result = try property_value_pairs.getOrPut(pair);
+
+            if (!result.found_existing) {
+                result.value_ptr.* = ArrayList(*Node).init(allocator);
+            }
+
+            try result.value_ptr.*.append(node);
+        }
+    }
+}
+
 fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
     const err = error{
         MoreThanOneSupportedGameVersion,
@@ -675,46 +715,40 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
     }
 }
 
-fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
-    var pair = PropertyValuePair{
-        .property = "AddActor",
-        .value = "Arm",
-    };
-
-    var arm = property_value_pairs.get(pair);
-
-    if (arm) |nodes| {
-        // Add GripStrength to any Arm that is missing it
-        outer: for (nodes.items) |node| {
-            var children = &node.children;
-
-            for (children.items) |child| {
-                if (child.property) |property| {
-                    if (eql(u8, property, "GripStrength")) {
-                        continue :outer;
+fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    var actor = properties.get("AddActor");
+    if (actor) |actor_nodes| {
+        for (actor_nodes.items) |actor_node| {
+            for (actor_node.children.items) |*child_node| {
+                if (child_node.property) |child_property| {
+                    if (eql(u8, child_property, "MaxMass")) {
+                        if (child_node.value) |v| {
+                            const max_mass = try parseFloat(f32, v);
+                            for (actor_node.children.items) |child_node2| {
+                                if (child_node2.property) |child_property2| {
+                                    if (eql(u8, child_property2, "Mass")) {
+                                        if (child_node2.value) |v2| {
+                                            const mass = try parseFloat(f32, v2);
+                                            child_node.property = "MaxInventoryMass";
+                                            const max_inventory_mass = max_mass - mass;
+                                            child_node.value = try std.fmt.allocPrint(allocator, "{d}", .{max_inventory_mass});
+                                        } else {
+                                            return UpdateFileTreeErrors.ExpectedValue;
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            return UpdateFileTreeErrors.ExpectedValue;
+                        }
                     }
                 }
             }
-
-            try children.append(Node{
-                .property = "GripStrength",
-                .value = "424242",
-                .comments = ArrayList([]const u8).init(allocator),
-                .children = ArrayList(Node).init(allocator),
-            });
-
-            var result = try property_value_pairs.getOrPut(pair);
-
-            if (!result.found_existing) {
-                result.value_ptr.* = ArrayList(*Node).init(allocator);
-            }
-
-            try result.value_ptr.*.append(node);
         }
     }
 }
 
-fn maxThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+fn maxThrottleRangeToPositiveThrottleMultiplier(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
     var min_throttle_range = properties.get("MaxThrottleRange");
     if (min_throttle_range) |nodes| {
         for (nodes.items) |node| {
