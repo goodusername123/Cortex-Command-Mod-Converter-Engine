@@ -139,9 +139,16 @@ fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
     while (try dir_iterator.next()) |entry| {
         // std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
         if (entry.kind == std.fs.File.Kind.File) {
+            const text = try readFile(try join(allocator, &.{ folder_path, entry.name }), allocator);
+
+            var tokens = try getTokens(text, allocator);
+
+            // TODO: Should I stop passing the address of tokens and ast everywhere?
+            var ast = try getAstFromTokens(&tokens, allocator);
+
             var file = File{
                 .name = try allocator.dupe(u8, entry.name),
-                .ast = try getFileAst(try join(allocator, &.{ folder_path, entry.name }), allocator),
+                .ast = ast,
             };
             try folder.files.append(file);
         } else if (entry.kind == std.fs.File.Kind.Directory) {
@@ -151,17 +158,6 @@ fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
     }
 
     return folder;
-}
-
-fn getFileAst(file_path: []const u8, allocator: Allocator) !ArrayList(Node) {
-    const text = try readFile(file_path, allocator);
-
-    var tokens = try getTokens(text, allocator);
-
-    // TODO: Should I stop passing the address of tokens and ast everywhere?
-
-    var ast = try getAstFromTokens(&tokens, allocator);
-    return ast;
 }
 
 fn readFile(input_path: []const u8, allocator: Allocator) ![]const u8 {
