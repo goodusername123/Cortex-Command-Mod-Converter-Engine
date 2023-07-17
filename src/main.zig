@@ -23,6 +23,8 @@ const eql = std.mem.eql;
 // const test_allocator = std.testing.allocator;
 // const expect = std.testing.expect;
 const expectEqualStrings = std.testing.expectEqualStrings;
+const fabs = std.math.fabs;
+const parseFloat = std.fmt.parseFloat;
 
 /// The purpose of the converter engine is to take an .ini input file like this:
 /// /* foo1   */ /* foo2*//*foo3*/
@@ -532,6 +534,7 @@ const PropertyValuePairContext = struct {
         // const value_hash = std.hash_map.hashString(x.value);
         // property_hash ^= value_hash + 0x517cc1b727220a95 + (property_hash << 6) + (property_hash >> 2);
         // return property_hash;
+
         return std.hash_map.hashString(x.property) ^ std.hash_map.hashString(x.value);
     }
 
@@ -539,6 +542,10 @@ const PropertyValuePairContext = struct {
         _ = self;
         return std.mem.eql(u8, a.property, b.property) and std.mem.eql(u8, a.value, b.value);
     }
+};
+
+const UpdateFileTreeErrors = error{
+    ExpectedValue,
 };
 
 fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
@@ -552,6 +559,8 @@ fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
 
     try addOrUpdateSupportedGameVersion(&properties, allocator);
     try addGripStrength(&property_value_pairs, allocator);
+    try maxThrottleRangeToNegativeThrottleMultiplier(&properties, allocator);
+    try minThrottleRangeToNegativeThrottleMultiplier(&properties, allocator);
 }
 
 fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
@@ -634,7 +643,7 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
                     node.*.value = "Pre-Release 5.0";
                 }
             } else {
-                node.*.value = "Pre-Release 5.0";
+                return UpdateFileTreeErrors.ExpectedValue;
             }
         } else {
             return err.MoreThanOneSupportedGameVersion;
@@ -701,6 +710,40 @@ fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*
             }
 
             try result.value_ptr.*.append(node);
+        }
+    }
+}
+
+fn maxThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    var min_throttle_range = properties.get("MaxThrottleRange");
+    if (min_throttle_range) |nodes| {
+        for (nodes.items) |node| {
+            // TODO: This node should be removed from properties["MinThrottleRange"] its list
+            node.property = "PositiveThrottleMultiplier";
+            if (node.value) |v| {
+                const old_value = try parseFloat(f32, v);
+                const new_value = fabs(1 + fabs(old_value));
+                node.value = try std.fmt.allocPrint(allocator, "{d}", .{new_value});
+            } else {
+                return UpdateFileTreeErrors.ExpectedValue;
+            }
+        }
+    }
+}
+
+fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    var min_throttle_range = properties.get("MinThrottleRange");
+    if (min_throttle_range) |nodes| {
+        for (nodes.items) |node| {
+            // TODO: This node should be removed from properties["MinThrottleRange"] its list
+            node.property = "NegativeThrottleMultiplier";
+            if (node.value) |v| {
+                const old_value = try parseFloat(f32, v);
+                const new_value = fabs(1 - fabs(old_value));
+                node.value = try std.fmt.allocPrint(allocator, "{d}", .{new_value});
+            } else {
+                return UpdateFileTreeErrors.ExpectedValue;
+            }
         }
     }
 }
