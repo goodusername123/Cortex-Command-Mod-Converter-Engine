@@ -770,6 +770,83 @@ test "general" {
     std.debug.print("\n\n", .{});
 }
 
+test "updated" {
+    var tmpdir = tmpDir(.{});
+    defer tmpdir.cleanup();
+
+    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    const tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
+
+    var iterable_tests = try std.fs.cwd().openIterableDir("tests/updated", .{});
+    defer iterable_tests.close();
+
+    // TODO: Use test_allocator
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var tests_walker = try iterable_tests.walk(allocator);
+
+    while (try tests_walker.next()) |entry| {
+        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
+        const dir_path = try entry.dir.realpath(".", &out_buffer);
+
+        if (entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini")) {
+            std.debug.print("\nSubtest 'updated/{s}'", .{entry.path});
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
+
+            const input_path = try join(allocator, &.{ dir_path, "in.ini" });
+            const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
+
+            const output_path = try join(allocator, &.{ tmpdir_path, "output.ini" });
+
+            // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
+
+            const text = try readFile(input_path, allocator);
+
+            var tokens = try getTokens(text, allocator);
+
+            var ast = try getAstFromTokens(&tokens, allocator);
+
+            var file_tree = Folder{
+                .name = "",
+                .files = ArrayList(File).init(allocator),
+                .folders = ArrayList(Folder).init(allocator),
+            };
+
+            try file_tree.files.append(File{
+                .name = "",
+                .ast = ast,
+            });
+
+            try updateFileTree(&file_tree, allocator);
+
+            try writeAst(&ast, output_path);
+
+            const cwd = std.fs.cwd();
+
+            const expected_file = try cwd.openFile(expected_path, .{});
+            defer expected_file.close();
+            var expected_buf_reader = bufferedReader(expected_file.reader());
+            const expected_stream = expected_buf_reader.reader();
+            const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+            const expected_text = try crlfToLf(expected_text_crlf, allocator);
+
+            const output_file = try cwd.openFile(output_path, .{});
+            defer output_file.close();
+            var output_buf_reader = bufferedReader(output_file.reader());
+            const output_stream = output_buf_reader.reader();
+            const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
+            const output_text = try crlfToLf(output_text_crlf, allocator);
+
+            try expectEqualStrings(expected_text, output_text);
+            std.debug.print(" passed", .{});
+        }
+    }
+
+    std.debug.print("\n\n", .{});
+}
+
 test "invalid" {
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/invalid", .{});
     defer iterable_tests.close();
