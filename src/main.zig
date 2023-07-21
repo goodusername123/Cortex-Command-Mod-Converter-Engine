@@ -25,6 +25,7 @@ const eql = std.mem.eql;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const fabs = std.math.fabs;
 const parseFloat = std.fmt.parseFloat;
+const allocPrint = std.fmt.allocPrint;
 
 /// The purpose of the converter engine is to take an .ini input file like this:
 /// /* foo1   */ /* foo2*//*foo3*/
@@ -559,6 +560,7 @@ fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
 
     try addGripStrength(&property_value_pairs, allocator);
     try addOrUpdateSupportedGameVersion(&properties, allocator);
+    try maxLengthToOffsets(&property_value_pairs, allocator);
     try maxMassToMaxInventoryMass(&properties, allocator);
     try maxThrottleRangeToPositiveThrottleMultiplier(&properties, allocator);
     try minThrottleRangeToNegativeThrottleMultiplier(&properties, allocator);
@@ -715,6 +717,66 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
     }
 }
 
+fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+    var pair = PropertyValuePair{
+        .property = "AddActor",
+        .value = "Leg",
+    };
+
+    var leg = property_value_pairs.get(pair);
+
+    if (leg) |nodes| {
+        for (nodes.items) |node| {
+            var children = &node.children;
+
+            for (children.items) |*child| {
+                if (child.property) |property| {
+                    if (eql(u8, property, "MaxLength")) {
+                        if (child.value) |value| {
+                            child.property = "ContractedOffset";
+                            child.value = "Vector";
+                            try child.children.append(Node{
+                                .property = "X",
+                                .value = try allocPrint(allocator, "{d}", .{try parseFloat(f32, value) / 2}),
+                                .comments = ArrayList([]const u8).init(allocator),
+                                .children = ArrayList(Node).init(allocator),
+                            });
+                            try child.children.append(Node{
+                                .property = "Y",
+                                .value = "0",
+                                .comments = ArrayList([]const u8).init(allocator),
+                                .children = ArrayList(Node).init(allocator),
+                            });
+
+                            var extended_offset = Node{
+                                .property = "ExtendedOffset",
+                                .value = "Vector",
+                                .comments = ArrayList([]const u8).init(allocator),
+                                .children = ArrayList(Node).init(allocator),
+                            };
+                            try extended_offset.children.append(Node{
+                                .property = "X",
+                                .value = value,
+                                .comments = ArrayList([]const u8).init(allocator),
+                                .children = ArrayList(Node).init(allocator),
+                            });
+                            try extended_offset.children.append(Node{
+                                .property = "Y",
+                                .value = "0",
+                                .comments = ArrayList([]const u8).init(allocator),
+                                .children = ArrayList(Node).init(allocator),
+                            });
+                            try node.children.append(extended_offset);
+                        } else {
+                            return UpdateFileTreeErrors.ExpectedValue;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
     var actor = properties.get("AddActor");
     if (actor) |actor_nodes| {
@@ -731,7 +793,7 @@ fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), alloc
                                             const mass = try parseFloat(f32, v2);
                                             child_node.property = "MaxInventoryMass";
                                             const max_inventory_mass = max_mass - mass;
-                                            child_node.value = try std.fmt.allocPrint(allocator, "{d}", .{max_inventory_mass});
+                                            child_node.value = try allocPrint(allocator, "{d}", .{max_inventory_mass});
                                         } else {
                                             return UpdateFileTreeErrors.ExpectedValue;
                                         }
@@ -757,7 +819,7 @@ fn maxThrottleRangeToPositiveThrottleMultiplier(properties: *StringHashMap(Array
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
                 const new_value = fabs(1 + fabs(old_value));
-                node.value = try std.fmt.allocPrint(allocator, "{d}", .{new_value});
+                node.value = try allocPrint(allocator, "{d}", .{new_value});
             } else {
                 return UpdateFileTreeErrors.ExpectedValue;
             }
@@ -774,7 +836,7 @@ fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(Array
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
                 const new_value = fabs(1 - fabs(old_value));
-                node.value = try std.fmt.allocPrint(allocator, "{d}", .{new_value});
+                node.value = try allocPrint(allocator, "{d}", .{new_value});
             } else {
                 return UpdateFileTreeErrors.ExpectedValue;
             }
