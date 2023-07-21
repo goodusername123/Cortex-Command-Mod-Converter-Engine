@@ -26,6 +26,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 const fabs = std.math.fabs;
 const parseFloat = std.fmt.parseFloat;
 const allocPrint = std.fmt.allocPrint;
+const extension = std.fs.path.extension;
 
 /// The purpose of the converter engine is to take an .ini input file like this:
 /// /* foo1   */ /* foo2*//*foo3*/
@@ -108,8 +109,8 @@ const Folder = struct {
 
 pub fn main() !void {
     try convert(
-        "I:/Programming/Cortex-Command-Mod-Converter-Engine/tests/mod/in/mod.rte",
-        "I:/Programming/Cortex-Command-Mod-Converter-Engine/tests/mod/out",
+        "I:/Programming/Cortex-Command-Mod-Converter-Engine/tons_of_mods/in/mods",
+        "I:/Programming/Cortex-Command-Mod-Converter-Engine/tons_of_mods/out",
     );
 }
 
@@ -143,18 +144,24 @@ fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
     while (try dir_iterator.next()) |entry| {
         // std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
         if (entry.kind == std.fs.File.Kind.File) {
-            const text = try readFile(try join(allocator, &.{ folder_path, entry.name }), allocator);
+            const file_path = try join(allocator, &.{ folder_path, entry.name });
+            if (eql(u8, extension(entry.name), ".ini")) {
+                std.debug.print("file path '{s}'\n", .{file_path});
+                const text = try readFile(file_path, allocator);
 
-            var tokens = try getTokens(text, allocator);
+                var tokens = try getTokens(text, allocator);
 
-            // TODO: Should I stop passing the address of tokens and ast everywhere?
-            var ast = try getAstFromTokens(&tokens, allocator);
+                // TODO: Should I stop passing the address of tokens and ast everywhere?
+                var ast = try getAstFromTokens(&tokens, allocator);
 
-            var file = File{
-                .name = try allocator.dupe(u8, entry.name),
-                .ast = ast,
-            };
-            try folder.files.append(file);
+                var file = File{
+                    .name = try allocator.dupe(u8, entry.name),
+                    .ast = ast,
+                };
+                try folder.files.append(file);
+            } else {
+                // TODO: Copy file regularly
+            }
         } else if (entry.kind == std.fs.File.Kind.Directory) {
             var child_folder = try getFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator);
             try folder.folders.append(child_folder);
