@@ -107,19 +107,55 @@ const Folder = struct {
     folders: ArrayList(Folder),
 };
 
-pub fn main() !void {
-    try convert(
-        "I:/Programming/Cortex-Command-Mod-Converter-Engine/tons_of_mods/in/mods",
-        "I:/Programming/Cortex-Command-Mod-Converter-Engine/tons_of_mods/out",
-    );
-}
+const Diagnostics = struct {
+    file_path: ?[]const u8 = null,
+    token: ?[]const u8 = null,
+    line: ?i32 = null,
+    column: ?i32 = null,
+};
 
-fn convert(input_mod_path: []const u8, output_folder_path: []const u8) !void {
+pub fn main() !void {
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    var file_tree = try getFileTree(input_mod_path, allocator);
+    var diagnostics: Diagnostics = .{};
+    convert(
+        "/code/tons_of_mods/in/mods",
+        "/code/tons_of_mods/out",
+        allocator,
+        &diagnostics,
+    ) catch |err| switch (err) {
+        error.UnexpectedToken => {
+            const token = diagnostics.token orelse "null";
+            const file_path = diagnostics.file_path orelse "null";
+            const line = diagnostics.line orelse -1;
+            const column = diagnostics.column orelse -1;
+
+            std.debug.print("Error: Unexpected token\nToken: '{s}'\nFile path: {s}\nLine: {}\nColumn: {} (roughly)\n", .{
+                token,
+                file_path,
+                line,
+                column,
+            });
+        },
+        error.TooManyTabs => {
+            const file_path = diagnostics.file_path orelse "null";
+            const line = diagnostics.line orelse -1;
+            const column = diagnostics.column orelse -1;
+
+            std.debug.print("Error: Too many tabs\nFile path: {s}\nLine: {} (roughly)\nColumn: {} (roughly)\n", .{
+                file_path,
+                line,
+                column,
+            });
+        },
+        else => |e| return e,
+    };
+}
+
+fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+    var file_tree = try getFileTree(input_mod_path, allocator, diagnostics);
 
     try updateFileTree(&file_tree, allocator);
 
@@ -128,7 +164,7 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8) !void {
     try writeFileTree(&file_tree, output_mod_path, allocator);
 }
 
-fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
+fn getFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !Folder {
     // std.debug.print("folder_path: '{s}'\n", .{folder_path});
 
     var folder = Folder{
@@ -146,13 +182,14 @@ fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
         if (entry.kind == std.fs.File.Kind.File) {
             const file_path = try join(allocator, &.{ folder_path, entry.name });
             if (eql(u8, extension(entry.name), ".ini")) {
-                std.debug.print("file path '{s}'\n", .{file_path});
+                diagnostics.file_path = file_path;
+                // std.debug.print("file path '{s}'\n", .{file_path});
                 const text = try readFile(file_path, allocator);
 
                 var tokens = try getTokens(text, allocator);
 
                 // TODO: Should I stop passing the address of tokens and ast everywhere?
-                var ast = try getAstFromTokens(&tokens, allocator);
+                var ast = try getAstFromTokens(&tokens, allocator, diagnostics);
 
                 var file = File{
                     .name = try allocator.dupe(u8, entry.name),
@@ -163,7 +200,7 @@ fn getFileTree(folder_path: []const u8, allocator: Allocator) !Folder {
                 // TODO: Copy file regularly
             }
         } else if (entry.kind == std.fs.File.Kind.Directory) {
-            var child_folder = try getFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator);
+            var child_folder = try getFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator, diagnostics);
             try folder.folders.append(child_folder);
         }
     }
@@ -335,7 +372,7 @@ fn getToken(slice: *[]const u8, multiline_comment_depth: *i32) Token {
     return token;
 }
 
-fn getAstFromTokens(tokens: *ArrayList(Token), allocator: Allocator) !ArrayList(Node) {
+fn getAstFromTokens(tokens: *ArrayList(Token), allocator: Allocator, diagnostics: *Diagnostics) !ArrayList(Node) {
     var ast = ArrayList(Node).init(allocator);
 
     var token_index: usize = 0;
@@ -345,7 +382,7 @@ fn getAstFromTokens(tokens: *ArrayList(Token), allocator: Allocator) !ArrayList(
     }
 
     while (token_index < tokens.items.len) {
-        const node = try getNode(tokens, &token_index, 0, allocator);
+        const node = try getNode(tokens, &token_index, 0, allocator, diagnostics);
         try ast.append(node);
     }
 
@@ -380,7 +417,7 @@ fn leftTrimFirstLine(tokens: *ArrayList(Token)) usize {
     return token_index;
 }
 
-fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator: Allocator) error{ TooManyTabs, Unexpected, OutOfMemory }!Node {
+fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator: Allocator, diagnostics: *Diagnostics) error{ TooManyTabs, UnexpectedToken, OutOfMemory }!Node {
     const States = enum {
         Start,
         Property,
@@ -391,7 +428,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
 
     const NodeError = error{
         TooManyTabs,
-        Unexpected,
+        UnexpectedToken,
     };
 
     var seen: States = .Start;
@@ -406,6 +443,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
     var line_depth = getLineDepth(tokens, token_index.*);
     // std.debug.print("a {}\n", .{line_depth});
     if (line_depth > depth) {
+        calculateLineAndColumnDiagnostics(tokens, token_index.*, diagnostics);
         return NodeError.TooManyTabs;
     } else if (line_depth < depth) {
         return node;
@@ -432,9 +470,10 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             // std.debug.print("b {}\n", .{line_depth});
 
             if (line_depth > depth + 1) {
+                calculateLineAndColumnDiagnostics(tokens, token_index.*, diagnostics);
                 return NodeError.TooManyTabs;
             } else if (line_depth == depth + 1) {
-                const child_node = try getNode(tokens, token_index, depth + 1, allocator);
+                const child_node = try getNode(tokens, token_index, depth + 1, allocator, diagnostics);
                 try node.children.append(child_node);
                 checked_line_depth = false;
             } else {
@@ -459,12 +498,32 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             token_index.* += 1;
             checked_line_depth = false;
         } else {
-            // std.debug.print("{}\n", .{token});
-            return NodeError.Unexpected;
+            diagnostics.token = token.slice;
+            calculateLineAndColumnDiagnostics(tokens, token_index.*, diagnostics);
+            return NodeError.UnexpectedToken;
         }
     }
 
     return node;
+}
+
+fn calculateLineAndColumnDiagnostics(tokens: *ArrayList(Token), token_index: usize, diagnostics: *Diagnostics) void {
+    diagnostics.line = 1;
+    diagnostics.column = 1;
+
+    var i: usize = 0;
+    while (i < token_index) {
+        var token = tokens.items[i];
+
+        if (token.type == .Newline) {
+            diagnostics.line.? += 1;
+            diagnostics.column.? = 1;
+        } else {
+            diagnostics.column.? += @intCast(i32, token.slice.len);
+        }
+
+        i += 1;
+    }
 }
 
 fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
@@ -988,7 +1047,8 @@ test "general" {
 
             var tokens = try getTokens(text, allocator);
 
-            var ast = try getAstFromTokens(&tokens, allocator);
+            var diagnostics: Diagnostics = .{};
+            var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
 
             try writeAst(&ast, output_path);
 
@@ -1052,7 +1112,8 @@ test "updated" {
 
             var tokens = try getTokens(text, allocator);
 
-            var ast = try getAstFromTokens(&tokens, allocator);
+            var diagnostics: Diagnostics = .{};
+            var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
 
             var file_tree = Folder{
                 .name = "",
@@ -1141,7 +1202,8 @@ test "invalid" {
 fn verifyInvalidTestThrowsError(text: *const []const u8, allocator: Allocator) !void {
     var tokens = try getTokens(text.*, allocator);
 
-    var ast = try getAstFromTokens(&tokens, allocator);
+    var diagnostics: Diagnostics = .{};
+    var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
     _ = ast;
 
     // Tests from the invalid/ folder should always return an error from this function before reaching this
