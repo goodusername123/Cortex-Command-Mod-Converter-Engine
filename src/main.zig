@@ -30,8 +30,6 @@ const replacementSize = std.mem.replacementSize;
 const tmpDir = std.testing.tmpDir;
 const trim = std.mem.trim;
 
-// const test_allocator = std.testing.allocator;
-
 /// The purpose of the converter engine is to take an .ini input file like this:
 /// /* foo1   */ /* foo2*//*foo3*/
 /// DataModule
@@ -1043,7 +1041,6 @@ test "general" {
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/general", .{});
     defer iterable_tests.close();
 
-    // TODO: Use test_allocator
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1108,7 +1105,6 @@ test "updated" {
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/updated", .{});
     defer iterable_tests.close();
 
-    // TODO: Use test_allocator
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
@@ -1180,7 +1176,6 @@ test "invalid" {
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/invalid", .{});
     defer iterable_tests.close();
 
-    // TODO: Use test_allocator
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
