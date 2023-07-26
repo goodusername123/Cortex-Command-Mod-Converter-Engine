@@ -198,7 +198,21 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
             if (!eql(u8, extension(entry.name), ".ini")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
                 const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
-                try copyFileAbsolute(input_file_path, output_file_path, .{});
+                const access = std.fs.accessAbsolute(output_file_path, .{});
+                if (access == error.FileNotFound) {
+                    try copyFileAbsolute(input_file_path, output_file_path, .{});
+                } else if (access catch null) |_| {
+                    // TODO: Windows can be significantly faster if we use iterable_dir.dir.stat() manually here,
+                    // if (and only if) directory mod times are updated when files change on Windows!
+
+                    const input_stat = try iterable_dir.dir.statFile(input_file_path);
+                    const output_stat = try iterable_dir.dir.statFile(output_file_path);
+                    if (!identicalStats(input_stat, output_stat, null)) {
+                        _ = try std.fs.updateFileAbsolute(input_file_path, output_file_path, .{});
+                    }
+                } else {
+                    return access;
+                }
             }
         } else if (entry.kind == std.fs.File.Kind.Directory) {
             const child_input_folder_path = try join(allocator, &.{ input_folder_path, entry.name });
@@ -206,6 +220,14 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
             try copyFiles(child_input_folder_path, child_output_folder_path, allocator);
         }
     }
+}
+
+fn identicalStats(stat1: std.fs.File.Stat, stat2: std.fs.File.Stat, override_mode: ?std.os.system.mode_t) bool {
+    const actual_mode = override_mode orelse stat1.mode;
+
+    return (stat1.size == stat2.size and
+        stat1.mtime == stat2.mtime and
+        actual_mode == stat2.mode);
 }
 
 fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !IniFolder {
