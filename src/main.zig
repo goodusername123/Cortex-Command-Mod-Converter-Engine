@@ -179,7 +179,7 @@ fn makeOutputDirs(input_folder_path: []const u8, output_folder_path: []const u8,
     var dir_iterator = iterable_dir.iterate();
 
     while (try dir_iterator.next()) |entry| {
-        if (entry.kind == std.fs.File.Kind.Directory) {
+        if (entry.kind == std.fs.File.Kind.directory) {
             const child_input_folder_path = try join(allocator, &.{ input_folder_path, entry.name });
             const child_output_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
             try makeOutputDirs(child_input_folder_path, child_output_folder_path, allocator);
@@ -194,7 +194,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
     var dir_iterator = iterable_dir.iterate();
 
     while (try dir_iterator.next()) |entry| {
-        if (entry.kind == std.fs.File.Kind.File) {
+        if (entry.kind == std.fs.File.Kind.file) {
             if (!eql(u8, extension(entry.name), ".ini")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
                 const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
@@ -214,7 +214,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     return access;
                 }
             }
-        } else if (entry.kind == std.fs.File.Kind.Directory) {
+        } else if (entry.kind == std.fs.File.Kind.directory) {
             const child_input_folder_path = try join(allocator, &.{ input_folder_path, entry.name });
             const child_output_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
             try copyFiles(child_input_folder_path, child_output_folder_path, allocator);
@@ -245,7 +245,7 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
 
     while (try dir_iterator.next()) |entry| {
         // std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
-        if (entry.kind == std.fs.File.Kind.File) {
+        if (entry.kind == std.fs.File.Kind.file) {
             const file_path = try join(allocator, &.{ folder_path, entry.name });
             if (eql(u8, extension(entry.name), ".ini")) {
                 diagnostics.file_path = file_path;
@@ -263,7 +263,7 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
                 };
                 try folder.files.append(file);
             }
-        } else if (entry.kind == std.fs.File.Kind.Directory) {
+        } else if (entry.kind == std.fs.File.Kind.directory) {
             var child_folder = try getIniFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator, diagnostics);
             try folder.folders.append(child_folder);
         }
@@ -583,7 +583,7 @@ fn calculateLineAndColumnDiagnostics(tokens: *ArrayList(Token), token_index: usi
             diagnostics.line.? += 1;
             diagnostics.column.? = 1;
         } else {
-            diagnostics.column.? += @intCast(i32, token.slice.len);
+            diagnostics.column.? += @intCast(token.slice.len);
         }
 
         i += 1;
@@ -611,7 +611,7 @@ fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
         }
 
         if (token.type == .Tabs) {
-            tabs_seen += @intCast(i32, token.slice.len);
+            tabs_seen += @intCast(token.slice.len);
         }
 
         token_index += 1;
@@ -638,7 +638,7 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
         }
 
         if (token.type == .Tabs) {
-            tabs_seen += @intCast(i32, token.slice.len);
+            tabs_seen += @intCast(token.slice.len);
         }
 
         token_index += 1;
@@ -997,7 +997,7 @@ fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
     var buffered = bufferedWriter(output_file.writer());
     const buffered_writer = buffered.writer();
 
-    for (ast.items) |*node, index| {
+    for (ast.items, 0..) |*node, index| {
         try writeAstRecursively(node, buffered_writer, 0);
 
         // Doesn't add a trailing newline, because writeAstRecursively() already adds it
