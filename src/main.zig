@@ -28,6 +28,7 @@ const parseFloat = std.fmt.parseFloat;
 const allocPrint = std.fmt.allocPrint;
 const extension = std.fs.path.extension;
 const copyFileAbsolute = std.fs.copyFileAbsolute;
+const makeDirAbsolute = std.fs.makeDirAbsolute;
 
 /// The purpose of the converter engine is to take an .ini input file like this:
 /// /* foo1   */ /* foo2*//*foo3*/
@@ -156,13 +157,32 @@ pub fn main() !void {
 }
 
 fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+    try makeOutputDirs(input_mod_path, output_folder_path, allocator);
+
     var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
 
     try updateIniFileTree(&file_tree, allocator);
 
-    const output_mod_path = try join(allocator, &.{ output_folder_path, basename(input_mod_path) });
+    try writeIniFileTree(&file_tree, output_folder_path, allocator);
+}
 
-    try writeIniFileTree(&file_tree, output_mod_path, allocator);
+fn makeOutputDirs(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
+    makeDirAbsolute(output_folder_path) catch |err| switch (err) {
+        error.PathAlreadyExists => {},
+        else => |e| return e,
+    };
+
+    var iterable_dir = try std.fs.openIterableDirAbsolute(input_folder_path, .{});
+    defer iterable_dir.close();
+    var dir_iterator = iterable_dir.iterate();
+
+    while (try dir_iterator.next()) |entry| {
+        if (entry.kind == std.fs.File.Kind.Directory) {
+            const child_input_folder_path = try join(allocator, &.{ input_folder_path, entry.name });
+            const child_output_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
+            try makeOutputDirs(child_input_folder_path, child_output_folder_path, allocator);
+        }
+    }
 }
 
 fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !IniFolder {
@@ -174,10 +194,10 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
         .folders = ArrayList(IniFolder).init(allocator),
     };
 
-    var dir = try std.fs.openIterableDirAbsolute(folder_path, .{});
-    defer dir.close();
+    var iterable_dir = try std.fs.openIterableDirAbsolute(folder_path, .{});
+    defer iterable_dir.close();
+    var dir_iterator = iterable_dir.iterate();
 
-    var dir_iterator = dir.iterate();
     while (try dir_iterator.next()) |entry| {
         // std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
         if (entry.kind == std.fs.File.Kind.File) {
@@ -914,21 +934,16 @@ fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(Array
     }
 }
 
-fn writeIniFileTree(file_tree: *const IniFolder, output_mod_path: []const u8, allocator: Allocator) !void {
-    std.fs.makeDirAbsolute(output_mod_path) catch |err| switch (err) {
-        error.PathAlreadyExists => {},
-        else => |e| return e,
-    };
-
+fn writeIniFileTree(file_tree: *const IniFolder, output_folder_path: []const u8, allocator: Allocator) !void {
     for (file_tree.files.items) |file| {
-        // std.debug.print("output_mod_path: '{s}', file.name: '{s}'\n", .{ output_mod_path, file.name });
-        const file_path = try join(allocator, &.{ output_mod_path, file.name });
+        // std.debug.print("output_folder_path: '{s}', file.name: '{s}'\n", .{ output_folder_path, file.name });
+        const file_path = try join(allocator, &.{ output_folder_path, file.name });
         // std.debug.print("file_path: '{s}'\n", .{file_path});
         try writeAst(&file.ast, file_path);
     }
 
     for (file_tree.folders.items) |folder| {
-        const child_output_mod_path = try join(allocator, &.{ output_mod_path, folder.name });
+        const child_output_mod_path = try join(allocator, &.{ output_folder_path, folder.name });
         // std.debug.print("{s}\n", .{child_output_mod_path});
         try writeIniFileTree(&folder, child_output_mod_path, allocator);
     }
@@ -938,6 +953,7 @@ fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
     const cwd = std.fs.cwd();
     const output_file = try cwd.createFile(output_path, .{});
     defer output_file.close();
+
     var buffered = bufferedWriter(output_file.writer());
     const buffered_writer = buffered.writer();
 
