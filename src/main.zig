@@ -159,6 +159,8 @@ pub fn main() !void {
 fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
     try makeOutputDirs(input_mod_path, output_folder_path, allocator);
 
+    try copyFiles(input_mod_path, output_folder_path, allocator);
+
     var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
 
     try updateIniFileTree(&file_tree, allocator);
@@ -181,6 +183,27 @@ fn makeOutputDirs(input_folder_path: []const u8, output_folder_path: []const u8,
             const child_input_folder_path = try join(allocator, &.{ input_folder_path, entry.name });
             const child_output_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
             try makeOutputDirs(child_input_folder_path, child_output_folder_path, allocator);
+        }
+    }
+}
+
+/// Doesn't copy .ini files
+fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
+    var iterable_dir = try std.fs.openIterableDirAbsolute(input_folder_path, .{});
+    defer iterable_dir.close();
+    var dir_iterator = iterable_dir.iterate();
+
+    while (try dir_iterator.next()) |entry| {
+        if (entry.kind == std.fs.File.Kind.File) {
+            if (!eql(u8, extension(entry.name), ".ini")) {
+                const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
+                const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
+                try copyFileAbsolute(input_file_path, output_file_path, .{});
+            }
+        } else if (entry.kind == std.fs.File.Kind.Directory) {
+            const child_input_folder_path = try join(allocator, &.{ input_folder_path, entry.name });
+            const child_output_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
+            try copyFiles(child_input_folder_path, child_output_folder_path, allocator);
         }
     }
 }
@@ -217,11 +240,6 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
                     .ast = ast,
                 };
                 try folder.files.append(file);
-            } else {
-                // Copy file regularly
-                // const file_destination_path = file_path;
-                // std.debug.print("file path: {s}\nfile destination path: {s}\n\n", .{ file_path, file_destination_path });
-                // copyFileAbsolute(file_path, file_destination_path, .{});
             }
         } else if (entry.kind == std.fs.File.Kind.Directory) {
             var child_folder = try getIniFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator, diagnostics);
