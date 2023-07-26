@@ -27,6 +27,7 @@ const fabs = std.math.fabs;
 const parseFloat = std.fmt.parseFloat;
 const allocPrint = std.fmt.allocPrint;
 const extension = std.fs.path.extension;
+const copyFileAbsolute = std.fs.copyFileAbsolute;
 
 /// The purpose of the converter engine is to take an .ini input file like this:
 /// /* foo1   */ /* foo2*//*foo3*/
@@ -96,15 +97,15 @@ const Node = struct {
     children: ArrayList(Node),
 };
 
-const File = struct {
+const IniFile = struct {
     name: []const u8,
     ast: ArrayList(Node),
 };
 
-const Folder = struct {
+const IniFolder = struct {
     name: []const u8,
-    files: ArrayList(File),
-    folders: ArrayList(Folder),
+    files: ArrayList(IniFile),
+    folders: ArrayList(IniFolder),
 };
 
 const Diagnostics = struct {
@@ -155,22 +156,22 @@ pub fn main() !void {
 }
 
 fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
-    var file_tree = try getFileTree(input_mod_path, allocator, diagnostics);
+    var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
 
-    try updateFileTree(&file_tree, allocator);
+    try updateIniFileTree(&file_tree, allocator);
 
     const output_mod_path = try join(allocator, &.{ output_folder_path, basename(input_mod_path) });
 
-    try writeFileTree(&file_tree, output_mod_path, allocator);
+    try writeIniFileTree(&file_tree, output_mod_path, allocator);
 }
 
-fn getFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !Folder {
+fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !IniFolder {
     // std.debug.print("folder_path: '{s}'\n", .{folder_path});
 
-    var folder = Folder{
+    var folder = IniFolder{
         .name = basename(folder_path),
-        .files = ArrayList(File).init(allocator),
-        .folders = ArrayList(Folder).init(allocator),
+        .files = ArrayList(IniFile).init(allocator),
+        .folders = ArrayList(IniFolder).init(allocator),
     };
 
     var dir = try std.fs.openIterableDirAbsolute(folder_path, .{});
@@ -191,16 +192,19 @@ fn getFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diag
                 // TODO: Should I stop passing the address of tokens and ast everywhere?
                 var ast = try getAstFromTokens(&tokens, allocator, diagnostics);
 
-                var file = File{
+                var file = IniFile{
                     .name = try allocator.dupe(u8, entry.name),
                     .ast = ast,
                 };
                 try folder.files.append(file);
             } else {
-                // TODO: Copy file regularly
+                // Copy file regularly
+                // const file_destination_path = file_path;
+                // std.debug.print("file path: {s}\nfile destination path: {s}\n\n", .{ file_path, file_destination_path });
+                // copyFileAbsolute(file_path, file_destination_path, .{});
             }
         } else if (entry.kind == std.fs.File.Kind.Directory) {
-            var child_folder = try getFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator, diagnostics);
+            var child_folder = try getIniFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator, diagnostics);
             try folder.folders.append(child_folder);
         }
     }
@@ -611,11 +615,11 @@ const PropertyValuePairContext = struct {
     }
 };
 
-const UpdateFileTreeErrors = error{
+const UpdateIniFileTreeErrors = error{
     ExpectedValue,
 };
 
-fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
+fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     // Create a hashmap, where the key is a property,
     // and the value is a list of Nodes that have this property
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
@@ -632,7 +636,7 @@ fn updateFileTree(file_tree: *Folder, allocator: Allocator) !void {
     try minThrottleRangeToNegativeThrottleMultiplier(&properties, allocator);
 }
 
-fn addProperties(file_tree: *Folder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+fn addProperties(file_tree: *IniFolder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
     for (file_tree.files.items) |file| {
         for (file.ast.items) |*node| {
             try addFileProperties(node, properties, allocator);
@@ -660,7 +664,7 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
     }
 }
 
-fn addPropertyValuePairs(file_tree: *Folder, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+fn addPropertyValuePairs(file_tree: *IniFolder, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
     for (file_tree.files.items) |file| {
         for (file.ast.items) |*node| {
             try addFilePropertyValuePairs(node, property_value_pairs, allocator);
@@ -751,7 +755,7 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
                     node.*.value = "Pre-Release 5.0";
                 }
             } else {
-                return UpdateFileTreeErrors.ExpectedValue;
+                return UpdateIniFileTreeErrors.ExpectedValue;
             }
         } else {
             return err.MoreThanOneSupportedGameVersion;
@@ -834,7 +838,7 @@ fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayLis
                             });
                             try node.children.append(extended_offset);
                         } else {
-                            return UpdateFileTreeErrors.ExpectedValue;
+                            return UpdateIniFileTreeErrors.ExpectedValue;
                         }
                     }
                 }
@@ -861,13 +865,13 @@ fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), alloc
                                             const max_inventory_mass = max_mass - mass;
                                             child_node.value = try allocPrint(allocator, "{d}", .{max_inventory_mass});
                                         } else {
-                                            return UpdateFileTreeErrors.ExpectedValue;
+                                            return UpdateIniFileTreeErrors.ExpectedValue;
                                         }
                                     }
                                 }
                             }
                         } else {
-                            return UpdateFileTreeErrors.ExpectedValue;
+                            return UpdateIniFileTreeErrors.ExpectedValue;
                         }
                     }
                 }
@@ -887,7 +891,7 @@ fn maxThrottleRangeToPositiveThrottleMultiplier(properties: *StringHashMap(Array
                 const new_value = fabs(1 + fabs(old_value));
                 node.value = try allocPrint(allocator, "{d}", .{new_value});
             } else {
-                return UpdateFileTreeErrors.ExpectedValue;
+                return UpdateIniFileTreeErrors.ExpectedValue;
             }
         }
     }
@@ -904,13 +908,13 @@ fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(Array
                 const new_value = fabs(1 - fabs(old_value));
                 node.value = try allocPrint(allocator, "{d}", .{new_value});
             } else {
-                return UpdateFileTreeErrors.ExpectedValue;
+                return UpdateIniFileTreeErrors.ExpectedValue;
             }
         }
     }
 }
 
-fn writeFileTree(file_tree: *const Folder, output_mod_path: []const u8, allocator: Allocator) !void {
+fn writeIniFileTree(file_tree: *const IniFolder, output_mod_path: []const u8, allocator: Allocator) !void {
     std.fs.makeDirAbsolute(output_mod_path) catch |err| switch (err) {
         error.PathAlreadyExists => {},
         else => |e| return e,
@@ -926,7 +930,7 @@ fn writeFileTree(file_tree: *const Folder, output_mod_path: []const u8, allocato
     for (file_tree.folders.items) |folder| {
         const child_output_mod_path = try join(allocator, &.{ output_mod_path, folder.name });
         // std.debug.print("{s}\n", .{child_output_mod_path});
-        try writeFileTree(&folder, child_output_mod_path, allocator);
+        try writeIniFileTree(&folder, child_output_mod_path, allocator);
     }
 }
 
@@ -1115,18 +1119,18 @@ test "updated" {
             var diagnostics: Diagnostics = .{};
             var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
 
-            var file_tree = Folder{
+            var file_tree = IniFolder{
                 .name = "",
-                .files = ArrayList(File).init(allocator),
-                .folders = ArrayList(Folder).init(allocator),
+                .files = ArrayList(IniFile).init(allocator),
+                .folders = ArrayList(IniFolder).init(allocator),
             };
 
-            try file_tree.files.append(File{
+            try file_tree.files.append(IniFile{
                 .name = "",
                 .ast = ast,
             });
 
-            try updateFileTree(&file_tree, allocator);
+            try updateIniFileTree(&file_tree, allocator);
 
             try writeAst(&ast, output_path);
 
