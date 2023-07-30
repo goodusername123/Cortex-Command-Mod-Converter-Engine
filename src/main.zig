@@ -121,10 +121,18 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
+    const cwd = std.fs.cwd();
+
+    var input_mod_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    const input_mod_path = try cwd.realpath("tons_of_mods/in/mods", &input_mod_path_buffer);
+
+    var output_mod_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    const output_mod_path = try cwd.realpath("tons_of_mods/out", &output_mod_path_buffer);
+
     var diagnostics: Diagnostics = .{};
     convert(
-        "/code/tons_of_mods/in/mods",
-        "/code/tons_of_mods/out",
+        input_mod_path,
+        output_mod_path,
         allocator,
         &diagnostics,
     ) catch |err| switch (err) {
