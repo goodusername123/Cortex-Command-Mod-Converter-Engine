@@ -746,8 +746,19 @@ fn parseIniRules(allocator: Allocator) ![]Rule {
 }
 
 fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage)) void {
-    _ = property_value_pairs;
-    _ = ini_rules;
+    for (ini_rules) |rule| {
+        var key = PropertyValuePair{
+            .property = rule.old_property,
+            .value = rule.old_value,
+        };
+        var result = property_value_pairs.get(key);
+        if (result) |r| {
+            for (r.items) |line| {
+                line.property = rule.new_property;
+                line.value = rule.new_value;
+            }
+        }
+    }
 }
 
 const PropertyValuePair = struct {

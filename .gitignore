@@ -6,6 +6,7 @@
 !src/cortex_command_mod_converter_engine/conversion_rules/**/*.json
 !src/cortex_command_mod_converter_engine/stylua_executables/linux/stylua
 !src/cortex_command_mod_converter_engine/stylua_executables/windows/stylua.exe
+!src/ini_rules.json
 !src/**/*.zig
 !tests/**/*.ini
 !tests/**/*.txt
