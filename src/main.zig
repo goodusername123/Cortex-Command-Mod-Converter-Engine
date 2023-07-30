@@ -24,6 +24,7 @@ const join = std.fs.path.join;
 const makeDirAbsolute = std.fs.makeDirAbsolute;
 const maxInt = std.math.maxInt;
 const parseFloat = std.fmt.parseFloat;
+const parseFromSliceLeaky = std.json.parseFromSliceLeaky;
 const realpath = std.fs.realpath;
 const replace = std.mem.replace;
 const replacementSize = std.mem.replacementSize;
@@ -176,6 +177,10 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
 
     try copyFiles(input_mod_path, output_folder_path, allocator);
 
+    const lua_rules = try parseLuaRules(allocator);
+    std.debug.print("{}\n", .{lua_rules});
+    // applyLuaRules(lua_rules);
+
     var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
 
     // Create a hashmap, where the key is a property,
@@ -257,6 +262,16 @@ fn identicalStats(stat1: std.fs.File.Stat, stat2: std.fs.File.Stat, override_mod
     return (stat1.size == stat2.size and
         stat1.mtime == stat2.mtime and
         actual_mode == stat2.mode);
+}
+
+fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const lua_rules_path = "src/lua_rules.json";
+    const lua_rules_text = try readFile(lua_rules_path, allocator);
+
+    var scanner = std.json.Scanner.initCompleteInput(allocator, lua_rules_text);
+
+    var lua_rules_hashmap = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = std.json.default_max_value_len });
+    return lua_rules_hashmap;
 }
 
 fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !IniFolder {
@@ -742,7 +757,7 @@ fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(Propert
 fn parseIniRules(allocator: Allocator) ![]Rule {
     const ini_rules_path = "src/ini_rules.json";
     const ini_rules_text = try readFile(ini_rules_path, allocator);
-    return try std.json.parseFromSliceLeaky([]Rule, allocator, ini_rules_text, .{});
+    return try parseFromSliceLeaky([]Rule, allocator, ini_rules_text, .{});
 }
 
 fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage)) void {
