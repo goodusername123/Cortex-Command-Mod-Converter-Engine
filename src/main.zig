@@ -178,18 +178,23 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
 
     var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
 
-    const ini_rules = try parseIniRules(allocator);
-    std.debug.print("{any}\n", .{ini_rules});
+    // Create a hashmap, where the key is a property,
+    // and the value is a list of Nodes that have this key
+    var properties = StringHashMap(ArrayList(*Node)).init(allocator);
+    try addProperties(&file_tree, &properties, allocator);
 
-    try updateIniFileTree(&file_tree, allocator);
+    // Create a hashmap, where the key is a PropertyValuePair,
+    // and the value is a list of Nodes that have this key
+    var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage).init(allocator);
+    try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
+
+    const ini_rules = try parseIniRules(allocator);
+    // std.debug.print("{any}\n", .{ini_rules});
+    applyIniRules(ini_rules, &property_value_pairs);
+
+    try updateIniFileTree(&properties, &property_value_pairs, allocator);
 
     try writeIniFileTree(&file_tree, output_folder_path, allocator);
-}
-
-fn parseIniRules(allocator: Allocator) ![]Rule {
-    const ini_rules_path = "src/ini_rules.json";
-    const ini_rules_text = try readFile(ini_rules_path, allocator);
-    return try std.json.parseFromSliceLeaky([]Rule, allocator, ini_rules_text, .{});
 }
 
 fn makeOutputDirs(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
@@ -674,52 +679,6 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
-const PropertyValuePair = struct {
-    property: []const u8,
-    value: []const u8,
-};
-
-const PropertyValuePairContext = struct {
-    pub fn hash(self: PropertyValuePairContext, x: PropertyValuePair) u64 {
-        _ = self;
-        // TODO: XOR is shite; it returns 0 when the property and value are identical
-        // I tried replacing it with this one, but it panics with integer overflow:
-        // Source: https://stackoverflow.com/a/27952689/13279557
-        // var property_hash = std.hash_map.hashString(x.property);
-        // const value_hash = std.hash_map.hashString(x.value);
-        // property_hash ^= value_hash + 0x517cc1b727220a95 + (property_hash << 6) + (property_hash >> 2);
-        // return property_hash;
-
-        return std.hash_map.hashString(x.property) ^ std.hash_map.hashString(x.value);
-    }
-
-    pub fn eql(self: PropertyValuePairContext, a: PropertyValuePair, b: PropertyValuePair) bool {
-        _ = self;
-        return std.mem.eql(u8, a.property, b.property) and std.mem.eql(u8, a.value, b.value);
-    }
-};
-
-const UpdateIniFileTreeErrors = error{
-    ExpectedValue,
-};
-
-fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
-    // Create a hashmap, where the key is a property,
-    // and the value is a list of Nodes that have this property
-    var properties = StringHashMap(ArrayList(*Node)).init(allocator);
-    try addProperties(file_tree, &properties, allocator);
-
-    var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage).init(allocator);
-    try addPropertyValuePairs(file_tree, &property_value_pairs, allocator);
-
-    try addGripStrength(&property_value_pairs, allocator);
-    try addOrUpdateSupportedGameVersion(&properties, allocator);
-    try maxLengthToOffsets(&property_value_pairs, allocator);
-    try maxMassToMaxInventoryMass(&properties, allocator);
-    try maxThrottleRangeToPositiveThrottleMultiplier(&properties, allocator);
-    try minThrottleRangeToNegativeThrottleMultiplier(&properties, allocator);
-}
-
 fn addProperties(file_tree: *IniFolder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
     for (file_tree.files.items) |file| {
         for (file.ast.items) |*node| {
@@ -778,6 +737,55 @@ fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(Propert
     for (node.children.items) |*child| {
         try addFilePropertyValuePairs(child, property_value_pairs, allocator);
     }
+}
+
+fn parseIniRules(allocator: Allocator) ![]Rule {
+    const ini_rules_path = "src/ini_rules.json";
+    const ini_rules_text = try readFile(ini_rules_path, allocator);
+    return try std.json.parseFromSliceLeaky([]Rule, allocator, ini_rules_text, .{});
+}
+
+fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage)) void {
+    _ = property_value_pairs;
+    _ = ini_rules;
+}
+
+const PropertyValuePair = struct {
+    property: []const u8,
+    value: []const u8,
+};
+
+const PropertyValuePairContext = struct {
+    pub fn hash(self: PropertyValuePairContext, x: PropertyValuePair) u64 {
+        _ = self;
+        // TODO: XOR is shite; it returns 0 when the property and value are identical
+        // I tried replacing it with this one, but it panics with integer overflow:
+        // Source: https://stackoverflow.com/a/27952689/13279557
+        // var property_hash = std.hash_map.hashString(x.property);
+        // const value_hash = std.hash_map.hashString(x.value);
+        // property_hash ^= value_hash + 0x517cc1b727220a95 + (property_hash << 6) + (property_hash >> 2);
+        // return property_hash;
+
+        return std.hash_map.hashString(x.property) ^ std.hash_map.hashString(x.value);
+    }
+
+    pub fn eql(self: PropertyValuePairContext, a: PropertyValuePair, b: PropertyValuePair) bool {
+        _ = self;
+        return std.mem.eql(u8, a.property, b.property) and std.mem.eql(u8, a.value, b.value);
+    }
+};
+
+const UpdateIniFileTreeErrors = error{
+    ExpectedValue,
+};
+
+fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+    try addGripStrength(property_value_pairs, allocator);
+    try addOrUpdateSupportedGameVersion(properties, allocator);
+    try maxLengthToOffsets(property_value_pairs, allocator);
+    try maxMassToMaxInventoryMass(properties, allocator);
+    try maxThrottleRangeToPositiveThrottleMultiplier(properties, allocator);
+    try minThrottleRangeToNegativeThrottleMultiplier(properties, allocator);
 }
 
 fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
