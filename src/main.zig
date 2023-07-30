@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const default_max_load_percentage = std.hash_map.default_max_load_percentage;
+const default_max_value_len = std.json.default_max_value_len;
 const MAX_PATH_BYTES = std.fs.MAX_PATH_BYTES;
 const page_allocator = std.heap.page_allocator;
 
@@ -8,6 +10,7 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const ArrayList = std.ArrayList;
 const HashMap = std.hash_map.HashMap;
 const MultiArrayList = std.MultiArrayList;
+const Scanner = std.json.Scanner;
 const StringHashMap = std.hash_map.StringHashMap;
 
 const allocPrint = std.fmt.allocPrint;
@@ -178,8 +181,7 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
     try copyFiles(input_mod_path, output_folder_path, allocator);
 
     const lua_rules = try parseLuaRules(allocator);
-    std.debug.print("{}\n", .{lua_rules});
-    // applyLuaRules(lua_rules);
+    try applyLuaRules(lua_rules, output_folder_path, allocator);
 
     var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
 
@@ -190,7 +192,7 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
 
     // Create a hashmap, where the key is a PropertyValuePair,
     // and the value is a list of Nodes that have this key
-    var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage).init(allocator);
+    var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
     try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
 
     const ini_rules = try parseIniRules(allocator);
@@ -268,10 +270,52 @@ fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
     const lua_rules_path = "src/lua_rules.json";
     const lua_rules_text = try readFile(lua_rules_path, allocator);
 
-    var scanner = std.json.Scanner.initCompleteInput(allocator, lua_rules_text);
+    var scanner = Scanner.initCompleteInput(allocator, lua_rules_text);
 
-    var lua_rules_hashmap = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = std.json.default_max_value_len });
+    var lua_rules_hashmap = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return lua_rules_hashmap;
+}
+
+fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []const u8, allocator: Allocator) !void {
+    var iterable_dir = try std.fs.openIterableDirAbsolute(folder_path, .{});
+    defer iterable_dir.close();
+    var dir_iterator = iterable_dir.iterate();
+
+    while (try dir_iterator.next()) |dir_entry| {
+        if (dir_entry.kind == std.fs.File.Kind.file) {
+            if (eql(u8, extension(dir_entry.name), ".lua")) {
+                const file_path = try join(allocator, &.{ folder_path, dir_entry.name });
+                var text = try readFile(file_path, allocator);
+
+                var text_contains_any_key = false;
+
+                var map_iterator = lua_rules.map.iterator();
+                while (map_iterator.next()) |map_entry| {
+                    const key = map_entry.key_ptr.*;
+                    const value = map_entry.value_ptr.*;
+
+                    const text_contains_key = std.mem.indexOfPos(u8, text, 0, key) != null;
+                    if (text_contains_key) {
+                        text_contains_any_key = true;
+
+                        const replacement_size = replacementSize(u8, text, key, value);
+                        const new_text = try allocator.alloc(u8, replacement_size);
+                        _ = replace(u8, text, key, value, new_text);
+                        text = new_text;
+                    }
+                }
+
+                if (text_contains_any_key) {
+                    const cwd = std.fs.cwd();
+                    var file = try cwd.openFile(file_path, .{ .mode = .write_only });
+                    defer file.close();
+                    try file.writeAll(text);
+                }
+            }
+        } else if (dir_entry.kind == std.fs.File.Kind.directory) {
+            try applyLuaRules(lua_rules, try join(allocator, &.{ folder_path, dir_entry.name }), allocator);
+        }
+    }
 }
 
 fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !IniFolder {
@@ -722,7 +766,7 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
     }
 }
 
-fn addPropertyValuePairs(file_tree: *IniFolder, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+fn addPropertyValuePairs(file_tree: *IniFolder, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     for (file_tree.files.items) |file| {
         for (file.ast.items) |*node| {
             try addFilePropertyValuePairs(node, property_value_pairs, allocator);
@@ -734,7 +778,7 @@ fn addPropertyValuePairs(file_tree: *IniFolder, property_value_pairs: *HashMap(P
     }
 }
 
-fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     if (node.property != null and node.value != null) {
         const property_value_pair = PropertyValuePair{
             .property = node.property.?,
@@ -760,7 +804,7 @@ fn parseIniRules(allocator: Allocator) ![]Rule {
     return try parseFromSliceLeaky([]Rule, allocator, ini_rules_text, .{});
 }
 
-fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage)) void {
+fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) void {
     for (ini_rules) |rule| {
         var key = PropertyValuePair{
             .property = rule.old_property,
@@ -805,7 +849,7 @@ const UpdateIniFileTreeErrors = error{
     ExpectedValue,
 };
 
-fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     try addGripStrength(property_value_pairs, allocator);
     try addOrUpdateSupportedGameVersion(properties, allocator);
     try maxLengthToOffsets(property_value_pairs, allocator);
@@ -814,7 +858,7 @@ fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_valu
     try minThrottleRangeToNegativeThrottleMultiplier(properties, allocator);
 }
 
-fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     var pair = PropertyValuePair{
         .property = "AddActor",
         .value = "Arm",
@@ -905,7 +949,7 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
     }
 }
 
-fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, std.hash_map.default_max_load_percentage), allocator: Allocator) !void {
+fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     var pair = PropertyValuePair{
         .property = "AddActor",
         .value = "Leg",
