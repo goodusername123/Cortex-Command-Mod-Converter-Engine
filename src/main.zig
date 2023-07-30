@@ -98,6 +98,13 @@ const Node = struct {
     children: ArrayList(Node),
 };
 
+const Rule = struct {
+    old_property: []const u8,
+    old_value: []const u8,
+    new_property: []const u8,
+    new_value: []const u8,
+};
+
 const IniFile = struct {
     name: []const u8,
     ast: ArrayList(Node),
@@ -171,9 +178,18 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
 
     var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
 
+    const ini_rules = try parseIniRules(allocator);
+    std.debug.print("{any}\n", .{ini_rules});
+
     try updateIniFileTree(&file_tree, allocator);
 
     try writeIniFileTree(&file_tree, output_folder_path, allocator);
+}
+
+fn parseIniRules(allocator: Allocator) ![]Rule {
+    const ini_rules_path = "src/ini_rules.json";
+    const ini_rules_text = try readFile(ini_rules_path, allocator);
+    return try std.json.parseFromSliceLeaky([]Rule, allocator, ini_rules_text, .{});
 }
 
 fn makeOutputDirs(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
