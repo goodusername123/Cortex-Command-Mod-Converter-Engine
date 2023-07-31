@@ -2,6 +2,8 @@
 !*/
 !.vscode/launch.json
 !.vscode/tasks.json
+!docker/Dockerfile
+!docker/get_url.py
 !src/**/*.py
 !src/cortex_command_mod_converter_engine/conversion_rules/**/*.json
 !src/cortex_command_mod_converter_engine/stylua_executables/linux/stylua
