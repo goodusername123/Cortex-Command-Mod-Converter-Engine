@@ -1,5 +1,5 @@
 # docker build -t zig-master ./docker --build-arg ZIGVER=master
-# docker run -it -v $(pwd):/code zig-master
+# docker run --rm -it -v $(pwd):/code zig-master
 
 FROM alpine:3.13 as builder
 
