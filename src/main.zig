@@ -198,6 +198,9 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
     const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
     try applyIniCopyOfRules(ini_copy_of_rules, &property_value_pairs);
 
+    const ini_property_rules = try parseIniPropertyRules(allocator);
+    try applyIniPropertyRules(ini_property_rules, &properties);
+
     const ini_rules = try parseIniRules(allocator);
     applyIniRules(ini_rules, &property_value_pairs);
 
@@ -824,6 +827,31 @@ fn applyIniCopyOfRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), pro
         if (result) |r| {
             for (r.items) |line| {
                 line.value = new_value;
+            }
+        }
+    }
+}
+
+fn parseIniPropertyRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const ini_property_rules_path = "src/ini_property_rules.json";
+    const ini_property_rules_text = try readFile(ini_property_rules_path, allocator);
+
+    var scanner = Scanner.initCompleteInput(allocator, ini_property_rules_text);
+
+    var ini_property_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    return ini_property_rules;
+}
+
+fn applyIniPropertyRules(ini_property_rules: std.json.ArrayHashMap([]const u8), properties: *StringHashMap(ArrayList(*Node))) !void {
+    var map_iterator = ini_property_rules.map.iterator();
+    while (map_iterator.next()) |map_entry| {
+        const old_property = map_entry.key_ptr.*;
+        const new_property = map_entry.value_ptr.*;
+
+        var result = properties.get(old_property);
+        if (result) |r| {
+            for (r.items) |line| {
+                line.property = new_property;
             }
         }
     }
