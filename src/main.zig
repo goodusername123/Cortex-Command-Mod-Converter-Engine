@@ -195,8 +195,10 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
     var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
     try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
 
+    const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
+    try applyIniCopyOfRules(ini_copy_of_rules, &property_value_pairs);
+
     const ini_rules = try parseIniRules(allocator);
-    // std.debug.print("{any}\n", .{ini_rules});
     applyIniRules(ini_rules, &property_value_pairs);
 
     try updateIniFileTree(&properties, &property_value_pairs, allocator);
@@ -272,8 +274,8 @@ fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
 
     var scanner = Scanner.initCompleteInput(allocator, lua_rules_text);
 
-    var lua_rules_hashmap = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
-    return lua_rules_hashmap;
+    var lua_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    return lua_rules;
 }
 
 fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []const u8, allocator: Allocator) !void {
@@ -796,6 +798,35 @@ fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(Propert
     for (node.children.items) |*child| {
         try addFilePropertyValuePairs(child, property_value_pairs, allocator);
     }
+}
+
+fn parseIniCopyOfRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const ini_copy_of_rules_path = "src/ini_copy_of_rules.json";
+    const ini_copy_of_rules_text = try readFile(ini_copy_of_rules_path, allocator);
+
+    var scanner = Scanner.initCompleteInput(allocator, ini_copy_of_rules_text);
+
+    var ini_copy_of_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    return ini_copy_of_rules;
+}
+
+fn applyIniCopyOfRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+	var map_iterator = ini_copy_of_rules.map.iterator();
+	while (map_iterator.next()) |map_entry| {
+		const old_value = map_entry.key_ptr.*;
+		const new_value = map_entry.value_ptr.*;
+
+        var pair = PropertyValuePair{
+            .property = "CopyOf",
+            .value = old_value,
+        };
+        var result = property_value_pairs.get(pair);
+        if (result) |r| {
+            for (r.items) |line| {
+                line.value = new_value;
+            }
+        }
+	}
 }
 
 fn parseIniRules(allocator: Allocator) ![]Rule {
