@@ -1,0 +1,8 @@
+{
+	"Robotic": "Mechanical",
+	"DefaultGoldCake": "DefaultGoldCakeDifficulty",
+	"DefaultGoldEasy": "DefaultGoldEasyDifficulty",
+	"DefaultGoldMedium": "DefaultGoldMediumDifficulty",
+	"DefaultGoldHard": "DefaultGoldHardDifficulty",
+	"DefaultGoldNuts": "DefaultGoldNutsDifficulty"
+}

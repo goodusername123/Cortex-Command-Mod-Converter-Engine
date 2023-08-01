@@ -1,14 +1,26 @@
 [
 	{
-		"old_property": "A",
-		"old_value": "B",
-		"new_property": "C",
-		"new_value": "D"
+		"old_property": "FilePath",
+		"old_value": "Coalition.rte/Devices/Weapons/Shotgun/Sounds/ReloadEnd.flac",
+		"new_property": "FilePath",
+		"new_value": "Coalition.rte/Devices/Weapons/Shotgun/Sounds/Insert1.flac"
 	},
 	{
-		"old_property": "E",
-		"old_value": "F",
-		"new_property": "G",
-		"new_value": "H"
+		"old_property": "Location",
+		"old_value": "Vector",
+		"new_property": "Position",
+		"new_value": "Vector"
+	},
+	{
+		"old_property": "FilePath",
+		"old_value": "Ronin.rte/Devices/Weapons/M1Garand/Sounds/Ping.flac",
+		"new_property": "FilePath",
+		"new_value": "Ronin.rte/Devices/Weapons/M1Garand/Sounds/Ping1.flac"
+	},
+	{
+		"old_property": "ScriptPath",
+		"old_value": "Base.rte/Scripts/Shared/GibOverLifeTime.lua",
+		"new_property": "GibAtEndOfLifetime",
+		"new_value": "1"
 	}
 ]

@@ -1,9 +1,0 @@
-{
-	"\tRobotic = ": "\tMechanical = ",
-	"\tDefaultGoldCake = ": "\tDefaultGoldCakeDifficulty = ",
-	"\tDefaultGoldEasy = ": "\tDefaultGoldEasyDifficulty = ",
-	"\tDefaultGoldMedium = ": "\tDefaultGoldMediumDifficulty = ",
-	"\tDefaultGoldHard = ": "\tDefaultGoldHardDifficulty = ",
-	"\tDefaultGoldNuts = ": "\tDefaultGoldNutsDifficulty = ",
-	"\tScriptPath = Base.rte/Scripts/Shared/GibOverLifeTime.lua\n": "\tGibAtEndOfLifetime = 1\n"
-}
