@@ -5,10 +5,5 @@
 	"\tDefaultGoldMedium = ": "\tDefaultGoldMediumDifficulty = ",
 	"\tDefaultGoldHard = ": "\tDefaultGoldHardDifficulty = ",
 	"\tDefaultGoldNuts = ": "\tDefaultGoldNutsDifficulty = ",
-	"\tCopyOf = Sniper Smoke Trail 1\n": "\tCopyOf = Tiny Smoke Trail 1\n",
-	"\tCopyOf = Sniper Smoke Trail 2\n": "\tCopyOf = Tiny Smoke Trail 2\n",
-	"\tCopyOf = Sniper Smoke Trail 3\n": "\tCopyOf = Tiny Smoke Trail 3\n",
-	"\tCopyOf = Hand\n": "\tCopyOf = Hand Open\n",
-	"\tScriptPath = Base.rte/Scripts/Shared/GibOverLifeTime.lua\n": "\tGibAtEndOfLifetime = 1\n",
-	"\tCopyOf = Crab Walk Path Left\n": "\tCopyOf = Crab Walk Path\n"
+	"\tScriptPath = Base.rte/Scripts/Shared/GibOverLifeTime.lua\n": "\tGibAtEndOfLifetime = 1\n"
 }
