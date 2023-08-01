@@ -309,7 +309,7 @@ fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []co
 
                 if (text_contains_any_key) {
                     const cwd = std.fs.cwd();
-                    var file = try cwd.openFile(file_path, .{ .mode = .write_only });
+                    var file = try cwd.createFile(file_path, .{});
                     defer file.close();
                     try file.writeAll(text);
                 }
@@ -811,10 +811,10 @@ fn parseIniCopyOfRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) 
 }
 
 fn applyIniCopyOfRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
-	var map_iterator = ini_copy_of_rules.map.iterator();
-	while (map_iterator.next()) |map_entry| {
-		const old_value = map_entry.key_ptr.*;
-		const new_value = map_entry.value_ptr.*;
+    var map_iterator = ini_copy_of_rules.map.iterator();
+    while (map_iterator.next()) |map_entry| {
+        const old_value = map_entry.key_ptr.*;
+        const new_value = map_entry.value_ptr.*;
 
         var pair = PropertyValuePair{
             .property = "CopyOf",
@@ -826,7 +826,7 @@ fn applyIniCopyOfRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), pro
                 line.value = new_value;
             }
         }
-	}
+    }
 }
 
 fn parseIniRules(allocator: Allocator) ![]Rule {
