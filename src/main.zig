@@ -1252,7 +1252,7 @@ test "general" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'general/{s}'", .{entry.path});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
 
@@ -1316,7 +1316,7 @@ test "updated" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'updated/{s}'", .{entry.path});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
 
@@ -1345,7 +1345,13 @@ test "updated" {
                 .ast = ast,
             });
 
-            try updateIniFileTree(&file_tree, allocator);
+			var properties = StringHashMap(ArrayList(*Node)).init(allocator);
+			try addProperties(&file_tree, &properties, allocator);
+
+			var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
+			try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
+
+            try updateIniFileTree(&properties, &property_value_pairs, allocator);
 
             try writeAst(&ast, output_path);
 
@@ -1387,7 +1393,7 @@ test "invalid" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'invalid/{s}'", .{entry.path});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
 
