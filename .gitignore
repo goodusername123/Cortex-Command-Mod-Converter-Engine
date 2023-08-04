@@ -15,6 +15,7 @@
 !src/**/*.zig
 !tests/**/*.ini
 !tests/**/*.txt
+!tests/**/*.lua
 !tests/**/*.zig
 !.gitignore
 !build.zig

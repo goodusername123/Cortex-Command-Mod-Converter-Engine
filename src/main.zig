@@ -33,6 +33,7 @@ const replace = std.mem.replace;
 const replacementSize = std.mem.replacementSize;
 const tmpDir = std.testing.tmpDir;
 const trim = std.mem.trim;
+const updateFileAbsolute = std.fs.updateFileAbsolute;
 
 /// The purpose of the converter engine is to take an .ini input file like this:
 /// /* foo1   */ /* foo2*//*foo3*/
@@ -240,6 +241,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
                 const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
                 const access = std.fs.accessAbsolute(output_file_path, .{});
+
                 if (access == error.FileNotFound) {
                     try copyFileAbsolute(input_file_path, output_file_path, .{});
                 } else if (access catch null) |_| {
@@ -249,7 +251,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const input_stat = try iterable_dir.dir.statFile(input_file_path);
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
                     if (!identicalStats(input_stat, output_stat, null)) {
-                        _ = try std.fs.updateFileAbsolute(input_file_path, output_file_path, .{});
+                        _ = try updateFileAbsolute(input_file_path, output_file_path, .{});
                     }
                 } else {
                     return access;
@@ -1253,7 +1255,7 @@ test "general" {
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
-            std.debug.print("\nSubtest 'general/{s}'", .{entry.path});
+            std.debug.print("\nSubtest 'general/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
@@ -1269,6 +1271,158 @@ test "general" {
 
             var diagnostics: Diagnostics = .{};
             var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
+
+            try writeAst(&ast, output_path);
+
+            const cwd = std.fs.cwd();
+
+            const expected_file = try cwd.openFile(expected_path, .{});
+            defer expected_file.close();
+            var expected_buf_reader = bufferedReader(expected_file.reader());
+            const expected_stream = expected_buf_reader.reader();
+            const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+            const expected_text = try crlfToLf(expected_text_crlf, allocator);
+
+            const output_file = try cwd.openFile(output_path, .{});
+            defer output_file.close();
+            var output_buf_reader = bufferedReader(output_file.reader());
+            const output_stream = output_buf_reader.reader();
+            const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
+            const output_text = try crlfToLf(output_text_crlf, allocator);
+
+            try expectEqualStrings(expected_text, output_text);
+            std.debug.print(" passed", .{});
+        }
+    }
+
+    std.debug.print("\n\n", .{});
+}
+
+test "lua_rules" {
+    var tmpdir = tmpDir(.{});
+    defer tmpdir.cleanup();
+
+    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    const tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
+
+    var iterable_tests = try std.fs.cwd().openIterableDir("tests/lua_rules", .{});
+    defer iterable_tests.close();
+
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var tests_walker = try iterable_tests.walk(allocator);
+
+    while (try tests_walker.next()) |entry| {
+        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
+        const dir_path = try entry.dir.realpath(".", &out_buffer);
+
+        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.lua")) {
+            std.debug.print("\nSubtest 'lua_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
+
+            const input_path = try join(allocator, &.{ dir_path, "in.lua" });
+            const expected_path = try join(allocator, &.{ dir_path, "out.lua" });
+            const output_path = try join(allocator, &.{ tmpdir_path, "output.lua" });
+
+            // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
+
+            // const text = try readFile(input_path, allocator);
+
+            _ = try updateFileAbsolute(input_path, output_path, .{});
+
+            const lua_rules = try parseLuaRules(allocator);
+            try applyLuaRules(lua_rules, tmpdir_path, allocator);
+
+            const cwd = std.fs.cwd();
+
+            const expected_file = try cwd.openFile(expected_path, .{});
+            defer expected_file.close();
+            var expected_buf_reader = bufferedReader(expected_file.reader());
+            const expected_stream = expected_buf_reader.reader();
+            const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+            const expected_text = try crlfToLf(expected_text_crlf, allocator);
+
+            const output_file = try cwd.openFile(output_path, .{});
+            defer output_file.close();
+            var output_buf_reader = bufferedReader(output_file.reader());
+            const output_stream = output_buf_reader.reader();
+            const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
+            const output_text = try crlfToLf(output_text_crlf, allocator);
+
+            try expectEqualStrings(expected_text, output_text);
+            std.debug.print(" passed", .{});
+        }
+    }
+
+    std.debug.print("\n\n", .{});
+}
+
+test "ini_rules" {
+    var tmpdir = tmpDir(.{});
+    defer tmpdir.cleanup();
+
+    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    const tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
+
+    var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_rules", .{});
+    defer iterable_tests.close();
+
+    var arena = ArenaAllocator.init(page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+
+    var tests_walker = try iterable_tests.walk(allocator);
+
+    while (try tests_walker.next()) |entry| {
+        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
+        const dir_path = try entry.dir.realpath(".", &out_buffer);
+
+        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
+            std.debug.print("\nSubtest 'ini_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
+
+            const input_path = try join(allocator, &.{ dir_path, "in.ini" });
+            const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
+
+            const output_path = try join(allocator, &.{ tmpdir_path, "output.ini" });
+
+            // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
+
+            const text = try readFile(input_path, allocator);
+
+            var tokens = try getTokens(text, allocator);
+
+            var diagnostics: Diagnostics = .{};
+            var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
+
+            var file_tree = IniFolder{
+                .name = "",
+                .files = ArrayList(IniFile).init(allocator),
+                .folders = ArrayList(IniFolder).init(allocator),
+            };
+
+            try file_tree.files.append(IniFile{
+                .name = "",
+                .ast = ast,
+            });
+
+            var properties = StringHashMap(ArrayList(*Node)).init(allocator);
+            try addProperties(&file_tree, &properties, allocator);
+
+            var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
+            try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
+
+            const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
+            try applyIniCopyOfRules(ini_copy_of_rules, &property_value_pairs);
+
+            const ini_property_rules = try parseIniPropertyRules(allocator);
+            try applyIniPropertyRules(ini_property_rules, &properties);
+
+            const ini_rules = try parseIniRules(allocator);
+            applyIniRules(ini_rules, &property_value_pairs);
+
+            try updateIniFileTree(&properties, &property_value_pairs, allocator);
 
             try writeAst(&ast, output_path);
 
@@ -1317,7 +1471,7 @@ test "updated" {
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
-            std.debug.print("\nSubtest 'updated/{s}'", .{entry.path});
+            std.debug.print("\nSubtest 'updated/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
@@ -1345,11 +1499,11 @@ test "updated" {
                 .ast = ast,
             });
 
-			var properties = StringHashMap(ArrayList(*Node)).init(allocator);
-			try addProperties(&file_tree, &properties, allocator);
+            var properties = StringHashMap(ArrayList(*Node)).init(allocator);
+            try addProperties(&file_tree, &properties, allocator);
 
-			var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
-			try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
+            var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
+            try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
 
             try updateIniFileTree(&properties, &property_value_pairs, allocator);
 
@@ -1394,7 +1548,7 @@ test "invalid" {
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
-            std.debug.print("\nSubtest 'invalid/{s}'", .{entry.path});
+            std.debug.print("\nSubtest 'invalid/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
