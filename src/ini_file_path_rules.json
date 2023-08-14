@@ -462,5 +462,14 @@
 	"Base.rte/GUIs/PieIcons/TradeStar.bmp": "Base.rte/GUIs/PieMenus/PieIcons/TradeStar.png",
 	"Base.rte/GUIs/PieIcons/Unknown.bmp": "Base.rte/GUIs/PieMenus/PieIcons/Unknown.png",
 	"Base.rte/GUIs/PieIcons/ZoomIn.bmp": "Base.rte/GUIs/PieMenus/PieIcons/ZoomIn.png",
-	"Base.rte/GUIs/PieIcons/ZoomOut.bmp": "Base.rte/GUIs/PieMenus/PieIcons/ZoomOut.png"
+	"Base.rte/GUIs/PieIcons/ZoomOut.bmp": "Base.rte/GUIs/PieMenus/PieIcons/ZoomOut.png",
+
+	"Imperatus.rte/Devices/Weapons/Marauder/MarauderRound.bmp": "Imperatus.rte/Devices/Weapons/Marauder/MarauderShot.png",
+	"Coalition.rte/Devices/Sprites/PieIcons/IconBounce.bmp": "Base.rte/GUIs/PieMenus/PieIcons/Follow.png",
+	"Coalition.rte/Devices/Sprites/PieIcons/IconDetonate.bmp": "Base.rte/GUIs/PieMenus/PieIcons/Remove.png",
+	"Coalition.rte/Devices/Sprites/PieIcons/IconImpact.bmp": "Base.rte/GUIs/PieMenus/PieIcons/Remove.png",
+	"Dummy.rte/Devices/Weapons/Launchers/Grenade/PieIcons/IconBounce.bmp": "Base.rte/GUIs/PieMenus/PieIcons/Follow.png",
+	"Dummy.rte/Devices/Weapons/Launchers/Grenade/PieIcons/IconShotCone.bmp": "Base.rte/GUIs/PieMenus/PieIcons/Clear.png",
+	"Ronin.rte/Devices/Sprites/PieIcons/IconBounce.bmp": "Base.rte/GUIs/PieMenus/PieIcons/Follow.png",
+	"Ronin.rte/Devices/Sprites/PieIcons/IconImpact.bmp": "Base.rte/GUIs/PieMenus/PieIcons/Remove.png"
 }

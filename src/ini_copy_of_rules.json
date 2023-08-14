@@ -98,5 +98,11 @@
 	"Tut Right Border": "Right Border",
 	"Base.rte/Tut Right Border": "Right Border",
 	"Tut End Border": "End Border",
-	"Base.rte/Tut End Border": "End Border"
+	"Base.rte/Tut End Border": "End Border",
+
+	"Ronin Soldier": "Bandit",
+	"Ronin Heavy": "Raider",
+	"Browncoat Light": "Browncoat",
+	"Browncoat Heavy": "Exterminator",
+	"Techion Silver Man": "Silver Man"
 }
