@@ -1,21 +1,9 @@
 [
 	{
-		"old_property": "FilePath",
-		"old_value": "Coalition.rte/Devices/Weapons/Shotgun/Sounds/ReloadEnd.flac",
-		"new_property": "FilePath",
-		"new_value": "Coalition.rte/Devices/Weapons/Shotgun/Sounds/Insert1.flac"
-	},
-	{
 		"old_property": "Location",
 		"old_value": "Vector",
 		"new_property": "Position",
 		"new_value": "Vector"
-	},
-	{
-		"old_property": "FilePath",
-		"old_value": "Ronin.rte/Devices/Weapons/M1Garand/Sounds/Ping.flac",
-		"new_property": "FilePath",
-		"new_value": "Ronin.rte/Devices/Weapons/M1Garand/Sounds/Ping1.flac"
 	},
 	{
 		"old_property": "ScriptPath",
