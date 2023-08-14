@@ -22,5 +22,17 @@
 		"old_value": "Base.rte/Scripts/Shared/GibOverLifeTime.lua",
 		"new_property": "GibAtEndOfLifetime",
 		"new_value": "1"
+	},
+	{
+		"old_property": "AddSound",
+		"old_value": "Sound",
+		"new_property": "AddSoundContainer",
+		"new_value": "SoundContainer"
+	},
+	{
+		"old_property": "AddSample",
+		"old_value": "ContentFile",
+		"new_property": "AddSound",
+		"new_value": "ContentFile"
 	}
 ]
