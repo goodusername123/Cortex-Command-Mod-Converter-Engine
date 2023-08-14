@@ -128,6 +128,35 @@ const Diagnostics = struct {
     column: ?i32 = null,
 };
 
+const PropertyValuePair = struct {
+    property: []const u8,
+    value: []const u8,
+};
+
+const PropertyValuePairContext = struct {
+    pub fn hash(self: PropertyValuePairContext, x: PropertyValuePair) u64 {
+        _ = self;
+        // TODO: XOR is shite; it returns 0 when the property and value are identical
+        // I tried replacing it with this one, but it panics with integer overflow:
+        // Source: https://stackoverflow.com/a/27952689/13279557
+        // var property_hash = std.hash_map.hashString(x.property);
+        // const value_hash = std.hash_map.hashString(x.value);
+        // property_hash ^= value_hash + 0x517cc1b727220a95 + (property_hash << 6) + (property_hash >> 2);
+        // return property_hash;
+
+        return std.hash_map.hashString(x.property) ^ std.hash_map.hashString(x.value);
+    }
+
+    pub fn eql(self: PropertyValuePairContext, a: PropertyValuePair, b: PropertyValuePair) bool {
+        _ = self;
+        return std.mem.eql(u8, a.property, b.property) and std.mem.eql(u8, a.value, b.value);
+    }
+};
+
+const UpdateIniFileTreeErrors = error{
+    ExpectedValue,
+};
+
 pub fn main() !void {
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
@@ -207,6 +236,9 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
 
     const ini_rules = try parseIniRules(allocator);
     applyIniRules(ini_rules, &property_value_pairs);
+
+    const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
+    applyIniSoundContainerRules(ini_sound_container_rules, &property_value_pairs);
 
     try updateIniFileTree(&properties, &property_value_pairs, allocator);
 
@@ -892,9 +924,9 @@ fn applyIniPropertyRules(ini_property_rules: std.json.ArrayHashMap([]const u8), 
 }
 
 fn parseIniRules(allocator: Allocator) ![]Rule {
-    const ini_rules_path = "src/ini_rules.json";
-    const ini_rules_text = try readFile(ini_rules_path, allocator);
-    return try parseFromSliceLeaky([]Rule, allocator, ini_rules_text, .{});
+    const path = "src/ini_rules.json";
+    const text = try readFile(path, allocator);
+    return try parseFromSliceLeaky([]Rule, allocator, text, .{});
 }
 
 fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) void {
@@ -913,34 +945,26 @@ fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValue
     }
 }
 
-const PropertyValuePair = struct {
-    property: []const u8,
-    value: []const u8,
-};
+fn parseIniSoundContainerRules(allocator: Allocator) ![][]const u8 {
+    const path = "src/ini_sound_container_rules.json";
+    const text = try readFile(path, allocator);
+    return try parseFromSliceLeaky([][]const u8, allocator, text, .{});
+}
 
-const PropertyValuePairContext = struct {
-    pub fn hash(self: PropertyValuePairContext, x: PropertyValuePair) u64 {
-        _ = self;
-        // TODO: XOR is shite; it returns 0 when the property and value are identical
-        // I tried replacing it with this one, but it panics with integer overflow:
-        // Source: https://stackoverflow.com/a/27952689/13279557
-        // var property_hash = std.hash_map.hashString(x.property);
-        // const value_hash = std.hash_map.hashString(x.value);
-        // property_hash ^= value_hash + 0x517cc1b727220a95 + (property_hash << 6) + (property_hash >> 2);
-        // return property_hash;
-
-        return std.hash_map.hashString(x.property) ^ std.hash_map.hashString(x.value);
+fn applyIniSoundContainerRules(ini_sound_container_rules: [][]const u8, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) void {
+    for (ini_sound_container_rules) |property| {
+        var key = PropertyValuePair{
+            .property = property,
+            .value = "Sound",
+        };
+        var result = property_value_pairs.get(key);
+        if (result) |r| {
+            for (r.items) |line| {
+                line.value = "SoundContainer";
+            }
+        }
     }
-
-    pub fn eql(self: PropertyValuePairContext, a: PropertyValuePair, b: PropertyValuePair) bool {
-        _ = self;
-        return std.mem.eql(u8, a.property, b.property) and std.mem.eql(u8, a.value, b.value);
-    }
-};
-
-const UpdateIniFileTreeErrors = error{
-    ExpectedValue,
-};
+}
 
 fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     try addGripStrength(property_value_pairs, allocator);
@@ -1456,6 +1480,9 @@ test "ini_rules" {
 
             const ini_rules = try parseIniRules(allocator);
             applyIniRules(ini_rules, &property_value_pairs);
+
+            const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
+            applyIniSoundContainerRules(ini_sound_container_rules, &property_value_pairs);
 
             try updateIniFileTree(&properties, &property_value_pairs, allocator);
 

@@ -12,6 +12,7 @@
 !src/ini_file_path_rules.json
 !src/ini_property_rules.json
 !src/ini_rules.json
+!src/ini_sound_container_rules.json
 !src/lua_rules.json
 !src/**/*.zig
 !tests/**/*.ini
