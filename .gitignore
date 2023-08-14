@@ -9,6 +9,7 @@
 !src/cortex_command_mod_converter_engine/stylua_executables/linux/stylua
 !src/cortex_command_mod_converter_engine/stylua_executables/windows/stylua.exe
 !src/ini_copy_of_rules.json
+!src/ini_file_path_rules.json
 !src/ini_property_rules.json
 !src/ini_rules.json
 !src/lua_rules.json
