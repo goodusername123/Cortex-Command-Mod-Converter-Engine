@@ -10,5 +10,17 @@
 		"old_value": "Sound",
 		"new_property": "AddSoundContainer",
 		"new_value": "SoundContainer"
+	},
+	{
+		"old_property": "ScriptPath",
+		"old_value": "Base.rte/Devices/Shared/Scripts/MuzzleSmokeHigh.lua",
+		"new_property": null,
+		"new_value": null
+	},
+	{
+		"old_property": "ScriptPath",
+		"old_value": "Coalition.rte/Devices/Weapons/MuzzleSmoke.lua",
+		"new_property": null,
+		"new_value": null
 	}
 ]
