@@ -28,5 +28,8 @@
 	"RLeg": "RightLeg",
 	"LFootGroup": "LeftFootGroup",
 	"RFootGroup": "RightFootGroup",
-	"CollidesWithTerrainWhenAttached": "CollidesWithTerrainWhileAttached"
+	"CollidesWithTerrainWhenAttached": "CollidesWithTerrainWhileAttached",
+	"DrawWhenOpen": "DrawMaterialLayerWhenOpen",
+	"DrawWhenClosed": "DrawMaterialLayerWhenClosed",
+	"AffectedByPitch": "AffectedByGlobalPitch"
 }
