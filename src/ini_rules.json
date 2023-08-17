@@ -1,11 +1,5 @@
 [
 	{
-		"old_property": "Location",
-		"old_value": "Vector",
-		"new_property": "Position",
-		"new_value": "Vector"
-	},
-	{
 		"old_property": "ScriptPath",
 		"old_value": "Base.rte/Scripts/Shared/GibOverLifeTime.lua",
 		"new_property": "GibAtEndOfLifetime",
@@ -16,11 +10,5 @@
 		"old_value": "Sound",
 		"new_property": "AddSoundContainer",
 		"new_value": "SoundContainer"
-	},
-	{
-		"old_property": "AddSample",
-		"old_value": "ContentFile",
-		"new_property": "AddSound",
-		"new_value": "ContentFile"
 	}
 ]
