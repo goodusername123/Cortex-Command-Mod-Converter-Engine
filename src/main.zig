@@ -231,6 +231,9 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
     const ini_file_path_rules = try parseIniFilePathRules(allocator);
     try applyIniFilePathRules(ini_file_path_rules, &property_value_pairs);
 
+    const ini_script_path_rules = try parseIniScriptPathRules(allocator);
+    try applyIniScriptPathRules(ini_script_path_rules, &property_value_pairs);
+
     const ini_property_rules = try parseIniPropertyRules(allocator);
     try applyIniPropertyRules(ini_property_rules, &properties);
 
@@ -898,6 +901,35 @@ fn applyIniFilePathRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), p
     }
 }
 
+fn parseIniScriptPathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const ini_copy_of_rules_path = "src/ini_script_path_rules.json";
+    const ini_copy_of_rules_text = try readFile(ini_copy_of_rules_path, allocator);
+
+    var scanner = Scanner.initCompleteInput(allocator, ini_copy_of_rules_text);
+
+    var ini_copy_of_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    return ini_copy_of_rules;
+}
+
+fn applyIniScriptPathRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+    var map_iterator = ini_copy_of_rules.map.iterator();
+    while (map_iterator.next()) |map_entry| {
+        const old_value = map_entry.key_ptr.*;
+        const new_value = map_entry.value_ptr.*;
+
+        var pair = PropertyValuePair{
+            .property = "ScriptPath",
+            .value = old_value,
+        };
+        var result = property_value_pairs.get(pair);
+        if (result) |r| {
+            for (r.items) |line| {
+                line.value = new_value;
+            }
+        }
+    }
+}
+
 fn parseIniPropertyRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
     const ini_property_rules_path = "src/ini_property_rules.json";
     const ini_property_rules_text = try readFile(ini_property_rules_path, allocator);
@@ -1474,6 +1506,12 @@ test "ini_rules" {
 
             const ini_file_path_rules = try parseIniFilePathRules(allocator);
             try applyIniFilePathRules(ini_file_path_rules, &property_value_pairs);
+
+            const ini_script_path_rules = try parseIniScriptPathRules(allocator);
+            try applyIniScriptPathRules(ini_script_path_rules, &property_value_pairs);
+
+            // TODO: Figure out a way to remove all these function calls that are already done by convert()
+            // TODO: At the moment I am literally keeping both in sync manually
 
             const ini_property_rules = try parseIniPropertyRules(allocator);
             try applyIniPropertyRules(ini_property_rules, &properties);
