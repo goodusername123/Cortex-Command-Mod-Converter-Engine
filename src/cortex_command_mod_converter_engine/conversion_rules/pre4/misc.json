@@ -1,6 +1,4 @@
 {
-	"FilePath = FilePath = ": "FilePath = ",
-	"\tPath =": "\tFilePath =",
 	"KillAllActors": "KillAllEnemyActors",
 	"DeleteWithParent": "DeleteWhenRemovedFromParent",
 	"TotalWoundCount": "WoundCount",
