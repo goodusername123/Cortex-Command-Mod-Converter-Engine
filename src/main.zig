@@ -106,8 +106,8 @@ const Node = struct {
 const Rule = struct {
     old_property: []const u8,
     old_value: []const u8,
-    new_property: []const u8,
-    new_value: []const u8,
+    new_property: ?[]const u8,
+    new_value: ?[]const u8,
 };
 
 const IniFile = struct {
