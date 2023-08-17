@@ -6,5 +6,8 @@
 	"DefaultGoldHard": "DefaultGoldHardDifficulty",
 	"DefaultGoldNuts": "DefaultGoldNutsDifficulty",
 	"Location": "Position",
-	"AddSample": "AddSound"
+	"AddSample": "AddSound",
+	"ScriptFile": "ScriptPath",
+	"TextureFile": "FGTextureFile",
+	"Path": "FilePath"
 }

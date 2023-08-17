@@ -32,4 +32,5 @@
 	"FrameMan:Draw(": "PrimitiveMan:Draw(",
 	":IsPlaying(": ":IsBeingPlayed(",
 	"math.mod(": "math.fmod(",
+	":ReloadFirearm(": ":ReloadFirearms("
 }

@@ -151,5 +151,18 @@
 	"Imperatus Weapons Gib I": "Gib Weapon F",
 	"Imperatus Weapons Gib J": "Gib Weapon G",
 	"Imperatus Weapons Gib K": "Gib Weapon H",
-	"Imperatus Weapons Gib L": "Gib Weapon I"
+	"Imperatus Weapons Gib L": "Gib Weapon I",
+	"Coalition Gatling Turret Stand Path Left": "Null Path",
+	"Coalition Gatling Turret Stand Path Right": "Null Path",
+	"Coalition Gatling Turret Walk Path Left": "Null Path",
+	"Coalition Gatling Turret Walk Path Right": "Null Path",
+	"Coalition Gatling Turret Dislodge Path Left": "Null Path",
+	"Coalition Gatling Turret Dislodge Path Right": "Null Path",
+	"Mine Laser Particle 1": "Mine Laser Beam 1",
+	"Mine Laser Particle 2": "Mine Laser Beam 1",
+	"Mine Laser Particle 3": "Mine Laser Beam 1",
+	"Mine Laser Particle 4": "Mine Laser Beam 1",
+	"Mine Laser Particle 5": "Mine Laser Beam 2",
+	"Mine Laser Particle 6": "Mine Laser Beam 3",
+	"Mine Laser Particle 7": "Mine Laser Beam 3"
 }

@@ -157,9 +157,7 @@
 	"Coalition Null Bullet": "Null Bullet",
 	"ProvidesPieMenuContext = 0": "",
 	"ProvidesPieMenuContext = 1": "",
-	"\tTextureFile = ": "\tFGTextureFile = ",
 	"AddBackgroundLayer = SceneLayer": "AddBackgroundLayer = SLBackground",
-	"ScriptFile = ": "ScriptPath = ",
 	"OnlyOnSurface = 0": "DebrisPlacementMode = 0",
 	"OnlyOnSurface = 1": "DebrisPlacementMode = 1",
 }
