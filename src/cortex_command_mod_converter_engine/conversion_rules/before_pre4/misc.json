@@ -52,12 +52,6 @@
 	"Particle Coalition Flamer Light 2": "Spark Yellow 1",
 	"Particle FT-200 Flamer Light 1": "Spark Yellow 1",
 	"Particle FT-200 Flamer Light 2": "Spark Yellow 1",
-
-	// TODO: These are stupid; we don't want to hardcode that CopyOf always has to come on the next line!
-	"GibParticle = AEmitter\n\t\t\tCopyOf = Fuel Fire Trace Black\n": "GibParticle = PEmitter\n\t\t\tCopyOf = Fuel Fire Trace Black\n",
-	"Shell = AEmitter\n\t\tCopyOf = Cannon Casing\n": "Shell = AEmitter\n\t\tCopyOf = Smoking Cannon Casing\n",
-	"EmittedParticle = MOPixel\n\t\t\tCopyOf = Null\n": "EmittedParticle = MOPixel\n\t\t\tCopyOf = Null Bullet\n",
-
 	"Drop Ship Hull Panel Gib A": "Dropship Hull Panel Gib A",
 	"Drop Ship Hull Panel Gib B": "Dropship Hull Panel Gib B",
 	"Drop Ship Hull Panel Gib C": "Dropship Hull Panel Gib C",
