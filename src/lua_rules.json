@@ -32,5 +32,9 @@
 	"FrameMan:Draw(": "PrimitiveMan:Draw(",
 	":IsPlaying(": ":IsBeingPlayed(",
 	"math.mod(": "math.fmod(",
-	":ReloadFirearm(": ":ReloadFirearms("
+	":ReloadFirearm(": ":ReloadFirearms(",
+	":KillAllActors(": ":KillAllEnemyActors(",
+	".TotalWoundCount": ".WoundCount",
+	":RemoveAnyRandomWounds(": ":RemoveWounds(",
+	"CreateAEmitter(\"Remote Explosive Sound Activate\")": "CreateAEmitter(\"Remote Explosive Shaped Blast\")"
 }

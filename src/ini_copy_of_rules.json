@@ -164,5 +164,14 @@
 	"Mine Laser Particle 4": "Mine Laser Beam 1",
 	"Mine Laser Particle 5": "Mine Laser Beam 2",
 	"Mine Laser Particle 6": "Mine Laser Beam 3",
-	"Mine Laser Particle 7": "Mine Laser Beam 3"
+	"Mine Laser Particle 7": "Mine Laser Beam 3",
+	"Robot Crouch Path": "Human Crouch Path",
+	"10 Gold Brick": "10oz Gold Brick",
+	"Base.rte/Block A": "Base.rte/Metal Block",
+	"Base.rte/Drop Ship Bay Up 3x2": "Base.rte/Dropship Bay Up 3x2",
+	"Base.rte/Drop Ship Bay Up 5x2": "Base.rte/Dropship Bay Up 5x2",
+	"Small Turret Stand Path Left": "Null Path",
+	"Small Turret Stand Path Right": "Null Path",
+	"Muzzle Flash Techion Laser": "Muzzle Flash Blue",
+	"Remote Explosive Sound Activate": "Remote Explosive Shaped Blast"
 }
