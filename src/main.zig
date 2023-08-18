@@ -309,10 +309,46 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const input_stat = try iterable_dir.dir.statFile(input_file_path);
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
 
-                    if (!identicalStats(input_stat, output_stat)) {
+                    // std.debug.print("{}\n{}\n\n", .{ input_stat.mtime, output_stat.mtime });
+
+                    if (input_stat.mtime > output_stat.mtime) {
+                        // std.debug.print("Converted bmp to png\n", .{});
                         // TODO: Figure out whether a different function should be called in this case,
                         // similar to below where updateFileAbsolute() can be called instead of copyFileAbsolute()
                         try convertBmpToPng(input_file_path, output_file_path, allocator);
+                    }
+                } else { // Else return the access error
+                    return output_file_access;
+                }
+            } else if (eql(u8, extension(entry.name), ".wav")) {
+                const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
+
+                // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
+                var output_name = try allocator.alloc(u8, entry.name.len + 1);
+                @memcpy(output_name[0..entry.name.len], entry.name);
+                output_name[output_name.len - 1] = 'c';
+                output_name[output_name.len - 2] = 'a';
+                output_name[output_name.len - 3] = 'l';
+                output_name[output_name.len - 4] = 'f';
+
+                const output_file_path = try join(allocator, &.{ output_folder_path, output_name });
+
+                const output_file_access = std.fs.accessAbsolute(output_file_path, .{});
+
+                if (output_file_access == error.FileNotFound) {
+                    try convertWavToFlac(input_file_path, output_file_path, allocator);
+                } else if (output_file_access catch null) |_| { // Else if there was no access error
+                    // TODO: Windows can be significantly faster if we use iterable_dir.dir.stat() manually here,
+                    // if (and only if) directory mod times are updated when files change on Windows!
+
+                    const input_stat = try iterable_dir.dir.statFile(input_file_path);
+                    const output_stat = try iterable_dir.dir.statFile(output_file_path);
+
+                    if (input_stat.mtime > output_stat.mtime) {
+                        // std.debug.print("Converted wav to flac\n", .{});
+                        // TODO: Figure out whether a different function should be called in this case,
+                        // similar to below where updateFileAbsolute() can be called instead of copyFileAbsolute()
+                        try convertWavToFlac(input_file_path, output_file_path, allocator);
                     }
                 } else { // Else return the access error
                     return output_file_access;
@@ -332,7 +368,8 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const input_stat = try iterable_dir.dir.statFile(input_file_path);
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
 
-                    if (!identicalStats(input_stat, output_stat)) {
+                    if (input_stat.mtime > output_stat.mtime) {
+                        // std.debug.print("Copied something else\n", .{});
                         // TODO: Reverify that this is faster than the plain copyFileAbsolute()
                         _ = try updateFileAbsolute(input_file_path, output_file_path, .{});
                     }
@@ -349,14 +386,22 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
 }
 
 fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
-    var argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path };
-    _ = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
+    var argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path, "-y" };
+    const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
+    _ = result;
 }
 
-fn identicalStats(stat1: std.fs.File.Stat, stat2: std.fs.File.Stat) bool {
-    return (stat1.size == stat2.size and
-        stat1.mtime == stat2.mtime and
-        stat1.mode == stat2.mode);
+fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
+    var argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path, "-y" };
+    const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
+    _ = result;
+
+    // var line_iter = std.mem.split(u8, result.stderr, "\n");
+    // while (line_iter.next()) |line| {
+    //     if (line.len == 0) continue;
+    //     std.debug.print("{s}\n", .{line});
+    // }
+    // std.debug.print("\n", .{});
 }
 
 fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
