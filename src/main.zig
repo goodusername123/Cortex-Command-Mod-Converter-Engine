@@ -166,10 +166,10 @@ pub fn main() !void {
     const cwd = std.fs.cwd();
 
     var input_mod_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const input_mod_path = try cwd.realpath("tons_of_mods/in", &input_mod_path_buffer);
+    const input_mod_path = try cwd.realpath("tests/mod/in", &input_mod_path_buffer);
 
     var output_mod_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const output_mod_path = try cwd.realpath("tons_of_mods/out", &output_mod_path_buffer);
+    const output_mod_path = try cwd.realpath("tests/mod/out", &output_mod_path_buffer);
 
     var diagnostics: Diagnostics = .{};
     convert(
