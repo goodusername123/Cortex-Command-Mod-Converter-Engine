@@ -1141,6 +1141,7 @@ fn applyIniSoundContainerRules(ini_sound_container_rules: [][]const u8, property
 fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     try addGripStrength(property_value_pairs, allocator);
     try addOrUpdateSupportedGameVersion(properties, allocator);
+    try aemitterFuelToPemitter(property_value_pairs, allocator);
     try maxLengthToOffsets(property_value_pairs, allocator);
     try maxMassToMaxInventoryMass(properties, allocator);
     try maxThrottleRangeToPositiveThrottleMultiplier(properties, allocator);
@@ -1234,6 +1235,36 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
         } else {
             // TODO: Maybe bring this back?
             // return err.MissingDataModule;
+        }
+    }
+}
+
+fn aemitterFuelToPemitter(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
+    _ = allocator;
+    var pair = PropertyValuePair{
+        .property = "GibParticle",
+        .value = "AEmitter",
+    };
+
+    var gib = property_value_pairs.get(pair);
+
+    if (gib) |nodes| {
+        for (nodes.items) |node| {
+            var children = &node.children;
+
+            for (children.items) |*child| {
+                if (child.property) |property| {
+                    if (eql(u8, property, "CopyOf")) {
+                        if (child.value) |value| {
+                            if (eql(u8, value, "Fuel Fire Trace Black")) {
+                                node.value = "PEmitter";
+                            }
+                        } else {
+                            return UpdateIniFileTreeErrors.ExpectedValue;
+                        }
+                    }
+                }
+            }
         }
     }
 }
