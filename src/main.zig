@@ -18,6 +18,7 @@ const basename = std.fs.path.basename;
 const bufferedReader = std.io.bufferedReader;
 const bufferedWriter = std.io.bufferedWriter;
 const copyFileAbsolute = std.fs.copyFileAbsolute;
+const endsWith = std.mem.endsWith;
 const eql = std.mem.eql;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const extension = std.fs.path.extension;
@@ -219,6 +220,8 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
     // and the value is a list of Nodes that have this key
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
     try addProperties(&file_tree, &properties, allocator);
+
+    try bmpExtensionToPng(&properties, allocator);
 
     // Create a hashmap, where the key is a PropertyValuePair,
     // and the value is a list of Nodes that have this key
@@ -808,6 +811,23 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
 
     for (node.children.items) |*child| {
         try addFileProperties(child, properties, allocator);
+    }
+}
+
+fn bmpExtensionToPng(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    var file_path = properties.get("FilePath");
+    if (file_path) |nodes| {
+        for (nodes.items) |node| {
+			if (node.value) |*path| {
+				if (endsWith(u8, path.*, ".bmp")) {
+					var new_path = try allocator.dupe(u8, path.*);
+					new_path[new_path.len - 1] = 'g';
+					new_path[new_path.len - 2] = 'n';
+					new_path[new_path.len - 3] = 'p';
+					node.value = new_path;
+				}
+			}
+		}
     }
 }
 
@@ -1498,6 +1518,8 @@ test "ini_rules" {
             var properties = StringHashMap(ArrayList(*Node)).init(allocator);
             try addProperties(&file_tree, &properties, allocator);
 
+    		try bmpExtensionToPng(&properties, allocator);
+
             var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
             try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
 
@@ -1601,6 +1623,8 @@ test "updated" {
 
             var properties = StringHashMap(ArrayList(*Node)).init(allocator);
             try addProperties(&file_tree, &properties, allocator);
+
+    		try bmpExtensionToPng(&properties, allocator);
 
             var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
             try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
