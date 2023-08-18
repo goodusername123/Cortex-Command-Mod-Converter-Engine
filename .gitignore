@@ -13,7 +13,7 @@
 !tests/**/*.ini
 !tests/**/*.txt
 !tests/**/*.lua
-!tests/**/*.zig
+!tests/**/*.bmp
 !.gitignore
 !build.zig
 !example.py
