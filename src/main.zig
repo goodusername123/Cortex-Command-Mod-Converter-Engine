@@ -221,6 +221,17 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
     try addProperties(&file_tree, &properties, allocator);
 
+	// This HAS to be called before addPropertyValuePairs(),
+	// cause the PropertyValuePair keys it generates can't be modified later.
+	//
+	// It also HAS to be called before applyIniFilePathRules(),
+	// because otherwise this could happen:
+	// The game reports that Base.rte/foo.png doesn't exist,
+	// so the user enters this rule:
+	// "Base.rte/foo.png": "Base.rte/bar.png"
+	// The game reports that Base.rte/foo.png *still* doesn't exist,
+	// due to the parsed input mod containing "Base.rte/foo.bmp"
+	// The rule isn't applied to this string, due to it saying .bmp!
     try bmpExtensionToPng(&properties, allocator);
 
     // Create a hashmap, where the key is a PropertyValuePair,
