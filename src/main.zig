@@ -829,16 +829,17 @@ fn bmpExtensionToPng(properties: *StringHashMap(ArrayList(*Node)), allocator: Al
     var file_path = properties.get("FilePath");
     if (file_path) |nodes| {
         for (nodes.items) |node| {
-			if (node.value) |*path| {
-				if (endsWith(u8, path.*, ".bmp")) {
-					var new_path = try allocator.dupe(u8, path.*);
-					new_path[new_path.len - 1] = 'g';
-					new_path[new_path.len - 2] = 'n';
-					new_path[new_path.len - 3] = 'p';
-					node.value = new_path;
-				}
-			}
-		}
+            if (node.value) |*path| {
+                if (endsWith(u8, path.*, ".bmp") and !eql(u8, path.*, "palette.bmp") and !eql(u8, path.*, "palettemat.bmp")) {
+                    // We have to dupe, since the u8s are const, but the slice itself isn't
+                    var new_path = try allocator.dupe(u8, path.*);
+                    new_path[new_path.len - 1] = 'g';
+                    new_path[new_path.len - 2] = 'n';
+                    new_path[new_path.len - 3] = 'p';
+                    node.value = new_path;
+                }
+            }
+        }
     }
 }
 
