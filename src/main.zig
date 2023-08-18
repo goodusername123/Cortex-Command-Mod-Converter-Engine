@@ -221,17 +221,17 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
     try addProperties(&file_tree, &properties, allocator);
 
-	// This HAS to be called before addPropertyValuePairs(),
-	// cause the PropertyValuePair keys it generates can't be modified later.
-	//
-	// It also HAS to be called before applyIniFilePathRules(),
-	// because otherwise this could happen:
-	// The game reports that Base.rte/foo.png doesn't exist,
-	// so the user enters this rule:
-	// "Base.rte/foo.png": "Base.rte/bar.png"
-	// The game reports that Base.rte/foo.png *still* doesn't exist,
-	// due to the parsed input mod containing "Base.rte/foo.bmp"
-	// The rule isn't applied to this string, due to it saying .bmp!
+    // This HAS to be called before addPropertyValuePairs(),
+    // cause the PropertyValuePair keys it generates can't be modified later.
+    //
+    // It also HAS to be called before applyIniFilePathRules(),
+    // because otherwise this could happen:
+    // The game reports that Base.rte/foo.png doesn't exist,
+    // so the user enters this rule:
+    // "Base.rte/foo.png": "Base.rte/bar.png"
+    // The game reports that Base.rte/foo.png *still* doesn't exist,
+    // due to the parsed input mod containing "Base.rte/foo.bmp"
+    // The rule isn't applied to this string, due to it saying .bmp!
     try bmpExtensionToPng(&properties, allocator);
 
     // Create a hashmap, where the key is a PropertyValuePair,
@@ -289,24 +289,49 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
 
     while (try dir_iterator.next()) |entry| {
         if (entry.kind == std.fs.File.Kind.file) {
-            if (!eql(u8, extension(entry.name), ".ini")) {
+            if (eql(u8, extension(entry.name), ".bmp")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
                 const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
-                const access = std.fs.accessAbsolute(output_file_path, .{});
+                const output_file_access = std.fs.accessAbsolute(output_file_path, .{});
 
-                if (access == error.FileNotFound) {
-                    try copyFileAbsolute(input_file_path, output_file_path, .{});
-                } else if (access catch null) |_| {
+                if (output_file_access == error.FileNotFound) {
+                    convertBmpToPng(input_file_path, output_file_path);
+                } else if (output_file_access catch null) |_| { // Else if there was no access error
                     // TODO: Windows can be significantly faster if we use iterable_dir.dir.stat() manually here,
                     // if (and only if) directory mod times are updated when files change on Windows!
 
                     const input_stat = try iterable_dir.dir.statFile(input_file_path);
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
-                    if (!identicalStats(input_stat, output_stat, null)) {
+
+                    if (!identicalStats(input_stat, output_stat)) {
+                        // TODO: Figure out whether a different function should be called in this case,
+                        // similar to below where updateFileAbsolute() can be called instead of copyFileAbsolute()
+                        convertBmpToPng(input_file_path, output_file_path);
+                    }
+                } else { // Else return the access error
+                    return output_file_access;
+                }
+            } else if (!eql(u8, extension(entry.name), ".ini")) {
+                const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
+                const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
+
+                const output_file_access = std.fs.accessAbsolute(output_file_path, .{});
+
+                if (output_file_access == error.FileNotFound) {
+                    try copyFileAbsolute(input_file_path, output_file_path, .{});
+                } else if (output_file_access catch null) |_| { // Else if there was no access error
+                    // TODO: Windows can be significantly faster if we use iterable_dir.dir.stat() manually here,
+                    // if (and only if) directory mod times are updated when files change on Windows!
+
+                    const input_stat = try iterable_dir.dir.statFile(input_file_path);
+                    const output_stat = try iterable_dir.dir.statFile(output_file_path);
+
+                    if (!identicalStats(input_stat, output_stat)) {
+                        // TODO: Reverify that this is faster than the plain copyFileAbsolute()
                         _ = try updateFileAbsolute(input_file_path, output_file_path, .{});
                     }
-                } else {
-                    return access;
+                } else { // Else return the access error
+                    return output_file_access;
                 }
             }
         } else if (entry.kind == std.fs.File.Kind.directory) {
@@ -317,12 +342,18 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
     }
 }
 
-fn identicalStats(stat1: std.fs.File.Stat, stat2: std.fs.File.Stat, override_mode: ?std.os.system.mode_t) bool {
-    const actual_mode = override_mode orelse stat1.mode;
+fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8) void {
+    _ = input_file_path;
+    _ = output_file_path;
 
+    // TODO: Use this BMP parser from meghan (nektro)/cynthia9531 from the Zig Discord as inspiration:
+    // https://git.sr.ht/~nektro/magnolia-desktop/tree/master/item/src/bmp.zig
+}
+
+fn identicalStats(stat1: std.fs.File.Stat, stat2: std.fs.File.Stat) bool {
     return (stat1.size == stat2.size and
         stat1.mtime == stat2.mtime and
-        actual_mode == stat2.mode);
+        stat1.mode == stat2.mode);
 }
 
 fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
@@ -1530,7 +1561,7 @@ test "ini_rules" {
             var properties = StringHashMap(ArrayList(*Node)).init(allocator);
             try addProperties(&file_tree, &properties, allocator);
 
-    		try bmpExtensionToPng(&properties, allocator);
+            try bmpExtensionToPng(&properties, allocator);
 
             var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
             try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
@@ -1636,7 +1667,7 @@ test "updated" {
             var properties = StringHashMap(ArrayList(*Node)).init(allocator);
             try addProperties(&file_tree, &properties, allocator);
 
-    		try bmpExtensionToPng(&properties, allocator);
+            try bmpExtensionToPng(&properties, allocator);
 
             var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
             try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
