@@ -291,11 +291,17 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
         if (entry.kind == std.fs.File.Kind.file) {
             if (eql(u8, extension(entry.name), ".bmp")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
-                const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
+
+                var output_name = try allocator.dupe(u8, entry.name);
+                output_name[output_name.len - 1] = 'g';
+                output_name[output_name.len - 2] = 'n';
+                output_name[output_name.len - 3] = 'p';
+                const output_file_path = try join(allocator, &.{ output_folder_path, output_name });
+
                 const output_file_access = std.fs.accessAbsolute(output_file_path, .{});
 
                 if (output_file_access == error.FileNotFound) {
-                    convertBmpToPng(input_file_path, output_file_path);
+                    try convertBmpToPng(input_file_path, output_file_path, allocator);
                 } else if (output_file_access catch null) |_| { // Else if there was no access error
                     // TODO: Windows can be significantly faster if we use iterable_dir.dir.stat() manually here,
                     // if (and only if) directory mod times are updated when files change on Windows!
@@ -306,7 +312,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     if (!identicalStats(input_stat, output_stat)) {
                         // TODO: Figure out whether a different function should be called in this case,
                         // similar to below where updateFileAbsolute() can be called instead of copyFileAbsolute()
-                        convertBmpToPng(input_file_path, output_file_path);
+                        try convertBmpToPng(input_file_path, output_file_path, allocator);
                     }
                 } else { // Else return the access error
                     return output_file_access;
@@ -342,12 +348,9 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
     }
 }
 
-fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8) void {
-    _ = input_file_path;
-    _ = output_file_path;
-
-    // TODO: Use this BMP parser from meghan (nektro)/cynthia9531 from the Zig Discord as inspiration:
-    // https://git.sr.ht/~nektro/magnolia-desktop/tree/master/item/src/bmp.zig
+fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
+    var argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path };
+    _ = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
 }
 
 fn identicalStats(stat1: std.fs.File.Stat, stat2: std.fs.File.Stat) bool {
@@ -862,7 +865,7 @@ fn bmpExtensionToPng(properties: *StringHashMap(ArrayList(*Node)), allocator: Al
         for (nodes.items) |node| {
             if (node.value) |*path| {
                 if (endsWith(u8, path.*, ".bmp") and !eql(u8, path.*, "palette.bmp") and !eql(u8, path.*, "palettemat.bmp")) {
-                    // We have to dupe, since the u8s are const, but the slice itself isn't
+                    // We have to dupe, since the u8s in path are const
                     var new_path = try allocator.dupe(u8, path.*);
                     new_path[new_path.len - 1] = 'g';
                     new_path[new_path.len - 2] = 'n';
