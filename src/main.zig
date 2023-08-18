@@ -234,6 +234,8 @@ fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator
     // The rule isn't applied to this string, due to it saying .bmp!
     try bmpExtensionToPng(&properties, allocator);
 
+    try wavExtensionToFlac(&properties, allocator);
+
     // Create a hashmap, where the key is a PropertyValuePair,
     // and the value is a list of Nodes that have this key
     var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
@@ -293,9 +295,11 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
 
                 var output_name = try allocator.dupe(u8, entry.name);
+
                 output_name[output_name.len - 1] = 'g';
                 output_name[output_name.len - 2] = 'n';
                 output_name[output_name.len - 3] = 'p';
+
                 const output_file_path = try join(allocator, &.{ output_folder_path, output_name });
 
                 const output_file_access = std.fs.accessAbsolute(output_file_path, .{});
@@ -326,6 +330,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
                 var output_name = try allocator.alloc(u8, entry.name.len + 1);
                 @memcpy(output_name[0..entry.name.len], entry.name);
+
                 output_name[output_name.len - 1] = 'c';
                 output_name[output_name.len - 2] = 'a';
                 output_name[output_name.len - 3] = 'l';
@@ -912,9 +917,33 @@ fn bmpExtensionToPng(properties: *StringHashMap(ArrayList(*Node)), allocator: Al
                 if (endsWith(u8, path.*, ".bmp") and !eql(u8, path.*, "palette.bmp") and !eql(u8, path.*, "palettemat.bmp")) {
                     // We have to dupe, since the u8s in path are const
                     var new_path = try allocator.dupe(u8, path.*);
+
                     new_path[new_path.len - 1] = 'g';
                     new_path[new_path.len - 2] = 'n';
                     new_path[new_path.len - 3] = 'p';
+
+                    node.value = new_path;
+                }
+            }
+        }
+    }
+}
+
+fn wavExtensionToFlac(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    var file_path = properties.get("FilePath");
+    if (file_path) |nodes| {
+        for (nodes.items) |node| {
+            if (node.value) |*path| {
+                if (endsWith(u8, path.*, ".wav")) {
+                    // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
+                    var new_path = try allocator.alloc(u8, path.*.len + 1);
+                    @memcpy(new_path[0..path.*.len], path.*);
+
+                    new_path[new_path.len - 1] = 'c';
+                    new_path[new_path.len - 2] = 'a';
+                    new_path[new_path.len - 3] = 'l';
+                    new_path[new_path.len - 4] = 'f';
+
                     node.value = new_path;
                 }
             }
@@ -1611,6 +1640,8 @@ test "ini_rules" {
 
             try bmpExtensionToPng(&properties, allocator);
 
+            try wavExtensionToFlac(&properties, allocator);
+
             var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
             try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
 
@@ -1716,6 +1747,8 @@ test "updated" {
             try addProperties(&file_tree, &properties, allocator);
 
             try bmpExtensionToPng(&properties, allocator);
+
+            try wavExtensionToFlac(&properties, allocator);
 
             var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
             try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
