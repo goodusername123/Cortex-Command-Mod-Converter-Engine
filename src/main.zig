@@ -122,7 +122,7 @@ const IniFolder = struct {
     folders: ArrayList(IniFolder),
 };
 
-const Diagnostics = struct {
+pub const Diagnostics = struct {
     file_path: ?[]const u8 = null,
     token: ?[]const u8 = null,
     line: ?i32 = null,
@@ -206,7 +206,7 @@ pub fn main() !void {
     };
 }
 
-fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+pub fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
     try makeOutputDirs(input_mod_path, output_folder_path, allocator);
 
     try copyFiles(input_mod_path, output_folder_path, allocator);
