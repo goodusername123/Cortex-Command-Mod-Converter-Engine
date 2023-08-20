@@ -904,7 +904,7 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
             result.value_ptr.* = ArrayList(*Node).init(allocator);
         }
 
-        try result.value_ptr.*.append(node);
+        try result.value_ptr.append(node);
     }
 
     for (node.children.items) |*child| {
@@ -939,8 +939,8 @@ fn wavExtensionToFlac(properties: *StringHashMap(ArrayList(*Node)), allocator: A
             if (node.value) |*path| {
                 if (endsWith(u8, path.*, ".wav")) {
                     // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
-                    var new_path = try allocator.alloc(u8, path.*.len + 1);
-                    @memcpy(new_path[0..path.*.len], path.*);
+                    var new_path = try allocator.alloc(u8, path.len + 1);
+                    @memcpy(new_path[0..path.len], path.*);
 
                     new_path[new_path.len - 1] = 'c';
                     new_path[new_path.len - 2] = 'a';
@@ -978,7 +978,7 @@ fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(Propert
             result.value_ptr.* = ArrayList(*Node).init(allocator);
         }
 
-        try result.value_ptr.*.append(node);
+        try result.value_ptr.append(node);
     }
 
     for (node.children.items) |*child| {
@@ -1197,11 +1197,11 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
         if (nodes.items.len == 1) {
             var node = nodes.items[0];
 
-            if (node.*.value) |value| {
+            if (node.value) |value| {
                 // TODO: Maybe add a check that the input version isn't newer
                 // than the version this engine thinks is the latest?
                 if (!eql(u8, value, "Pre-Release 5.0")) {
-                    node.*.value = "Pre-Release 5.0";
+                    node.value = "Pre-Release 5.0";
                 }
             } else {
                 return UpdateIniFileTreeErrors.ExpectedValue;
