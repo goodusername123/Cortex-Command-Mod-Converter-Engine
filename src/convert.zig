@@ -540,8 +540,10 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
 
     var multiline_comment_depth: i32 = 0;
 
+    var seen_property = false;
+
     while (slice.len > 0) {
-        const token = getToken(&slice, &multiline_comment_depth);
+        const token = getToken(&slice, &multiline_comment_depth, &seen_property);
         // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
         try tokens.append(token);
     }
@@ -553,10 +555,11 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
     return tokens;
 }
 
-fn getToken(slice: *[]const u8, multiline_comment_depth: *i32) Token {
+fn getToken(slice: *[]const u8, multiline_comment_depth: *i32, seen_property: *bool) Token {
     // TODO: Consistently use either while-loops or for-loops everywhere in this function
 
     if (slice.*[0] == '\n') {
+        seen_property.* = false;
         const token = Token{ .type = .Newline, .slice = slice.*[0..1] };
         slice.* = slice.*[1..];
         return token;
@@ -656,8 +659,10 @@ fn getToken(slice: *[]const u8, multiline_comment_depth: *i32) Token {
     var end_index: usize = 1;
     var sentence_end_index: usize = end_index;
     while (end_index < slice.len) : (end_index += 1) {
-        // TODO: This doesn't handle an = being part of the value correctly
-        if (slice.*[end_index] == '=' or slice.*[end_index] == '\n' or (slice.*[end_index] == '/' and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
+        if (slice.*[end_index] == '=' and !seen_property.*) {
+            break;
+        }
+        if (slice.*[end_index] == '\n' or slice.*[end_index] == '\t' or (slice.*[end_index] == '/' and (slice.*[end_index + 1] == '*' or slice.*[end_index + 1] == '/'))) {
             break;
         }
         if (slice.*[end_index] != ' ') {
@@ -665,6 +670,7 @@ fn getToken(slice: *[]const u8, multiline_comment_depth: *i32) Token {
         }
     }
 
+    seen_property.* = true;
     const token = Token{ .type = .Sentence, .slice = slice.*[0..sentence_end_index] };
     slice.* = slice.*[sentence_end_index..];
     return token;
