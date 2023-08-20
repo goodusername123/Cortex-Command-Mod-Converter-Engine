@@ -1160,7 +1160,6 @@ fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*
     var arm = property_value_pairs.get(pair);
 
     if (arm) |nodes| {
-        // Add GripStrength to any Arm that is missing it
         outer: for (nodes.items) |node| {
             var children = &node.children;
 
@@ -1179,13 +1178,18 @@ fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*
                 .children = ArrayList(Node).init(allocator),
             });
 
-            var result = try property_value_pairs.getOrPut(pair);
+            // TODO: Make sure to keep both properties *and* property_value_pairs in sync
+            // TODO: with the changes made by all of these functions
+            // var result = try property_value_pairs.getOrPut(PropertyValuePair{
+            //     .property = "GripStrength",
+            //     .value = "424242",
+            // });
 
-            if (!result.found_existing) {
-                result.value_ptr.* = ArrayList(*Node).init(allocator);
-            }
+            // if (!result.found_existing) {
+            //     result.value_ptr.* = ArrayList(*Node).init(allocator);
+            // }
 
-            try result.value_ptr.*.append(node);
+            // try result.value_ptr.append(node);
         }
     }
 }
@@ -1849,7 +1853,7 @@ test "invalid" {
             const text = try readFile(input_path, allocator);
 
             verifyInvalidTestThrowsError(&text, allocator) catch |err| {
-                try expectEqualStrings(@errorName(err), error_text);
+                try expectEqualStrings(error_text, @errorName(err));
             };
 
             std.debug.print(" passed", .{});
