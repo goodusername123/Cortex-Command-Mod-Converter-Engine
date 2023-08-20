@@ -184,11 +184,11 @@ pub fn main() !void {
             const line = diagnostics.line orelse -1;
             const column = diagnostics.column orelse -1;
 
-            std.debug.print("Error: Unexpected token\nToken: '{s}'\nFile path: {s}\nLine: {}\nColumn: {} (roughly)\n", .{
-                token,
+            std.debug.print("{s}:{}:{}: syntax error, unexpected '{s}'\n", .{
                 file_path,
                 line,
                 column,
+                token,
             });
         },
         error.TooManyTabs => {
