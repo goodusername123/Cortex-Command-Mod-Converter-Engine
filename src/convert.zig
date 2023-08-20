@@ -410,13 +410,16 @@ fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, a
 }
 
 fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const lua_rules_path = "src/lua_rules.json";
-    const lua_rules_text = try readFile(lua_rules_path, allocator);
+    const text = try readFile(parentDir() ++ "/lua_rules.json", allocator);
 
-    var scanner = Scanner.initCompleteInput(allocator, lua_rules_text);
+    var scanner = Scanner.initCompleteInput(allocator, text);
 
     var lua_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return lua_rules;
+}
+
+inline fn parentDir() []const u8 {
+    return comptime std.fs.path.dirname(@src().file) orelse ".";
 }
 
 fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []const u8, allocator: Allocator) !void {
@@ -984,10 +987,9 @@ fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(Propert
 }
 
 fn parseIniCopyOfRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const ini_copy_of_rules_path = "src/ini_copy_of_rules.json";
-    const ini_copy_of_rules_text = try readFile(ini_copy_of_rules_path, allocator);
+    const text = try readFile(parentDir() ++ "/ini_copy_of_rules.json", allocator);
 
-    var scanner = Scanner.initCompleteInput(allocator, ini_copy_of_rules_text);
+    var scanner = Scanner.initCompleteInput(allocator, text);
 
     var ini_copy_of_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return ini_copy_of_rules;
@@ -1013,10 +1015,9 @@ fn applyIniCopyOfRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), pro
 }
 
 fn parseIniFilePathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const ini_copy_of_rules_path = "src/ini_file_path_rules.json";
-    const ini_copy_of_rules_text = try readFile(ini_copy_of_rules_path, allocator);
+    const text = try readFile(parentDir() ++ "/ini_file_path_rules.json", allocator);
 
-    var scanner = Scanner.initCompleteInput(allocator, ini_copy_of_rules_text);
+    var scanner = Scanner.initCompleteInput(allocator, text);
 
     var ini_copy_of_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return ini_copy_of_rules;
@@ -1042,10 +1043,9 @@ fn applyIniFilePathRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), p
 }
 
 fn parseIniScriptPathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const ini_copy_of_rules_path = "src/ini_script_path_rules.json";
-    const ini_copy_of_rules_text = try readFile(ini_copy_of_rules_path, allocator);
+    const text = try readFile(parentDir() ++ "/ini_script_path_rules.json", allocator);
 
-    var scanner = Scanner.initCompleteInput(allocator, ini_copy_of_rules_text);
+    var scanner = Scanner.initCompleteInput(allocator, text);
 
     var ini_copy_of_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return ini_copy_of_rules;
@@ -1071,10 +1071,9 @@ fn applyIniScriptPathRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8),
 }
 
 fn parseIniPropertyRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const ini_property_rules_path = "src/ini_property_rules.json";
-    const ini_property_rules_text = try readFile(ini_property_rules_path, allocator);
+    const text = try readFile(parentDir() ++ "/ini_property_rules.json", allocator);
 
-    var scanner = Scanner.initCompleteInput(allocator, ini_property_rules_text);
+    var scanner = Scanner.initCompleteInput(allocator, text);
 
     var ini_property_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return ini_property_rules;
@@ -1096,8 +1095,7 @@ fn applyIniPropertyRules(ini_property_rules: std.json.ArrayHashMap([]const u8), 
 }
 
 fn parseIniRules(allocator: Allocator) ![]Rule {
-    const path = "src/ini_rules.json";
-    const text = try readFile(path, allocator);
+    const text = try readFile(parentDir() ++ "/ini_rules.json", allocator);
     return try parseFromSliceLeaky([]Rule, allocator, text, .{});
 }
 
@@ -1118,8 +1116,7 @@ fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValue
 }
 
 fn parseIniSoundContainerRules(allocator: Allocator) ![][]const u8 {
-    const path = "src/ini_sound_container_rules.json";
-    const text = try readFile(path, allocator);
+    const text = try readFile(parentDir() ++ "/ini_sound_container_rules.json", allocator);
     return try parseFromSliceLeaky([][]const u8, allocator, text, .{});
 }
 
