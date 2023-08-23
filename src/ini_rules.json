@@ -130,5 +130,41 @@
 		"old_value": "1",
 		"new_property": "DebrisPlacementMode",
 		"new_value": "1"
+	},
+	{
+		"old_property": "Direction",
+		"old_value": "-1",
+		"new_property": "Direction",
+		"new_value": "None"
+	},
+	{
+		"old_property": "Direction",
+		"old_value": "0",
+		"new_property": "Direction",
+		"new_value": "Up"
+	},
+	{
+		"old_property": "Direction",
+		"old_value": "1",
+		"new_property": "Direction",
+		"new_value": "Down"
+	},
+	{
+		"old_property": "Direction",
+		"old_value": "2",
+		"new_property": "Direction",
+		"new_value": "Left"
+	},
+	{
+		"old_property": "Direction",
+		"old_value": "3",
+		"new_property": "Direction",
+		"new_value": "Right"
+	},
+	{
+		"old_property": "Direction",
+		"old_value": "4",
+		"new_property": "Direction",
+		"new_value": "Any"
 	}
 ]

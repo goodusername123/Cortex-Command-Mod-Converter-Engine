@@ -1693,7 +1693,7 @@ test "ini_rules" {
             try applyIniScriptPathRules(ini_script_path_rules, &property_value_pairs);
 
             // TODO: Figure out a way to remove all these function calls that are already done by convert()
-            // TODO: At the moment I am literally keeping both in sync manually
+            // TODO: At the moment I am literally keeping these in sync manually
 
             const ini_property_rules = try parseIniPropertyRules(allocator);
             try applyIniPropertyRules(ini_property_rules, &properties);
@@ -1790,6 +1790,27 @@ test "updated" {
 
             var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
             try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
+
+            const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
+            try applyIniCopyOfRules(ini_copy_of_rules, &property_value_pairs);
+
+            const ini_file_path_rules = try parseIniFilePathRules(allocator);
+            try applyIniFilePathRules(ini_file_path_rules, &property_value_pairs);
+
+            const ini_script_path_rules = try parseIniScriptPathRules(allocator);
+            try applyIniScriptPathRules(ini_script_path_rules, &property_value_pairs);
+
+            // TODO: Figure out a way to remove all these function calls that are already done by convert()
+            // TODO: At the moment I am literally keeping these in sync manually
+
+            const ini_property_rules = try parseIniPropertyRules(allocator);
+            try applyIniPropertyRules(ini_property_rules, &properties);
+
+            const ini_rules = try parseIniRules(allocator);
+            applyIniRules(ini_rules, &property_value_pairs);
+
+            const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
+            applyIniSoundContainerRules(ini_sound_container_rules, &property_value_pairs);
 
             try updateIniFileTree(&properties, &property_value_pairs, allocator);
 
