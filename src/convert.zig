@@ -974,11 +974,10 @@ fn addPropertyValuePairs(file_tree: *IniFolder, property_value_pairs: *HashMap(P
 
 fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     if (node.property != null and node.value != null) {
-        const property_value_pair = PropertyValuePair{
+        var result = try property_value_pairs.getOrPut(PropertyValuePair{
             .property = node.property.?,
             .value = node.value.?,
-        };
-        var result = try property_value_pairs.getOrPut(property_value_pair);
+        });
 
         if (!result.found_existing) {
             result.value_ptr.* = ArrayList(*Node).init(allocator);
@@ -1007,13 +1006,13 @@ fn applyIniCopyOfRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), pro
         const old_value = map_entry.key_ptr.*;
         const new_value = map_entry.value_ptr.*;
 
-        var pair = PropertyValuePair{
+        var result_ = property_value_pairs.get(PropertyValuePair{
             .property = "CopyOf",
             .value = old_value,
-        };
-        var result = property_value_pairs.get(pair);
-        if (result) |r| {
-            for (r.items) |line| {
+        });
+
+        if (result_) |result| {
+            for (result.items) |line| {
                 line.value = new_value;
             }
         }
@@ -1035,13 +1034,13 @@ fn applyIniFilePathRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), p
         const old_value = map_entry.key_ptr.*;
         const new_value = map_entry.value_ptr.*;
 
-        var pair = PropertyValuePair{
+        var result_ = property_value_pairs.get(PropertyValuePair{
             .property = "FilePath",
             .value = old_value,
-        };
-        var result = property_value_pairs.get(pair);
-        if (result) |r| {
-            for (r.items) |line| {
+        });
+
+        if (result_) |result| {
+            for (result.items) |line| {
                 line.value = new_value;
             }
         }
@@ -1063,13 +1062,13 @@ fn applyIniScriptPathRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8),
         const old_value = map_entry.key_ptr.*;
         const new_value = map_entry.value_ptr.*;
 
-        var pair = PropertyValuePair{
+        var result_ = property_value_pairs.get(PropertyValuePair{
             .property = "ScriptPath",
             .value = old_value,
-        };
-        var result = property_value_pairs.get(pair);
-        if (result) |r| {
-            for (r.items) |line| {
+        });
+
+        if (result_) |result| {
+            for (result.items) |line| {
                 line.value = new_value;
             }
         }
@@ -1107,13 +1106,13 @@ fn parseIniRules(allocator: Allocator) ![]Rule {
 
 fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) void {
     for (ini_rules) |rule| {
-        var key = PropertyValuePair{
+        var result_ = property_value_pairs.get(PropertyValuePair{
             .property = rule.old_property,
             .value = rule.old_value,
-        };
-        var result = property_value_pairs.get(key);
-        if (result) |r| {
-            for (r.items) |line| {
+        });
+
+        if (result_) |result| {
+            for (result.items) |line| {
                 line.property = rule.new_property;
                 line.value = rule.new_value;
             }
@@ -1128,13 +1127,13 @@ fn parseIniSoundContainerRules(allocator: Allocator) ![][]const u8 {
 
 fn applyIniSoundContainerRules(ini_sound_container_rules: [][]const u8, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) void {
     for (ini_sound_container_rules) |property| {
-        var key = PropertyValuePair{
+        var result_ = property_value_pairs.get(PropertyValuePair{
             .property = property,
             .value = "Sound",
-        };
-        var result = property_value_pairs.get(key);
-        if (result) |r| {
-            for (r.items) |line| {
+        });
+
+        if (result_) |result| {
+            for (result.items) |line| {
                 line.value = "SoundContainer";
             }
         }
@@ -1144,24 +1143,23 @@ fn applyIniSoundContainerRules(ini_sound_container_rules: [][]const u8, property
 fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     try addGripStrength(property_value_pairs, allocator);
     try addOrUpdateSupportedGameVersion(properties, allocator);
-    try aemitterFuelToPemitter(property_value_pairs, allocator);
+    try aemitterFuelToPemitter(property_value_pairs);
     try maxLengthToOffsets(property_value_pairs, allocator);
     try maxMassToMaxInventoryMass(properties, allocator);
     try maxThrottleRangeToPositiveThrottleMultiplier(properties, allocator);
     try minThrottleRangeToNegativeThrottleMultiplier(properties, allocator);
+    try pieMenuCrab(property_value_pairs);
 }
 
 fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    var pair = PropertyValuePair{
+    var arms_ = property_value_pairs.get(PropertyValuePair{
         .property = "AddActor",
         .value = "Arm",
-    };
+    });
 
-    var arm = property_value_pairs.get(pair);
-
-    if (arm) |nodes| {
-        outer: for (nodes.items) |node| {
-            var children = &node.children;
+    if (arms_) |arms| {
+        outer: for (arms.items) |arm| {
+            var children = &arm.children;
 
             for (children.items) |child| {
                 if (child.property) |property| {
@@ -1189,7 +1187,7 @@ fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*
             //     result.value_ptr.* = ArrayList(*Node).init(allocator);
             // }
 
-            // try result.value_ptr.append(node);
+            // try result.value_ptr.append(arm);
         }
     }
 }
@@ -1202,6 +1200,7 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
     };
 
     var supported_game_version = properties.get("SupportedGameVersion");
+
     if (supported_game_version) |nodes| {
         // Update the SupportedGameVersion, if necessary
         if (nodes.items.len == 1) {
@@ -1246,25 +1245,22 @@ fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)),
     }
 }
 
-fn aemitterFuelToPemitter(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    _ = allocator;
-    var pair = PropertyValuePair{
+fn aemitterFuelToPemitter(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+    var gibs_ = property_value_pairs.get(PropertyValuePair{
         .property = "GibParticle",
         .value = "AEmitter",
-    };
+    });
 
-    var gib = property_value_pairs.get(pair);
-
-    if (gib) |nodes| {
-        for (nodes.items) |node| {
-            var children = &node.children;
+    if (gibs_) |gibs| {
+        for (gibs.items) |gib| {
+            var children = &gib.children;
 
             for (children.items) |*child| {
                 if (child.property) |property| {
                     if (eql(u8, property, "CopyOf")) {
                         if (child.value) |value| {
                             if (eql(u8, value, "Fuel Fire Trace Black")) {
-                                node.value = "PEmitter";
+                                gib.value = "PEmitter";
                             }
                         } else {
                             return UpdateIniFileTreeErrors.ExpectedValue;
@@ -1277,16 +1273,14 @@ fn aemitterFuelToPemitter(property_value_pairs: *HashMap(PropertyValuePair, Arra
 }
 
 fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    var pair = PropertyValuePair{
+    var legs_ = property_value_pairs.get(PropertyValuePair{
         .property = "AddActor",
         .value = "Leg",
-    };
+    });
 
-    var leg = property_value_pairs.get(pair);
-
-    if (leg) |nodes| {
-        for (nodes.items) |node| {
-            var children = &node.children;
+    if (legs_) |legs| {
+        for (legs.items) |leg| {
+            var children = &leg.children;
 
             for (children.items) |*child| {
                 if (child.property) |property| {
@@ -1325,7 +1319,7 @@ fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayLis
                                 .comments = ArrayList([]const u8).init(allocator),
                                 .children = ArrayList(Node).init(allocator),
                             });
-                            try node.children.append(extended_offset);
+                            try leg.children.append(extended_offset);
                         } else {
                             return UpdateIniFileTreeErrors.ExpectedValue;
                         }
@@ -1337,22 +1331,25 @@ fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayLis
 }
 
 fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var actor = properties.get("AddActor");
-    if (actor) |actor_nodes| {
-        for (actor_nodes.items) |actor_node| {
-            for (actor_node.children.items) |*child_node| {
-                if (child_node.property) |child_property| {
+    var actors_ = properties.get("AddActor");
+
+    if (actors_) |actors| {
+        for (actors.items) |actor| {
+            for (actor.children.items) |*child| {
+                if (child.property) |child_property| {
                     if (eql(u8, child_property, "MaxMass")) {
-                        if (child_node.value) |v| {
+                        if (child.value) |v| {
                             const max_mass = try parseFloat(f32, v);
-                            for (actor_node.children.items) |child_node2| {
-                                if (child_node2.property) |child_property2| {
+
+                            for (actor.children.items) |child2| {
+                                if (child2.property) |child_property2| {
                                     if (eql(u8, child_property2, "Mass")) {
-                                        if (child_node2.value) |v2| {
+                                        if (child2.value) |v2| {
+                                            child.property = "MaxInventoryMass";
+
                                             const mass = try parseFloat(f32, v2);
-                                            child_node.property = "MaxInventoryMass";
                                             const max_inventory_mass = max_mass - mass;
-                                            child_node.value = try allocPrint(allocator, "{d}", .{max_inventory_mass});
+                                            child.value = try allocPrint(allocator, "{d}", .{max_inventory_mass});
                                         } else {
                                             return UpdateIniFileTreeErrors.ExpectedValue;
                                         }
@@ -1370,9 +1367,10 @@ fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), alloc
 }
 
 fn maxThrottleRangeToPositiveThrottleMultiplier(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var min_throttle_range = properties.get("MaxThrottleRange");
-    if (min_throttle_range) |nodes| {
-        for (nodes.items) |node| {
+    var max_throttle_ranges_ = properties.get("MaxThrottleRange");
+
+    if (max_throttle_ranges_) |max_throttle_ranges| {
+        for (max_throttle_ranges.items) |node| {
             // TODO: This node should be removed from properties["MinThrottleRange"] its list
             node.property = "PositiveThrottleMultiplier";
             if (node.value) |v| {
@@ -1387,9 +1385,10 @@ fn maxThrottleRangeToPositiveThrottleMultiplier(properties: *StringHashMap(Array
 }
 
 fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var min_throttle_range = properties.get("MinThrottleRange");
-    if (min_throttle_range) |nodes| {
-        for (nodes.items) |node| {
+    var min_throttle_ranges_ = properties.get("MinThrottleRange");
+
+    if (min_throttle_ranges_) |min_throttle_ranges| {
+        for (min_throttle_ranges.items) |node| {
             // TODO: This node should be removed from properties["MinThrottleRange"] its list
             node.property = "NegativeThrottleMultiplier";
             if (node.value) |v| {
@@ -1398,6 +1397,33 @@ fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(Array
                 node.value = try allocPrint(allocator, "{d}", .{new_value});
             } else {
                 return UpdateIniFileTreeErrors.ExpectedValue;
+            }
+        }
+    }
+}
+
+fn pieMenuCrab(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+    var crabs_ = property_value_pairs.get(PropertyValuePair{
+        .property = "AddActor",
+        .value = "ACrab",
+    });
+
+    if (crabs_) |crabs| {
+        for (crabs.items) |crab| {
+            var children = &crab.children;
+
+            for (children.items) |*child| {
+                if (child.property) |property| {
+                    if (eql(u8, property, "AddPieSlice")) {
+                        if (child.value) |value| {
+                            if (eql(u8, value, "PieSlice")) {
+                                // TODO: Remove PieSlice node pointers from crab (move in file_tree)
+                            }
+                        } else {
+                            return UpdateIniFileTreeErrors.ExpectedValue;
+                        }
+                    }
+                }
             }
         }
     }
