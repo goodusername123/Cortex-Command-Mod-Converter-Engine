@@ -391,6 +391,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
 }
 
 fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
+    // TODO: ffmpeg won't always be available, so include its source code and call that instead
     var argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path, "-y" };
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
     _ = result;
@@ -1156,6 +1157,8 @@ fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_valu
     try pieMenu("Actor", "Default Actor Pie Menu", 1, 0, 0, 0, property_value_pairs, allocator);
     try pieMenu("AHuman", "Default Human Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
     try pieMenu("Turret", "Default Turret Pie Menu", 2, 0, 0, 1, property_value_pairs, allocator);
+
+    try shovelFlashFix(property_value_pairs);
 }
 
 fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
@@ -1260,9 +1263,7 @@ fn aemitterFuelToPemitter(property_value_pairs: *HashMap(PropertyValuePair, Arra
 
     if (gibs_) |gibs| {
         for (gibs.items) |gib| {
-            var children = &gib.children;
-
-            for (children.items) |*child| {
+            for (gib.children.items) |*child| {
                 if (child.property) |property| {
                     if (eql(u8, property, "CopyOf")) {
                         if (child.value) |value| {
@@ -1517,6 +1518,63 @@ fn applyPieQuadrantSlotLimit(pie_menu: *Node, direction: []const u8, starting_di
                     }
                 } else {
                     return UpdateIniFileTreeErrors.ExpectedValue;
+                }
+            }
+        }
+    }
+}
+
+fn shovelFlashFix(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+    var firearms_ = property_value_pairs.get(PropertyValuePair{
+        .property = "AddDevice",
+        .value = "HDFirearm",
+    });
+
+    if (firearms_) |firearms| {
+        for (firearms.items) |firearm| {
+            var changed_shovel_sprite = false;
+
+            for (firearm.children.items) |firearm_child| {
+                if (firearm_child.property) |firearm_child_property| {
+                    if (eql(u8, firearm_child_property, "SpriteFile")) {
+                        if (firearm_child.value) |firearm_child_value| {
+                            if (eql(u8, firearm_child_value, "ContentFile")) {
+                                for (firearm_child.children.items) |*content_file_child| {
+                                    if (content_file_child.property) |content_file_child_property| {
+                                        if (eql(u8, content_file_child_property, "FilePath")) {
+                                            if (content_file_child.value) |content_file_child_value| {
+                                                if (eql(u8, content_file_child_value, "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png")) {
+                                                    content_file_child.value = "Ronin.rte/Devices/Tools/Shovel/Effects/ShovelFlash.png";
+
+                                                    changed_shovel_sprite = true;
+                                                }
+                                            } else {
+                                                return UpdateIniFileTreeErrors.ExpectedValue;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            return UpdateIniFileTreeErrors.ExpectedValue;
+                        }
+                    }
+                }
+            }
+
+            if (changed_shovel_sprite) {
+                for (firearm.children.items) |*firearm_child| {
+                    if (firearm_child.property) |firearm_child_property| {
+                        if (eql(u8, firearm_child_property, "FrameCount")) {
+                            if (firearm_child.value) |firearm_child_value| {
+                                if (eql(u8, firearm_child_value, "2")) {
+                                    firearm_child.value = "1";
+                                }
+                            } else {
+                                return UpdateIniFileTreeErrors.ExpectedValue;
+                            }
+                        }
+                    }
                 }
             }
         }
