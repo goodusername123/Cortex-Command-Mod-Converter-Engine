@@ -397,6 +397,7 @@ fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, al
 }
 
 fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
+    // TODO: ffmpeg won't always be available, so include its source code and call that instead
     var argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path, "-y" };
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
     _ = result;
@@ -1148,7 +1149,13 @@ fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_valu
     try maxMassToMaxInventoryMass(properties, allocator);
     try maxThrottleRangeToPositiveThrottleMultiplier(properties, allocator);
     try minThrottleRangeToNegativeThrottleMultiplier(properties, allocator);
-    try pieMenuCrab(property_value_pairs);
+
+    try pieMenu("ACDropShip", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
+    try pieMenu("ACrab", "Default Crab Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
+    try pieMenu("ACRocket", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
+    try pieMenu("Actor", "Default Actor Pie Menu", 1, 0, 0, 0, property_value_pairs, allocator);
+    try pieMenu("AHuman", "Default Human Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
+    try pieMenu("Turret", "Default Turret Pie Menu", 2, 0, 0, 1, property_value_pairs, allocator);
 }
 
 fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
@@ -1319,7 +1326,7 @@ fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayLis
                                 .comments = ArrayList([]const u8).init(allocator),
                                 .children = ArrayList(Node).init(allocator),
                             });
-                            try leg.children.append(extended_offset);
+                            try children.append(extended_offset);
                         } else {
                             return UpdateIniFileTreeErrors.ExpectedValue;
                         }
@@ -1402,27 +1409,114 @@ fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(Array
     }
 }
 
-fn pieMenuCrab(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+fn pieMenu(actor_name: []const u8, default_copy_of_name: []const u8, starting_direction_count_up: u32, starting_direction_count_down: u32, starting_direction_count_left: u32, starting_direction_count_right: u32, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
     var crabs_ = property_value_pairs.get(PropertyValuePair{
         .property = "AddActor",
-        .value = "ACrab",
+        .value = actor_name,
     });
 
     if (crabs_) |crabs| {
         for (crabs.items) |crab| {
             var children = &crab.children;
 
+            var contains_pie_slice = false;
             for (children.items) |*child| {
                 if (child.property) |property| {
                     if (eql(u8, property, "AddPieSlice")) {
                         if (child.value) |value| {
                             if (eql(u8, value, "PieSlice")) {
-                                // TODO: Remove PieSlice node pointers from crab (move in file_tree)
+                                contains_pie_slice = true;
                             }
                         } else {
                             return UpdateIniFileTreeErrors.ExpectedValue;
                         }
                     }
+                }
+            }
+
+            if (contains_pie_slice) {
+                var pie_menu = Node{
+                    .property = "PieMenu",
+                    .value = "PieMenu",
+                    .comments = ArrayList([]const u8).init(allocator),
+                    .children = ArrayList(Node).init(allocator),
+                };
+
+                try pie_menu.children.append(Node{
+                    .property = "CopyOf",
+                    .value = default_copy_of_name,
+                    .comments = ArrayList([]const u8).init(allocator),
+                    .children = ArrayList(Node).init(allocator),
+                });
+
+                for (children.items) |*child| {
+                    if (child.property) |property| {
+                        if (eql(u8, property, "AddPieSlice")) {
+                            if (child.value) |value| {
+                                if (eql(u8, value, "PieSlice")) {
+                                    // Make a copy of the PieSlice in the PieMenu
+                                    try pie_menu.children.append(Node{
+                                        .property = "AddPieSlice",
+                                        .value = "PieSlice",
+                                        .comments = child.comments,
+                                        .children = child.children,
+                                    });
+
+                                    // Remove the PieSlice from the root of the crab
+                                    child.property = null;
+                                    child.value = null;
+                                    child.comments = ArrayList([]const u8).init(allocator);
+                                    child.children = ArrayList(Node).init(allocator);
+                                }
+                            } else {
+                                return UpdateIniFileTreeErrors.ExpectedValue;
+                            }
+                        }
+                    }
+                }
+
+                try applyPieQuadrantSlotLimit(&pie_menu, "Up", starting_direction_count_up);
+                try applyPieQuadrantSlotLimit(&pie_menu, "Down", starting_direction_count_down);
+                try applyPieQuadrantSlotLimit(&pie_menu, "Left", starting_direction_count_left);
+                try applyPieQuadrantSlotLimit(&pie_menu, "Right", starting_direction_count_right);
+
+                try children.append(pie_menu);
+            }
+        }
+    }
+}
+
+fn applyPieQuadrantSlotLimit(pie_menu: *Node, direction: []const u8, starting_direction_count: u32) !void {
+    var direction_count = starting_direction_count;
+
+    // From the Source repo in System/PieQuadrant.h, under the name c_PieQuadrantSlotCount
+    const PieQuadrantSlotCount = 5;
+
+    for (pie_menu.children.items) |menu_child| {
+        if (menu_child.property) |meny_child_property| {
+            if (eql(u8, meny_child_property, "AddPieSlice")) {
+                if (menu_child.value) |value| {
+                    if (eql(u8, value, "PieSlice")) {
+                        for (menu_child.children.items) |*slice_child| {
+                            if (slice_child.property) |slice_child_property| {
+                                if (eql(u8, slice_child_property, "Direction")) {
+                                    if (slice_child.value) |slice_child_value| {
+                                        if (eql(u8, slice_child_value, direction)) {
+                                            if (direction_count == PieQuadrantSlotCount) {
+                                                slice_child.value = "Any";
+                                            } else {
+                                                direction_count += 1;
+                                            }
+                                        }
+                                    } else {
+                                        return UpdateIniFileTreeErrors.ExpectedValue;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    return UpdateIniFileTreeErrors.ExpectedValue;
                 }
             }
         }
