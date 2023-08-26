@@ -9,7 +9,6 @@
 	"AddSample": "AddSound",
 	"ScriptFile": "ScriptPath",
 	"TextureFile": "FGTextureFile",
-	"Path": "FilePath",
 	"DeleteWithParent": "DeleteWhenRemovedFromParent",
 	"MountedMO": "MountedDevice",
 	"LFGLeg": "LeftFGLeg",

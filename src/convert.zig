@@ -232,6 +232,8 @@ pub fn convert(input_mod_path: []const u8, output_folder_path: []const u8, alloc
     std.debug.print("Adding properties...\n", .{});
     try addProperties(&file_tree, &properties, allocator);
 
+    try pathToFilePath(&properties, allocator);
+
     // This HAS to be called before addPropertyValuePairs(),
     // cause the PropertyValuePair keys it generates can't be modified later.
     //
@@ -940,6 +942,26 @@ fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), 
     for (node.children.items) |*child| {
         try addFileProperties(child, properties, allocator);
     }
+}
+
+fn pathToFilePath(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+    var paths_ = properties.get("Path");
+
+    if (paths_) |paths| {
+        for (paths.items) |path| {
+            path.property = "FilePath";
+
+            var file_paths = try properties.getOrPut("FilePath");
+
+            if (!file_paths.found_existing) {
+                file_paths.value_ptr.* = ArrayList(*Node).init(allocator);
+            }
+
+            try file_paths.value_ptr.append(path);
+        }
+    }
+
+    // TODO: Figure out a way to remove the Path key, or the list of Node pointers at that key
 }
 
 fn bmpExtensionToPng(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
@@ -1924,6 +1946,8 @@ test "ini_rules" {
             var properties = StringHashMap(ArrayList(*Node)).init(allocator);
             try addProperties(&file_tree, &properties, allocator);
 
+            try pathToFilePath(&properties, allocator);
+
             try bmpExtensionToPng(&properties, allocator);
 
             try wavExtensionToFlac(&properties, allocator);
@@ -2031,6 +2055,8 @@ test "updated" {
 
             var properties = StringHashMap(ArrayList(*Node)).init(allocator);
             try addProperties(&file_tree, &properties, allocator);
+
+            try pathToFilePath(&properties, allocator);
 
             try bmpExtensionToPng(&properties, allocator);
 
