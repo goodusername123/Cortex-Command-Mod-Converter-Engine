@@ -1226,54 +1226,38 @@ fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*
 }
 
 fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    const err = error{
-        MoreThanOneSupportedGameVersion,
-        // MissingDataModule,
-        MoreThanOneDataModule,
-    };
+    var data_modules_ = properties.get("DataModule");
 
-    var supported_game_version = properties.get("SupportedGameVersion");
+    if (data_modules_) |data_modules| {
+        for (data_modules.items) |data_module| {
+            var mod_has_supported_game_version = false;
 
-    if (supported_game_version) |nodes| {
-        // Update the SupportedGameVersion, if necessary
-        if (nodes.items.len == 1) {
-            var node = nodes.items[0];
+            for (data_module.children.items) |*data_module_child| {
+                if (data_module_child.property) |data_module_child_property| {
+                    if (eql(u8, data_module_child_property, "SupportedGameVersion")) {
+                        mod_has_supported_game_version = true;
 
-            if (node.value) |value| {
-                // TODO: Maybe add a check that the input version isn't newer
-                // than the version this engine thinks is the latest?
-                if (!eql(u8, value, "Pre-Release 5.0")) {
-                    node.value = "Pre-Release 5.0";
+                        if (data_module_child.value) |data_module_child_value| {
+                            if (!eql(u8, data_module_child_value, "Pre-Release 5.0")) {
+                                data_module_child.value = "Pre-Release 5.0";
+                            }
+                        }
+                    }
                 }
-            } else {
-                return UpdateIniFileTreeErrors.ExpectedValue;
             }
-        } else {
-            return err.MoreThanOneSupportedGameVersion;
-        }
-    } else {
-        // Add the SupportedGameVersion
-        var data_module = properties.get("DataModule");
-        if (data_module) |nodes| {
-            if (nodes.items.len == 1) {
-                var children = &nodes.items[0].children;
 
-                try children.append(Node{
+            if (!mod_has_supported_game_version) {
+                try data_module.children.append(Node{
                     .property = "SupportedGameVersion",
                     .value = "Pre-Release 5.0",
                     .comments = ArrayList([]const u8).init(allocator),
                     .children = ArrayList(Node).init(allocator),
                 });
 
-                var supported_list = ArrayList(*Node).init(allocator);
-                try supported_list.append(nodes.items[0]);
-                try properties.put("SupportedGameVersion", supported_list);
-            } else {
-                return err.MoreThanOneDataModule;
+                // var supported_list = ArrayList(*Node).init(allocator);
+                // try supported_list.append(nodes.items[0]);
+                // try properties.put("SupportedGameVersion", supported_list);
             }
-        } else {
-            // TODO: Maybe bring this back?
-            // return err.MissingDataModule;
         }
     }
 }
