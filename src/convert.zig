@@ -166,10 +166,16 @@ pub fn main() !void {
     const cwd = std.fs.cwd();
 
     var input_mod_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const input_mod_path = try cwd.realpath("tests/mod/in", &input_mod_path_buffer);
+    // const input_mod_path = try cwd.realpath("tests/mod/in", &input_mod_path_buffer);
+    // const input_mod_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/LegacyModConverter-v1.0-pre5.2/Input", &input_mod_path_buffer);
+    // const input_mod_path = try cwd.realpath("I:/Programming/Cortex-Command-Mod-Converter-Engine/tons_of_mods/extra", &input_mod_path_buffer);
+    const input_mod_path = try cwd.realpath("I:/Games/CCCP Pre5.2 - Copy/foo", &input_mod_path_buffer);
 
     var output_mod_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const output_mod_path = try cwd.realpath("tests/mod/out", &output_mod_path_buffer);
+    // const output_mod_path = try cwd.realpath("tests/mod/out", &output_mod_path_buffer);
+    // const output_mod_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/Mods", &output_mod_path_buffer);
+    // const output_mod_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/Mods/tmp", &output_mod_path_buffer);
+    const output_mod_path = try cwd.realpath("I:/Games/CCCP Pre5.2 - Copy/Mods", &output_mod_path_buffer);
 
     var diagnostics: Diagnostics = .{};
     convert(
@@ -184,11 +190,11 @@ pub fn main() !void {
             const line = diagnostics.line orelse -1;
             const column = diagnostics.column orelse -1;
 
-            std.debug.print("{s}:{}:{}: syntax error, unexpected '{s}'\n", .{
+            std.debug.print("Error: Unexpected '{s}' at {s}:{}:{}\n", .{
+                token,
                 file_path,
                 line,
                 column,
-                token,
             });
         },
         error.TooManyTabs => {
@@ -196,7 +202,7 @@ pub fn main() !void {
             const line = diagnostics.line orelse -1;
             const column = diagnostics.column orelse -1;
 
-            std.debug.print("Error: Too many tabs\nFile path: {s}\nLine: {} (roughly)\nColumn: {} (roughly)\n", .{
+            std.debug.print("Error: Too many tabs at {s}:{}:{}\n", .{
                 file_path,
                 line,
                 column,
@@ -207,18 +213,23 @@ pub fn main() !void {
 }
 
 pub fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+    std.debug.print("Making all output dirs...\n", .{});
     try makeOutputDirs(input_mod_path, output_folder_path, allocator);
 
+    std.debug.print("Copying files...\n", .{});
     try copyFiles(input_mod_path, output_folder_path, allocator);
 
     const lua_rules = try parseLuaRules(allocator);
+    std.debug.print("Applying Lua rules...\n", .{});
     try applyLuaRules(lua_rules, output_folder_path, allocator);
 
+    std.debug.print("Getting INI file tree...\n", .{});
     var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
 
     // Create a hashmap, where the key is a property,
     // and the value is a list of Nodes that have this key
     var properties = StringHashMap(ArrayList(*Node)).init(allocator);
+    std.debug.print("Adding properties...\n", .{});
     try addProperties(&file_tree, &properties, allocator);
 
     // This HAS to be called before addPropertyValuePairs(),
@@ -232,35 +243,46 @@ pub fn convert(input_mod_path: []const u8, output_folder_path: []const u8, alloc
     // The game reports that Base.rte/foo.png *still* doesn't exist,
     // due to the parsed input mod containing "Base.rte/foo.bmp"
     // The rule isn't applied to this string, due to it saying .bmp!
+    std.debug.print("Bmp extension to png...\n", .{});
     try bmpExtensionToPng(&properties, allocator);
 
+    std.debug.print("Wav extension to flac...\n", .{});
     try wavExtensionToFlac(&properties, allocator);
 
     // Create a hashmap, where the key is a PropertyValuePair,
     // and the value is a list of Nodes that have this key
     var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
+    std.debug.print("Adding property-value pairs...\n", .{});
     try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
 
     const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
+    std.debug.print("Applying INI CopyOf rules...\n", .{});
     try applyIniCopyOfRules(ini_copy_of_rules, &property_value_pairs);
 
     const ini_file_path_rules = try parseIniFilePathRules(allocator);
+    std.debug.print("Applying INI FilePath rules...\n", .{});
     try applyIniFilePathRules(ini_file_path_rules, &property_value_pairs);
 
     const ini_script_path_rules = try parseIniScriptPathRules(allocator);
+    std.debug.print("Applying INI ScriptPath rules...\n", .{});
     try applyIniScriptPathRules(ini_script_path_rules, &property_value_pairs);
 
     const ini_property_rules = try parseIniPropertyRules(allocator);
+    std.debug.print("Applying INI property rules...\n", .{});
     try applyIniPropertyRules(ini_property_rules, &properties);
 
     const ini_rules = try parseIniRules(allocator);
+    std.debug.print("Applying INI rules...\n", .{});
     applyIniRules(ini_rules, &property_value_pairs);
 
     const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
+    std.debug.print("Applying INI SoundContainer rules...\n", .{});
     applyIniSoundContainerRules(ini_sound_container_rules, &property_value_pairs);
 
+    std.debug.print("Updating INI file tree...\n", .{});
     try updateIniFileTree(&properties, &property_value_pairs, allocator);
 
+    std.debug.print("Writing INI file tree...\n", .{});
     try writeIniFileTree(&file_tree, output_folder_path, allocator);
 }
 
@@ -1158,6 +1180,7 @@ fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_valu
     try pieMenu("AHuman", "Default Human Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
     try pieMenu("Turret", "Default Turret Pie Menu", 2, 0, 0, 1, property_value_pairs, allocator);
 
+    try removeSlTerrainProperties(property_value_pairs, allocator);
     try shovelFlashFix(property_value_pairs);
 }
 
@@ -1518,6 +1541,69 @@ fn applyPieQuadrantSlotLimit(pie_menu: *Node, direction: []const u8, starting_di
                     }
                 } else {
                     return UpdateIniFileTreeErrors.ExpectedValue;
+                }
+            }
+        }
+    }
+}
+
+fn removeSlTerrainProperties(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
+    var terrains_ = property_value_pairs.get(PropertyValuePair{
+        .property = "Terrain",
+        .value = "SLTerrain",
+    });
+
+    if (terrains_) |terrains| {
+        // Remove Offset from the Terrain
+        for (terrains.items) |terrain| {
+            for (terrain.children.items) |*terrain_child| {
+                if (terrain_child.property) |terrain_child_property| {
+                    if (eql(u8, terrain_child_property, "Offset")) {
+                        if (terrain_child.value) |terrain_child_value| {
+                            if (eql(u8, terrain_child_value, "Vector")) {
+                                terrain_child.property = null;
+                                terrain_child.value = null;
+                                terrain_child.comments = ArrayList([]const u8).init(allocator);
+                                terrain_child.children = ArrayList(Node).init(allocator);
+                            }
+                        } else {
+                            return UpdateIniFileTreeErrors.ExpectedValue;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Remove DrawTransparent from the Terrain
+        for (terrains.items) |terrain| {
+            for (terrain.children.items) |*terrain_child| {
+                if (terrain_child.property) |terrain_child_property| {
+                    if (eql(u8, terrain_child_property, "DrawTransparent")) {
+                        terrain_child.property = null;
+                        terrain_child.value = null;
+                        terrain_child.comments = ArrayList([]const u8).init(allocator);
+                        terrain_child.children = ArrayList(Node).init(allocator);
+                    }
+                }
+            }
+        }
+
+        // Remove ScrollRatio from the Terrain
+        for (terrains.items) |terrain| {
+            for (terrain.children.items) |*terrain_child| {
+                if (terrain_child.property) |terrain_child_property| {
+                    if (eql(u8, terrain_child_property, "ScrollRatio")) {
+                        if (terrain_child.value) |terrain_child_value| {
+                            if (eql(u8, terrain_child_value, "Vector")) {
+                                terrain_child.property = null;
+                                terrain_child.value = null;
+                                terrain_child.comments = ArrayList([]const u8).init(allocator);
+                                terrain_child.children = ArrayList(Node).init(allocator);
+                            }
+                        } else {
+                            return UpdateIniFileTreeErrors.ExpectedValue;
+                        }
+                    }
                 }
             }
         }
