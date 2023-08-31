@@ -24,6 +24,21 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    // Strip debug symbols by default
+    // Should be disabled during development/debugging
+    // Source: https://github.com/theseyan/bkg/blob/main/build.zig
+    exe.strip = false;
+
+    exe.linkLibC();
+
+    // Compile zip library
+    exe.addCSourceFile(.{
+        .file = .{ .path = "submodules/zip/src/zip.c" },
+        .flags = &.{"-O3"},
+    });
+
+    exe.addIncludePath(.{ .path = "submodules/zip/src" });
+
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
     // step when running `zig build`).

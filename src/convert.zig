@@ -1,4 +1,5 @@
 const std = @import("std");
+const ziplib = @cImport(@cInclude("zip.h"));
 
 const default_max_load_percentage = std.hash_map.default_max_load_percentage;
 const default_max_value_len = std.json.default_max_value_len;
@@ -159,6 +160,8 @@ const UpdateIniFileTreeErrors = error{
 };
 
 pub fn main() !void {
+    try zip_mods();
+
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
@@ -2167,4 +2170,9 @@ fn verifyInvalidTestThrowsError(text: *const []const u8, allocator: Allocator) !
 
     // Tests from the invalid/ folder should always return an error from this function before reaching this
     unreachable;
+}
+
+pub fn zip_mods() !void {
+    var zipped = ziplib.zip_open("foo.zip", ziplib.ZIP_DEFAULT_COMPRESSION_LEVEL, 'w') orelse return error.ZipOpenError;
+    ziplib.zip_close(zipped);
 }
