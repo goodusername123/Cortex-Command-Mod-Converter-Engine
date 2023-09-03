@@ -34,7 +34,7 @@ pub fn build(b: *std.Build) void {
     // Compile zip library
     exe.addCSourceFile(.{
         .file = .{ .path = "submodules/zip/src/zip.c" },
-        .flags = &.{"-O3"},
+        .flags = &.{ "-O3", "-fno-sanitize=undefined" }, // "-fno-sanitize=undefined" unfortunately is needed to prevent "Illegal instruction" errors
     });
 
     exe.addIncludePath(.{ .path = "submodules/zip/src" });

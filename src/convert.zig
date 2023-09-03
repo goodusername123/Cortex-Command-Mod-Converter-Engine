@@ -160,30 +160,28 @@ const UpdateIniFileTreeErrors = error{
 };
 
 pub fn main() !void {
-    try zip_mods();
-
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
     var allocator = arena.allocator();
 
     const cwd = std.fs.cwd();
 
-    var input_mod_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    // const input_mod_path = try cwd.realpath("tests/mod/in", &input_mod_path_buffer);
-    // const input_mod_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/LegacyModConverter-v1.0-pre5.2/Input", &input_mod_path_buffer);
-    // const input_mod_path = try cwd.realpath("I:/Programming/Cortex-Command-Mod-Converter-Engine/tons_of_mods/extra", &input_mod_path_buffer);
-    const input_mod_path = try cwd.realpath("I:/Games/CCCP Pre5.2 - Copy/foo", &input_mod_path_buffer);
+    var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    // const input_folder_path = try cwd.realpath("tests/mod/in", &input_folder_path_buffer);
+    const input_folder_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/LegacyModConverter-v1.0-pre5.2/Input", &input_folder_path_buffer);
+    // const input_folder_path = try cwd.realpath("I:/Programming/Cortex-Command-Mod-Converter-Engine/tons_of_mods/extra", &input_folder_path_buffer);
+    // const input_folder_path = try cwd.realpath("I:/Games/CCCP Pre5.2 - Copy/foo", &input_folder_path_buffer);
 
-    var output_mod_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    // const output_mod_path = try cwd.realpath("tests/mod/out", &output_mod_path_buffer);
-    // const output_mod_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/Mods", &output_mod_path_buffer);
-    // const output_mod_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/Mods/tmp", &output_mod_path_buffer);
-    const output_mod_path = try cwd.realpath("I:/Games/CCCP Pre5.2 - Copy/Mods", &output_mod_path_buffer);
+    var output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    // const output_folder_path = try cwd.realpath("tests/mod/out", &output_folder_path_buffer);
+    const output_folder_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/Mods", &output_folder_path_buffer);
+    // const output_folder_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/Mods/tmp", &output_folder_path_buffer);
+    // const output_folder_path = try cwd.realpath("I:/Games/CCCP Pre5.2 - Copy/Mods", &output_folder_path_buffer);
 
     var diagnostics: Diagnostics = .{};
     convert(
-        input_mod_path,
-        output_mod_path,
+        input_folder_path,
+        output_folder_path,
         allocator,
         &diagnostics,
     ) catch |err| switch (err) {
@@ -213,21 +211,23 @@ pub fn main() !void {
         },
         else => |e| return e,
     };
+
+    try zip_mods(output_folder_path, allocator);
 }
 
-pub fn convert(input_mod_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
     std.debug.print("Making all output dirs...\n", .{});
-    try makeOutputDirs(input_mod_path, output_folder_path, allocator);
+    try makeOutputDirs(input_folder_path, output_folder_path, allocator);
 
     std.debug.print("Copying files...\n", .{});
-    try copyFiles(input_mod_path, output_folder_path, allocator);
+    try copyFiles(input_folder_path, output_folder_path, allocator);
 
     const lua_rules = try parseLuaRules(allocator);
     std.debug.print("Applying Lua rules...\n", .{});
     try applyLuaRules(lua_rules, output_folder_path, allocator);
 
     std.debug.print("Getting INI file tree...\n", .{});
-    var file_tree = try getIniFileTree(input_mod_path, allocator, diagnostics);
+    var file_tree = try getIniFileTree(input_folder_path, allocator, diagnostics);
 
     // Create a hashmap, where the key is a property,
     // and the value is a list of Nodes that have this key
@@ -1685,9 +1685,9 @@ fn writeIniFileTree(file_tree: *const IniFolder, output_folder_path: []const u8,
     }
 
     for (file_tree.folders.items) |folder| {
-        const child_output_mod_path = try join(allocator, &.{ output_folder_path, folder.name });
-        // std.debug.print("{s}\n", .{child_output_mod_path});
-        try writeIniFileTree(&folder, child_output_mod_path, allocator);
+        const child_output_folder_path = try join(allocator, &.{ output_folder_path, folder.name });
+        // std.debug.print("{s}\n", .{child_output_folder_path});
+        try writeIniFileTree(&folder, child_output_folder_path, allocator);
     }
 }
 
@@ -2172,7 +2172,53 @@ fn verifyInvalidTestThrowsError(text: *const []const u8, allocator: Allocator) !
     unreachable;
 }
 
-pub fn zip_mods() !void {
-    var zipped = ziplib.zip_open("foo.zip", ziplib.ZIP_DEFAULT_COMPRESSION_LEVEL, 'w') orelse return error.ZipOpenError;
-    ziplib.zip_close(zipped);
+pub fn zip_mods(output_folder_path: []const u8, allocator: Allocator) !void {
+    var iterable_dir = try std.fs.openIterableDirAbsolute(output_folder_path, .{});
+    defer iterable_dir.close();
+    var dir_iterator = iterable_dir.iterate();
+
+    while (try dir_iterator.next()) |entry| {
+        if (entry.kind == std.fs.File.Kind.directory) {
+            const mod_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
+
+            const needle = ".rte";
+            const replacement = "-pre5.2-v1.0.zip";
+            const name = try allocator.alloc(u8, replacementSize(u8, entry.name, needle, replacement));
+            _ = replace(u8, entry.name, needle, replacement, name);
+
+            const mod_zip_path = try allocator.dupeZ(u8, try join(allocator, &.{ output_folder_path, name }));
+
+            var zip = ziplib.zip_open(mod_zip_path.ptr, ziplib.ZIP_DEFAULT_COMPRESSION_LEVEL, 'w') orelse return error.ZipOpen;
+
+            try zip_mod_recursively(zip, mod_folder_path, ".");
+
+            ziplib.zip_close(zip);
+        }
+    }
+}
+
+fn zip_mod_recursively(zip: *ziplib.zip_t, full_path: []const u8, sub_path: []const u8) !void {
+    var child_full_path_buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+    var child_sub_path_buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+
+    var iterable_dir = try std.fs.openIterableDirAbsolute(full_path, .{});
+    defer iterable_dir.close();
+    var dir_iterator = iterable_dir.iterate();
+
+    while (try dir_iterator.next()) |entry| {
+        const child_full_path = try std.fmt.bufPrintZ(&child_full_path_buffer, "{s}/{s}", .{ full_path, entry.name });
+        const child_sub_path = try std.fmt.bufPrintZ(&child_sub_path_buffer, "{s}/{s}", .{ sub_path, entry.name });
+
+        if (entry.kind == std.fs.File.Kind.file) {
+            // TODO: Not sure whether these files are ever actually returned by Zig's dir iterator
+            if (eql(u8, entry.name, ".") or eql(u8, entry.name, ".."))
+                continue;
+
+            if (ziplib.zip_entry_open(zip, child_sub_path) < 0) return error.ZipEntryOpen;
+            if (ziplib.zip_entry_fwrite(zip, child_full_path) < 0) return error.ZipEntryFwrite;
+            if (ziplib.zip_entry_close(zip) < 0) return error.ZipEntryClose;
+        } else if (entry.kind == std.fs.File.Kind.directory) {
+            try zip_mod_recursively(zip, child_full_path, child_sub_path);
+        }
+    }
 }
