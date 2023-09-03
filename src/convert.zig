@@ -212,7 +212,7 @@ pub fn main() !void {
         else => |e| return e,
     };
 
-    try zip_mods(output_folder_path, allocator);
+    try zip_mods(input_folder_path, output_folder_path, allocator);
 }
 
 pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
@@ -2172,8 +2172,8 @@ fn verifyInvalidTestThrowsError(text: *const []const u8, allocator: Allocator) !
     unreachable;
 }
 
-pub fn zip_mods(output_folder_path: []const u8, allocator: Allocator) !void {
-    var iterable_dir = try std.fs.openIterableDirAbsolute(output_folder_path, .{});
+pub fn zip_mods(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
+    var iterable_dir = try std.fs.openIterableDirAbsolute(input_folder_path, .{});
     defer iterable_dir.close();
     var dir_iterator = iterable_dir.iterate();
 
