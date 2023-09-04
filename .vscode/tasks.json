@@ -20,8 +20,8 @@
 			"type": "shell",
 			"command": "zig",
 			"args": [
-				"build",
 				"test",
+				"src/main.zig",
 				"-freference-trace",
 			],
 			"problemMatcher": [],
