@@ -19,22 +19,24 @@ pub fn build(b: *std.Build) void {
         .name = "Cortex-Command-Mod-Converter-Engine",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
-        .root_source_file = .{ .path = "src/convert.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });
 
     // Strip debug symbols by default
     // Should be disabled during development/debugging
-    // Source: https://github.com/theseyan/bkg/blob/main/build.zig
+    // Source: https://github.com/theseyan/bkg/blob/38663d8ed0257f45d37ce003a7e2cafd0f278951/build.zig#L15
     exe.strip = false;
 
     exe.linkLibC();
 
-    // Compile zip library
     exe.addCSourceFile(.{
         .file = .{ .path = "submodules/zip/src/zip.c" },
-        .flags = &.{ "-O3", "-fno-sanitize=undefined" }, // "-fno-sanitize=undefined" unfortunately is needed to prevent "Illegal instruction" errors
+        .flags = &.{
+            "-O3",
+            "-fno-sanitize=undefined", // Necessary to prevent "Illegal instruction" error
+        },
     });
 
     exe.addIncludePath(.{ .path = "submodules/zip/src" });
@@ -70,7 +72,7 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/convert.zig" },
+        .root_source_file = .{ .path = "src/main.zig" },
         .target = target,
         .optimize = optimize,
     });

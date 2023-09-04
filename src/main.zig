@@ -2190,7 +2190,7 @@ pub fn zip_mods(input_folder_path: []const u8, output_folder_path: []const u8, a
 
             var zip = ziplib.zip_open(mod_zip_path.ptr, ziplib.ZIP_DEFAULT_COMPRESSION_LEVEL, 'w') orelse return error.ZipOpen;
 
-            try zip_mod_recursively(zip, mod_folder_path, ".");
+            try zip_mod_recursively(zip, mod_folder_path, entry.name);
 
             ziplib.zip_close(zip);
         }
