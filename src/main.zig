@@ -1193,6 +1193,7 @@ fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_valu
     try addGripStrength(property_value_pairs, allocator);
     try addOrUpdateSupportedGameVersion(properties, allocator);
     try aemitterFuelToPemitter(property_value_pairs);
+    try aemitterToAejetpack(property_value_pairs);
     try maxLengthToOffsets(property_value_pairs, allocator);
     try maxMassToMaxInventoryMass(properties, allocator);
     try maxThrottleRangeToPositiveThrottleMultiplier(properties, allocator);
@@ -1306,6 +1307,70 @@ fn aemitterFuelToPemitter(property_value_pairs: *HashMap(PropertyValuePair, Arra
                             return UpdateIniFileTreeErrors.ExpectedValue;
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+fn aemitterToAejetpack(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+    // Translate "Jetpack = AEmitter" to "Jetpack = AEJetpack" and its "AddEffect = AEmitter" children to "AddEffect = AEJetpack"
+    // Look up every "Jetpack = AEmitter"
+    //   Change it to "Jetpack = AEJetpack"
+    //   Remember the value of the "CopyOf" inside of the Jetpack
+    //   Iterate over every "AddEffect = AEmitter" and look up "PresetName = <CopyOf value>"
+    //     If it's in there, change the "AddEffect = AEmitter" to "AddEffect = AEJetpack"
+    //       Remember its "CopyOf" value
+    //       Recurse back to the "Iterate over" step
+    var jetpack_aemitters_ = property_value_pairs.get(PropertyValuePair{
+        .property = "Jetpack",
+        .value = "AEmitter",
+    });
+
+    if (jetpack_aemitters_) |jetpack_aemitters| {
+        for (jetpack_aemitters.items) |jetpack_aemitter| {
+            jetpack_aemitter.value = "AEJetpack";
+            try addeffectAemitterToAddeffectAejetpack(jetpack_aemitter, property_value_pairs);
+        }
+    }
+
+    // TODO: If an Actor's last Jetpack key has the value AEJetpack, recursively check whether the last thing the Actor is CopyOf-ing is an AEJetpack, and NOT any other Jetpack value than that, like None. If so, copy that jetpack's properties to its own jetpack
+    // Look up every "AddActor = ACrab" and "AddActor = AHuman"
+    //   If it contains "Jetpack = None", yeet any Jetpack key from the Actor (JetTime, JetReplenishRate, JetAngleRange, JumpTime, JumpReplenishRate, and JumpAngleRange)
+    //   Else, if it recursively contains "Jetpack = AEmitter", move all Jetpack keys into its own "Jetpack = AEmitter", creating one if it doesn't have it already that contains its base object's jetpack keys at the start
+
+    // TODO: If an Actor's last Jetpack key has the value AEJetpack, move the Actor's jetpack properties to it
+}
+
+fn addeffectAemitterToAddeffectAejetpack(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+    for (node.children.items) |*node_child| {
+        if (node_child.property) |node_child_property| {
+            if (eql(u8, node_child_property, "CopyOf")) {
+                if (node_child.value) |node_child_value| {
+                    var addeffect_aemitters_ = property_value_pairs.get(PropertyValuePair{
+                        .property = "AddEffect",
+                        .value = "AEmitter",
+                    });
+
+                    if (addeffect_aemitters_) |addeffect_aemitters| {
+                        for (addeffect_aemitters.items) |addeffect_aemitter| {
+                            for (addeffect_aemitter.children.items) |*addeffect_aemitter_child| {
+                                if (addeffect_aemitter_child.property) |addeffect_aemitter_child_property| {
+                                    if (eql(u8, addeffect_aemitter_child_property, "PresetName")) {
+                                        if (addeffect_aemitter_child.value) |addeffect_aemitter_child_value| {
+                                            if (eql(u8, addeffect_aemitter_child_value, node_child_value)) {
+                                                addeffect_aemitter.value = "AEJetpack";
+
+                                                try addeffectAemitterToAddeffectAejetpack(addeffect_aemitter, property_value_pairs);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    return UpdateIniFileTreeErrors.ExpectedValue;
                 }
             }
         }
