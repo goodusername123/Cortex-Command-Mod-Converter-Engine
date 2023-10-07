@@ -237,17 +237,13 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
 
     try pathToFilePath(&properties, allocator);
 
-    // This HAS to be called before addPropertyValuePairs(),
-    // cause the PropertyValuePair keys it generates can't be modified later.
-    //
     // It also HAS to be called before applyIniFilePathRules(),
     // because otherwise this could happen:
     // The game reports that Base.rte/foo.png doesn't exist,
-    // so the user enters this rule:
+    // so the user enters this ini_file_path_rules.json rule:
     // "Base.rte/foo.png": "Base.rte/bar.png"
     // The game reports that Base.rte/foo.png *still* doesn't exist,
-    // due to the parsed input mod containing "Base.rte/foo.bmp"
-    // The rule isn't applied to this string, due to it saying .bmp!
+    // due to the parsed input mod containing "Base.rte/foo.bmp"!
     std.debug.print("Bmp extension to png...\n", .{});
     try bmpExtensionToPng(&properties, allocator);
 
