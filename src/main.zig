@@ -1214,7 +1214,9 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     try applyOnNodes(addGripStrength, file_tree, allocator);
     try applyOnNodes(addOrUpdateSupportedGameVersion, file_tree, allocator);
     try applyOnNodes(aemitterFuelToPemitter, file_tree, allocator);
-    // try applyOnNodes(aemitterToAejetpack, file_tree, allocator);
+
+    try aemitterToAejetpack(file_tree, file_tree, allocator);
+
     try applyOnNodes(maxLengthToOffsets, file_tree, allocator);
     try applyOnNodes(maxMassToMaxInventoryMass, file_tree, allocator);
     try applyOnNodes(maxThrottleRangeToPositiveThrottleMultiplier, file_tree, allocator);
@@ -1336,7 +1338,19 @@ fn aemitterFuelToPemitter(node: *Node, allocator: Allocator) !void {
     }
 }
 
-fn aemitterToAejetpack(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+fn aemitterToAejetpack(folder: *IniFolder, file_tree: *IniFolder, allocator: Allocator) !void {
+    for (folder.folders.items) |*subfolder| {
+        try aemitterToAejetpack(subfolder, file_tree, allocator);
+    }
+
+    for (folder.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try aemitterToAejetpackRecursivelyNode(node, file_tree, allocator);
+        }
+    }
+}
+
+fn aemitterToAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
     // 1. Translate "Jetpack = AEmitter" to "Jetpack = AEJetpack", and its "AddEffect = AEmitter" children to "AddEffect = AEJetpack"
     // Look up every "Jetpack = AEmitter"
     //   Change it to "Jetpack = AEJetpack"
@@ -1345,15 +1359,15 @@ fn aemitterToAejetpack(property_value_pairs: *HashMap(PropertyValuePair, ArrayLi
     //     If it's in there, change the "AddEffect = AEmitter" to "AddEffect = AEJetpack"
     //       Remember its "CopyOf" value
     //       Recurse back to the "Iterate over" step
-    var jetpack_aemitters_ = property_value_pairs.get(PropertyValuePair{
-        .property = "Jetpack",
-        .value = "AEmitter",
-    });
+    if (node.property) |property| {
+        if (str_eql(property, "Jetpack")) {
+            if (node.value) |value| {
+                if (str_eql(value, "AEmitter")) {
+                    node.value = "AEJetpack";
 
-    if (jetpack_aemitters_) |jetpack_aemitters| {
-        for (jetpack_aemitters.items) |jetpack_aemitter| {
-            jetpack_aemitter.value = "AEJetpack";
-            try addeffectAemitterToAddeffectAejetpack(jetpack_aemitter, property_value_pairs);
+                    try addEffectAemitterToAddEffectAejetpackCopyOfFinder(node, file_tree);
+                }
+            }
         }
     }
 
@@ -1363,40 +1377,63 @@ fn aemitterToAejetpack(property_value_pairs: *HashMap(PropertyValuePair, ArrayLi
     //   Else, if it recursively contains "Jetpack = AEmitter", move all Jetpack keys into its own "Jetpack = AEmitter", creating one if it doesn't have it already that contains its base object's jetpack keys at the start
 
     // TODO: 3. If an Actor's last Jetpack key has the value AEJetpack, move the Actor's jetpack properties to it, and remove them otherwise
+
+    for (node.children.items) |*child| {
+        try aemitterToAejetpackRecursivelyNode(child, file_tree, allocator);
+    }
 }
 
-fn addeffectAemitterToAddeffectAejetpack(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
+fn addEffectAemitterToAddEffectAejetpackCopyOfFinder(node: *Node, file_tree: *IniFolder) error{ExpectedValue}!void {
     for (node.children.items) |*node_child| {
         if (node_child.property) |node_child_property| {
             if (str_eql(node_child_property, "CopyOf")) {
-                if (node_child.value) |node_child_value| {
-                    var addeffect_aemitters_ = property_value_pairs.get(PropertyValuePair{
-                        .property = "AddEffect",
-                        .value = "AEmitter",
-                    });
-
-                    if (addeffect_aemitters_) |addeffect_aemitters| {
-                        for (addeffect_aemitters.items) |addeffect_aemitter| {
-                            for (addeffect_aemitter.children.items) |*addeffect_aemitter_child| {
-                                if (addeffect_aemitter_child.property) |addeffect_aemitter_child_property| {
-                                    if (str_eql(addeffect_aemitter_child_property, "PresetName")) {
-                                        if (addeffect_aemitter_child.value) |addeffect_aemitter_child_value| {
-                                            if (str_eql(addeffect_aemitter_child_value, node_child_value)) {
-                                                addeffect_aemitter.value = "AEJetpack";
-
-                                                try addeffectAemitterToAddeffectAejetpack(addeffect_aemitter, property_value_pairs);
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                if (node_child.value) |copy_of_value| {
+                    try addEffectAemitterToAddEffectAejetpackRecursivelyFolder(file_tree, file_tree, copy_of_value);
                 } else {
                     return UpdateIniFileTreeErrors.ExpectedValue;
                 }
             }
         }
+    }
+}
+
+fn addEffectAemitterToAddEffectAejetpackRecursivelyFolder(folder: *IniFolder, file_tree: *IniFolder, copy_of_value: []const u8) !void {
+    for (folder.folders.items) |*subfolder| {
+        try addEffectAemitterToAddEffectAejetpackRecursivelyFolder(subfolder, file_tree, copy_of_value);
+    }
+
+    for (folder.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try addEffectAemitterToAddEffectAejetpackRecursivelyNode(node, file_tree, copy_of_value);
+        }
+    }
+}
+
+fn addEffectAemitterToAddEffectAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, copy_of_value: []const u8) !void {
+    if (node.property) |property| {
+        if (str_eql(property, "AddEffect")) {
+            if (node.value) |value| {
+                if (str_eql(value, "AEmitter")) {
+                    for (node.children.items) |*child| {
+                        if (child.property) |child_property| {
+                            if (str_eql(child_property, "PresetName")) {
+                                if (child.value) |child_value| {
+                                    if (str_eql(child_value, copy_of_value)) {
+                                        node.value = "AEJetpack";
+
+                                        try addEffectAemitterToAddEffectAejetpackCopyOfFinder(node, file_tree);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (node.children.items) |*child| {
+        try addEffectAemitterToAddEffectAejetpackRecursivelyNode(child, file_tree, copy_of_value);
     }
 }
 
