@@ -135,6 +135,10 @@ const PropertyValuePair = struct {
     value: []const u8,
 };
 
+fn str_eql(str1: []const u8, str2: []const u8) bool {
+    return eql(u8, str1, str2);
+}
+
 const PropertyValuePairContext = struct {
     pub fn hash(self: PropertyValuePairContext, x: PropertyValuePair) u64 {
         _ = self;
@@ -151,7 +155,7 @@ const PropertyValuePairContext = struct {
 
     pub fn eql(self: PropertyValuePairContext, a: PropertyValuePair, b: PropertyValuePair) bool {
         _ = self;
-        return std.mem.eql(u8, a.property, b.property) and std.mem.eql(u8, a.value, b.value);
+        return str_eql(a.property, b.property) and str_eql(a.value, b.value);
     }
 };
 
@@ -302,7 +306,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
 
     while (try dir_iterator.next()) |entry| {
         if (entry.kind == std.fs.File.Kind.file) {
-            if (eql(u8, extension(entry.name), ".bmp")) {
+            if (str_eql(extension(entry.name), ".bmp")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
 
                 var output_name = try allocator.dupe(u8, entry.name);
@@ -335,7 +339,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 } else { // Else return the access error
                     return output_file_access;
                 }
-            } else if (eql(u8, extension(entry.name), ".wav")) {
+            } else if (str_eql(extension(entry.name), ".wav")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
 
                 // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
@@ -369,7 +373,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 } else { // Else return the access error
                     return output_file_access;
                 }
-            } else if (!eql(u8, extension(entry.name), ".ini")) {
+            } else if (!str_eql(extension(entry.name), ".ini")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
                 const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
 
@@ -442,7 +446,7 @@ fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []co
 
     while (try dir_iterator.next()) |dir_entry| {
         if (dir_entry.kind == std.fs.File.Kind.file) {
-            if (eql(u8, extension(dir_entry.name), ".lua")) {
+            if (str_eql(extension(dir_entry.name), ".lua")) {
                 const file_path = try join(allocator, &.{ folder_path, dir_entry.name });
                 var text = try readFile(file_path, allocator);
 
@@ -494,7 +498,7 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
         // std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
         if (entry.kind == std.fs.File.Kind.file) {
             const file_path = try join(allocator, &.{ folder_path, entry.name });
-            if (eql(u8, extension(entry.name), ".ini")) {
+            if (str_eql(extension(entry.name), ".ini")) {
                 diagnostics.file_path = file_path;
                 // std.debug.print("file path '{s}'\n", .{file_path});
                 const text = try readFile(file_path, allocator);
@@ -917,7 +921,7 @@ fn pathToFilePath(file_tree: *IniFolder) void {
 
 fn pathToFilePathRecursivelyNode(node: *Node) void {
     if (node.property) |property| {
-        if (eql(u8, property, "Path")) {
+        if (str_eql(property, "Path")) {
             node.property = "FilePath";
         }
     }
@@ -941,9 +945,9 @@ fn bmpExtensionToPng(file_tree: *IniFolder, allocator: Allocator) !void {
 
 fn bmpExtensionToPngRecursivelyNode(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (eql(u8, property, "FilePath")) {
+        if (str_eql(property, "FilePath")) {
             if (node.value) |path| {
-                if (endsWith(u8, path, ".bmp") and !eql(u8, path, "palette.bmp") and !eql(u8, path, "palettemat.bmp")) {
+                if (endsWith(u8, path, ".bmp") and !str_eql(path, "palette.bmp") and !str_eql(path, "palettemat.bmp")) {
                     // We have to dupe, since the u8s in path are const
                     var new_path = try allocator.dupe(u8, path);
 
@@ -976,7 +980,7 @@ fn wavExtensionToFlac(file_tree: *IniFolder, allocator: Allocator) !void {
 
 fn wavExtensionToFlacRecursivelyNode(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (eql(u8, property, "FilePath")) {
+        if (str_eql(property, "FilePath")) {
             if (node.value) |path| {
                 if (endsWith(u8, path, ".wav")) {
                     // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
@@ -1032,9 +1036,9 @@ fn applyIniValueReplacementRulesRecursivelyFolder(file_tree: *IniFolder, comptim
 
 fn applyIniValueReplacementRulesRecursivelyNode(node: *Node, comptime property: []const u8, old_value: []const u8, new_value: []const u8) void {
     if (node.property) |node_property| {
-        if (eql(u8, node_property, property)) {
+        if (str_eql(node_property, property)) {
             if (node.value) |value| {
-                if (eql(u8, value, old_value)) {
+                if (str_eql(value, old_value)) {
                     node.value = new_value;
                 }
             }
@@ -1117,7 +1121,7 @@ fn applyIniPropertyRulesRecursivelyFolder(file_tree: *IniFolder, old_property: [
 
 fn applyIniPropertyRulesRecursivelyNode(node: *Node, old_property: []const u8, new_property: []const u8) void {
     if (node.property) |node_property| {
-        if (eql(u8, node_property, old_property)) {
+        if (str_eql(node_property, old_property)) {
             node.property = new_property;
         }
     }
@@ -1152,9 +1156,9 @@ fn applyIniRulesRecursivelyFolder(file_tree: *IniFolder, rule: *Rule) void {
 
 fn applyIniRulesRecursivelyNode(node: *Node, rule: *Rule) void {
     if (node.property) |node_property| {
-        if (eql(u8, node_property, rule.old_property)) {
+        if (str_eql(node_property, rule.old_property)) {
             if (node.value) |node_value| {
-                if (eql(u8, node_value, rule.old_value)) {
+                if (str_eql(node_value, rule.old_value)) {
                     node.property = rule.new_property;
                     node.value = rule.new_value;
                 }
@@ -1192,9 +1196,9 @@ fn applyIniSoundContainerRulesRecursivelyFolder(file_tree: *IniFolder, property:
 
 fn applyIniSoundContainerRulesRecursivelyNode(node: *Node, property: []const u8) void {
     if (node.property) |node_property| {
-        if (eql(u8, node_property, property)) {
+        if (str_eql(node_property, property)) {
             if (node.value) |node_value| {
-                if (eql(u8, node_value, "Sound")) {
+                if (str_eql(node_value, "Sound")) {
                     node.value = "SoundContainer";
                 }
             }
@@ -1208,13 +1212,13 @@ fn applyIniSoundContainerRulesRecursivelyNode(node: *Node, property: []const u8)
 
 fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     try applyOnNodes(addGripStrength, file_tree, allocator);
-    // try addOrUpdateSupportedGameVersion(properties, allocator);
-    // try aemitterFuelToPemitter(property_value_pairs);
-    // try aemitterToAejetpack(property_value_pairs);
-    // try maxLengthToOffsets(property_value_pairs, allocator);
-    // try maxMassToMaxInventoryMass(properties, allocator);
-    // try maxThrottleRangeToPositiveThrottleMultiplier(properties, allocator);
-    // try minThrottleRangeToNegativeThrottleMultiplier(properties, allocator);
+    try applyOnNodes(addOrUpdateSupportedGameVersion, file_tree, allocator);
+    try applyOnNodes(aemitterFuelToPemitter, file_tree, allocator);
+    // try applyOnNodes(aemitterToAejetpack, file_tree, allocator);
+    try applyOnNodes(maxLengthToOffsets, file_tree, allocator);
+    // try applyOnNodes(maxMassToMaxInventoryMass, file_tree, allocator);
+    // try applyOnNodes(maxThrottleRangeToPositiveThrottleMultiplier, file_tree, allocator);
+    // try applyOnNodes(minThrottleRangeToNegativeThrottleMultiplier, file_tree, allocator);
 
     // try pieMenu("ACDropShip", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
     // try pieMenu("ACrab", "Default Crab Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
@@ -1227,7 +1231,7 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     // try shovelFlashFix(property_value_pairs);
 }
 
-const nodeCallbackDef = fn (node: *Node, allocator: Allocator) error{OutOfMemory}!void;
+const nodeCallbackDef = fn (node: *Node, allocator: Allocator) error{ ExpectedValue, InvalidCharacter, OutOfMemory }!void;
 
 fn applyOnNodes(comptime nodeCallbackFn: nodeCallbackDef, file_tree: *IniFolder, allocator: Allocator) !void {
     for (file_tree.folders.items) |*folder| {
@@ -1251,14 +1255,14 @@ fn applyOnNode(comptime nodeCallbackFn: nodeCallbackDef, node: *Node, allocator:
 
 fn addGripStrength(node: *Node, allocator: Allocator) !void {
     if (node.property) |node_property| {
-        if (eql(u8, node_property, "AddActor")) {
+        if (str_eql(node_property, "AddActor")) {
             if (node.value) |node_value| {
-                if (eql(u8, node_value, "Arm")) {
+                if (str_eql(node_value, "Arm")) {
                     var children = &node.children;
 
                     for (children.items) |child| {
                         if (child.property) |property| {
-                            if (eql(u8, property, "GripStrength")) {
+                            if (str_eql(property, "GripStrength")) {
                                 return;
                             }
                         }
@@ -1276,60 +1280,54 @@ fn addGripStrength(node: *Node, allocator: Allocator) !void {
     }
 }
 
-fn addOrUpdateSupportedGameVersion(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var data_modules_ = properties.get("DataModule");
+fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (str_eql(property, "DataModule")) {
+            var has_supported_game_version = false;
 
-    if (data_modules_) |data_modules| {
-        for (data_modules.items) |data_module| {
-            var mod_has_supported_game_version = false;
+            for (node.children.items) |*child| {
+                if (child.property) |child_property| {
+                    if (str_eql(child_property, "SupportedGameVersion")) {
+                        has_supported_game_version = true;
 
-            for (data_module.children.items) |*data_module_child| {
-                if (data_module_child.property) |data_module_child_property| {
-                    if (eql(u8, data_module_child_property, "SupportedGameVersion")) {
-                        mod_has_supported_game_version = true;
-
-                        if (data_module_child.value) |data_module_child_value| {
-                            if (!eql(u8, data_module_child_value, "Pre-Release 5.0")) {
-                                data_module_child.value = "Pre-Release 5.0";
+                        if (child.value) |child_value| {
+                            if (!str_eql(child_value, "Pre-Release 5.0")) {
+                                child.value = "Pre-Release 5.0";
                             }
                         }
                     }
                 }
             }
 
-            if (!mod_has_supported_game_version) {
-                try data_module.children.append(Node{
+            if (!has_supported_game_version) {
+                try node.children.append(Node{
                     .property = "SupportedGameVersion",
                     .value = "Pre-Release 5.0",
                     .comments = ArrayList([]const u8).init(allocator),
                     .children = ArrayList(Node).init(allocator),
                 });
-
-                // var supported_list = ArrayList(*Node).init(allocator);
-                // try supported_list.append(nodes.items[0]);
-                // try properties.put("SupportedGameVersion", supported_list);
             }
         }
     }
 }
 
-fn aemitterFuelToPemitter(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
-    var gibs_ = property_value_pairs.get(PropertyValuePair{
-        .property = "GibParticle",
-        .value = "AEmitter",
-    });
-
-    if (gibs_) |gibs| {
-        for (gibs.items) |gib| {
-            for (gib.children.items) |*child| {
-                if (child.property) |property| {
-                    if (eql(u8, property, "CopyOf")) {
-                        if (child.value) |value| {
-                            if (eql(u8, value, "Fuel Fire Trace Black")) {
-                                gib.value = "PEmitter";
+fn aemitterFuelToPemitter(node: *Node, allocator: Allocator) !void {
+    _ = allocator;
+    if (node.property) |property| {
+        if (str_eql(property, "GibParticle")) {
+            if (node.value) |value| {
+                if (str_eql(value, "AEmitter")) {
+                    for (node.children.items) |*child| {
+                        if (child.property) |child_property| {
+                            if (str_eql(child_property, "CopyOf")) {
+                                if (child.value) |child_value| {
+                                    if (str_eql(child_value, "Fuel Fire Trace Black")) {
+                                        node.value = "PEmitter";
+                                    }
+                                } else {
+                                    return UpdateIniFileTreeErrors.ExpectedValue;
+                                }
                             }
-                        } else {
-                            return UpdateIniFileTreeErrors.ExpectedValue;
                         }
                     }
                 }
@@ -1370,7 +1368,7 @@ fn aemitterToAejetpack(property_value_pairs: *HashMap(PropertyValuePair, ArrayLi
 fn addeffectAemitterToAddeffectAejetpack(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
     for (node.children.items) |*node_child| {
         if (node_child.property) |node_child_property| {
-            if (eql(u8, node_child_property, "CopyOf")) {
+            if (str_eql(node_child_property, "CopyOf")) {
                 if (node_child.value) |node_child_value| {
                     var addeffect_aemitters_ = property_value_pairs.get(PropertyValuePair{
                         .property = "AddEffect",
@@ -1381,9 +1379,9 @@ fn addeffectAemitterToAddeffectAejetpack(node: *Node, property_value_pairs: *Has
                         for (addeffect_aemitters.items) |addeffect_aemitter| {
                             for (addeffect_aemitter.children.items) |*addeffect_aemitter_child| {
                                 if (addeffect_aemitter_child.property) |addeffect_aemitter_child_property| {
-                                    if (eql(u8, addeffect_aemitter_child_property, "PresetName")) {
+                                    if (str_eql(addeffect_aemitter_child_property, "PresetName")) {
                                         if (addeffect_aemitter_child.value) |addeffect_aemitter_child_value| {
-                                            if (eql(u8, addeffect_aemitter_child_value, node_child_value)) {
+                                            if (str_eql(addeffect_aemitter_child_value, node_child_value)) {
                                                 addeffect_aemitter.value = "AEJetpack";
 
                                                 try addeffectAemitterToAddeffectAejetpack(addeffect_aemitter, property_value_pairs);
@@ -1402,56 +1400,55 @@ fn addeffectAemitterToAddeffectAejetpack(node: *Node, property_value_pairs: *Has
     }
 }
 
-fn maxLengthToOffsets(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    var legs_ = property_value_pairs.get(PropertyValuePair{
-        .property = "AddActor",
-        .value = "Leg",
-    });
+fn maxLengthToOffsets(node: *Node, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (str_eql(property, "AddActor")) {
+            if (node.value) |value| {
+                if (str_eql(value, "Leg")) {
+                    var children = &node.children;
 
-    if (legs_) |legs| {
-        for (legs.items) |leg| {
-            var children = &leg.children;
+                    for (children.items) |*child| {
+                        if (child.property) |child_property| {
+                            if (str_eql(child_property, "MaxLength")) {
+                                if (child.value) |child_value| {
+                                    child.property = "ContractedOffset";
+                                    child.value = "Vector";
+                                    try child.children.append(Node{
+                                        .property = "X",
+                                        .value = try allocPrint(allocator, "{d}", .{try parseFloat(f32, child_value) / 2}),
+                                        .comments = ArrayList([]const u8).init(allocator),
+                                        .children = ArrayList(Node).init(allocator),
+                                    });
+                                    try child.children.append(Node{
+                                        .property = "Y",
+                                        .value = "0",
+                                        .comments = ArrayList([]const u8).init(allocator),
+                                        .children = ArrayList(Node).init(allocator),
+                                    });
 
-            for (children.items) |*child| {
-                if (child.property) |property| {
-                    if (eql(u8, property, "MaxLength")) {
-                        if (child.value) |value| {
-                            child.property = "ContractedOffset";
-                            child.value = "Vector";
-                            try child.children.append(Node{
-                                .property = "X",
-                                .value = try allocPrint(allocator, "{d}", .{try parseFloat(f32, value) / 2}),
-                                .comments = ArrayList([]const u8).init(allocator),
-                                .children = ArrayList(Node).init(allocator),
-                            });
-                            try child.children.append(Node{
-                                .property = "Y",
-                                .value = "0",
-                                .comments = ArrayList([]const u8).init(allocator),
-                                .children = ArrayList(Node).init(allocator),
-                            });
-
-                            var extended_offset = Node{
-                                .property = "ExtendedOffset",
-                                .value = "Vector",
-                                .comments = ArrayList([]const u8).init(allocator),
-                                .children = ArrayList(Node).init(allocator),
-                            };
-                            try extended_offset.children.append(Node{
-                                .property = "X",
-                                .value = value,
-                                .comments = ArrayList([]const u8).init(allocator),
-                                .children = ArrayList(Node).init(allocator),
-                            });
-                            try extended_offset.children.append(Node{
-                                .property = "Y",
-                                .value = "0",
-                                .comments = ArrayList([]const u8).init(allocator),
-                                .children = ArrayList(Node).init(allocator),
-                            });
-                            try children.append(extended_offset);
-                        } else {
-                            return UpdateIniFileTreeErrors.ExpectedValue;
+                                    var extended_offset = Node{
+                                        .property = "ExtendedOffset",
+                                        .value = "Vector",
+                                        .comments = ArrayList([]const u8).init(allocator),
+                                        .children = ArrayList(Node).init(allocator),
+                                    };
+                                    try extended_offset.children.append(Node{
+                                        .property = "X",
+                                        .value = child_value,
+                                        .comments = ArrayList([]const u8).init(allocator),
+                                        .children = ArrayList(Node).init(allocator),
+                                    });
+                                    try extended_offset.children.append(Node{
+                                        .property = "Y",
+                                        .value = "0",
+                                        .comments = ArrayList([]const u8).init(allocator),
+                                        .children = ArrayList(Node).init(allocator),
+                                    });
+                                    try children.append(extended_offset);
+                                } else {
+                                    return UpdateIniFileTreeErrors.ExpectedValue;
+                                }
+                            }
                         }
                     }
                 }
@@ -1467,13 +1464,13 @@ fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), alloc
         for (actors.items) |actor| {
             for (actor.children.items) |*child| {
                 if (child.property) |child_property| {
-                    if (eql(u8, child_property, "MaxMass")) {
+                    if (str_eql(child_property, "MaxMass")) {
                         if (child.value) |v| {
                             const max_mass = try parseFloat(f32, v);
 
                             for (actor.children.items) |child2| {
                                 if (child2.property) |child_property2| {
-                                    if (eql(u8, child_property2, "Mass")) {
+                                    if (str_eql(child_property2, "Mass")) {
                                         if (child2.value) |v2| {
                                             child.property = "MaxInventoryMass";
 
@@ -1543,9 +1540,9 @@ fn pieMenu(actor_name: []const u8, default_copy_of_name: []const u8, starting_di
             var contains_pie_slice = false;
             for (children.items) |*child| {
                 if (child.property) |property| {
-                    if (eql(u8, property, "AddPieSlice")) {
+                    if (str_eql(property, "AddPieSlice")) {
                         if (child.value) |value| {
-                            if (eql(u8, value, "PieSlice")) {
+                            if (str_eql(value, "PieSlice")) {
                                 contains_pie_slice = true;
                             }
                         } else {
@@ -1572,9 +1569,9 @@ fn pieMenu(actor_name: []const u8, default_copy_of_name: []const u8, starting_di
 
                 for (children.items) |*child| {
                     if (child.property) |property| {
-                        if (eql(u8, property, "AddPieSlice")) {
+                        if (str_eql(property, "AddPieSlice")) {
                             if (child.value) |value| {
-                                if (eql(u8, value, "PieSlice")) {
+                                if (str_eql(value, "PieSlice")) {
                                     // Make a copy of the PieSlice in the PieMenu
                                     try pie_menu.children.append(Node{
                                         .property = "AddPieSlice",
@@ -1615,14 +1612,14 @@ fn applyPieQuadrantSlotLimit(pie_menu: *Node, direction: []const u8, starting_di
 
     for (pie_menu.children.items) |menu_child| {
         if (menu_child.property) |meny_child_property| {
-            if (eql(u8, meny_child_property, "AddPieSlice")) {
+            if (str_eql(meny_child_property, "AddPieSlice")) {
                 if (menu_child.value) |value| {
-                    if (eql(u8, value, "PieSlice")) {
+                    if (str_eql(value, "PieSlice")) {
                         for (menu_child.children.items) |*slice_child| {
                             if (slice_child.property) |slice_child_property| {
-                                if (eql(u8, slice_child_property, "Direction")) {
+                                if (str_eql(slice_child_property, "Direction")) {
                                     if (slice_child.value) |slice_child_value| {
-                                        if (eql(u8, slice_child_value, direction)) {
+                                        if (str_eql(slice_child_value, direction)) {
                                             if (direction_count == PieQuadrantSlotCount) {
                                                 slice_child.value = "Any";
                                             } else {
@@ -1655,9 +1652,9 @@ fn removeSlTerrainProperties(property_value_pairs: *HashMap(PropertyValuePair, A
         for (terrains.items) |terrain| {
             for (terrain.children.items) |*terrain_child| {
                 if (terrain_child.property) |terrain_child_property| {
-                    if (eql(u8, terrain_child_property, "Offset")) {
+                    if (str_eql(terrain_child_property, "Offset")) {
                         if (terrain_child.value) |terrain_child_value| {
-                            if (eql(u8, terrain_child_value, "Vector")) {
+                            if (str_eql(terrain_child_value, "Vector")) {
                                 terrain_child.property = null;
                                 terrain_child.value = null;
                                 terrain_child.comments = ArrayList([]const u8).init(allocator);
@@ -1675,7 +1672,7 @@ fn removeSlTerrainProperties(property_value_pairs: *HashMap(PropertyValuePair, A
         for (terrains.items) |terrain| {
             for (terrain.children.items) |*terrain_child| {
                 if (terrain_child.property) |terrain_child_property| {
-                    if (eql(u8, terrain_child_property, "DrawTransparent")) {
+                    if (str_eql(terrain_child_property, "DrawTransparent")) {
                         terrain_child.property = null;
                         terrain_child.value = null;
                         terrain_child.comments = ArrayList([]const u8).init(allocator);
@@ -1689,9 +1686,9 @@ fn removeSlTerrainProperties(property_value_pairs: *HashMap(PropertyValuePair, A
         for (terrains.items) |terrain| {
             for (terrain.children.items) |*terrain_child| {
                 if (terrain_child.property) |terrain_child_property| {
-                    if (eql(u8, terrain_child_property, "ScrollRatio")) {
+                    if (str_eql(terrain_child_property, "ScrollRatio")) {
                         if (terrain_child.value) |terrain_child_value| {
-                            if (eql(u8, terrain_child_value, "Vector")) {
+                            if (str_eql(terrain_child_value, "Vector")) {
                                 terrain_child.property = null;
                                 terrain_child.value = null;
                                 terrain_child.comments = ArrayList([]const u8).init(allocator);
@@ -1719,14 +1716,14 @@ fn shovelFlashFix(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*N
 
             for (firearm.children.items) |firearm_child| {
                 if (firearm_child.property) |firearm_child_property| {
-                    if (eql(u8, firearm_child_property, "SpriteFile")) {
+                    if (str_eql(firearm_child_property, "SpriteFile")) {
                         if (firearm_child.value) |firearm_child_value| {
-                            if (eql(u8, firearm_child_value, "ContentFile")) {
+                            if (str_eql(firearm_child_value, "ContentFile")) {
                                 for (firearm_child.children.items) |*content_file_child| {
                                     if (content_file_child.property) |content_file_child_property| {
-                                        if (eql(u8, content_file_child_property, "FilePath")) {
+                                        if (str_eql(content_file_child_property, "FilePath")) {
                                             if (content_file_child.value) |content_file_child_value| {
-                                                if (eql(u8, content_file_child_value, "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png")) {
+                                                if (str_eql(content_file_child_value, "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png")) {
                                                     content_file_child.value = "Ronin.rte/Devices/Tools/Shovel/Effects/ShovelFlash.png";
 
                                                     changed_shovel_sprite = true;
@@ -1748,9 +1745,9 @@ fn shovelFlashFix(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*N
             if (changed_shovel_sprite) {
                 for (firearm.children.items) |*firearm_child| {
                     if (firearm_child.property) |firearm_child_property| {
-                        if (eql(u8, firearm_child_property, "FrameCount")) {
+                        if (str_eql(firearm_child_property, "FrameCount")) {
                             if (firearm_child.value) |firearm_child_value| {
-                                if (eql(u8, firearm_child_value, "2")) {
+                                if (str_eql(firearm_child_value, "2")) {
                                     firearm_child.value = "1";
                                 }
                             } else {
@@ -1881,9 +1878,9 @@ test "general" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'general/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and str_eql(entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
@@ -1945,7 +1942,7 @@ test "lua_rules" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.lua")) {
+        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.lua")) {
             std.debug.print("\nSubtest 'lua_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
 
             const input_path = try join(allocator, &.{ dir_path, "in.lua" });
@@ -2005,9 +2002,9 @@ test "ini_rules" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'ini_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and str_eql(entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
@@ -2109,9 +2106,9 @@ test "updated" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'updated/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and str_eql(entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
@@ -2207,9 +2204,9 @@ test "invalid" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and eql(u8, entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'invalid/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and eql(u8, entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and str_eql(entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const error_path = try join(allocator, &.{ dir_path, "error.txt" });
@@ -2287,7 +2284,7 @@ fn zip_mod_recursively(zip: *ziplib.zip_t, full_path: []const u8, sub_path: []co
 
         if (entry.kind == std.fs.File.Kind.file) {
             // TODO: Not sure whether these files are ever actually returned by Zig's dir iterator
-            if (eql(u8, entry.name, ".") or eql(u8, entry.name, ".."))
+            if (str_eql(entry.name, ".") or str_eql(entry.name, ".."))
                 continue;
 
             if (ziplib.zip_entry_open(zip, child_sub_path) < 0) return error.ZipEntryOpen;
