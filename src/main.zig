@@ -238,10 +238,10 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     // "Base.rte/foo.png": "Base.rte/bar.png"
     // The game reports that Base.rte/foo.png *still* doesn't exist,
     // due to the parsed input mod containing "Base.rte/foo.bmp"!
-    // std.debug.print("Bmp extension to png...\n", .{});
+    std.debug.print("Bmp extension to png...\n", .{});
     try bmpExtensionToPng(&file_tree, allocator);
 
-    // std.debug.print("Wav extension to flac...\n", .{});
+    std.debug.print("Wav extension to flac...\n", .{});
     try wavExtensionToFlac(&file_tree, allocator);
 
     const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
@@ -1207,9 +1207,7 @@ fn applyIniSoundContainerRulesRecursivelyNode(node: *Node, property: []const u8)
 }
 
 fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
-    _ = allocator;
-    _ = file_tree;
-    // try addGripStrength(property_value_pairs, allocator);
+    try applyOnNodes(addGripStrength, file_tree, allocator);
     // try addOrUpdateSupportedGameVersion(properties, allocator);
     // try aemitterFuelToPemitter(property_value_pairs);
     // try aemitterToAejetpack(property_value_pairs);
@@ -1229,30 +1227,51 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     // try shovelFlashFix(property_value_pairs);
 }
 
-fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    var arms_ = property_value_pairs.get(PropertyValuePair{
-        .property = "AddActor",
-        .value = "Arm",
-    });
+const nodeCallbackDef = fn (node: *Node, allocator: Allocator) error{OutOfMemory}!void;
 
-    if (arms_) |arms| {
-        outer: for (arms.items) |arm| {
-            var children = &arm.children;
+fn applyOnNodes(comptime nodeCallbackFn: nodeCallbackDef, file_tree: *IniFolder, allocator: Allocator) !void {
+    for (file_tree.folders.items) |*folder| {
+        try applyOnNodes(nodeCallbackFn, folder, allocator);
+    }
 
-            for (children.items) |child| {
-                if (child.property) |property| {
-                    if (eql(u8, property, "GripStrength")) {
-                        continue :outer;
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try applyOnNode(nodeCallbackFn, node, allocator);
+        }
+    }
+}
+
+fn applyOnNode(comptime nodeCallbackFn: nodeCallbackDef, node: *Node, allocator: Allocator) !void {
+    try nodeCallbackFn(node, allocator);
+
+    for (node.children.items) |*child| {
+        try applyOnNode(nodeCallbackFn, child, allocator);
+    }
+}
+
+fn addGripStrength(node: *Node, allocator: Allocator) !void {
+    if (node.property) |node_property| {
+        if (eql(u8, node_property, "AddActor")) {
+            if (node.value) |node_value| {
+                if (eql(u8, node_value, "Arm")) {
+                    var children = &node.children;
+
+                    for (children.items) |child| {
+                        if (child.property) |property| {
+                            if (eql(u8, property, "GripStrength")) {
+                                return;
+                            }
+                        }
                     }
+
+                    try children.append(Node{
+                        .property = "GripStrength",
+                        .value = "424242",
+                        .comments = ArrayList([]const u8).init(allocator),
+                        .children = ArrayList(Node).init(allocator),
+                    });
                 }
             }
-
-            try children.append(Node{
-                .property = "GripStrength",
-                .value = "424242",
-                .comments = ArrayList([]const u8).init(allocator),
-                .children = ArrayList(Node).init(allocator),
-            });
         }
     }
 }
