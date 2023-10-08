@@ -1216,19 +1216,19 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     try applyOnNodes(aemitterFuelToPemitter, file_tree, allocator);
     // try applyOnNodes(aemitterToAejetpack, file_tree, allocator);
     try applyOnNodes(maxLengthToOffsets, file_tree, allocator);
-    // try applyOnNodes(maxMassToMaxInventoryMass, file_tree, allocator);
-    // try applyOnNodes(maxThrottleRangeToPositiveThrottleMultiplier, file_tree, allocator);
-    // try applyOnNodes(minThrottleRangeToNegativeThrottleMultiplier, file_tree, allocator);
+    try applyOnNodes(maxMassToMaxInventoryMass, file_tree, allocator);
+    try applyOnNodes(maxThrottleRangeToPositiveThrottleMultiplier, file_tree, allocator);
+    try applyOnNodes(minThrottleRangeToNegativeThrottleMultiplier, file_tree, allocator);
 
-    // try pieMenu("ACDropShip", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
-    // try pieMenu("ACrab", "Default Crab Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
-    // try pieMenu("ACRocket", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
-    // try pieMenu("Actor", "Default Actor Pie Menu", 1, 0, 0, 0, property_value_pairs, allocator);
-    // try pieMenu("AHuman", "Default Human Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
-    // try pieMenu("Turret", "Default Turret Pie Menu", 2, 0, 0, 1, property_value_pairs, allocator);
+    try pieMenu("ACDropShip", "Default Craft Pie Menu", 2, 1, 1, 1, file_tree, allocator);
+    try pieMenu("ACrab", "Default Crab Pie Menu", 2, 2, 2, 2, file_tree, allocator);
+    try pieMenu("ACRocket", "Default Craft Pie Menu", 2, 1, 1, 1, file_tree, allocator);
+    try pieMenu("Actor", "Default Actor Pie Menu", 1, 0, 0, 0, file_tree, allocator);
+    try pieMenu("AHuman", "Default Human Pie Menu", 2, 2, 2, 2, file_tree, allocator);
+    try pieMenu("Turret", "Default Turret Pie Menu", 2, 0, 0, 1, file_tree, allocator);
 
-    // try removeSlTerrainProperties(property_value_pairs, allocator);
-    // try shovelFlashFix(property_value_pairs);
+    try applyOnNodes(removeSlTerrainProperties, file_tree, allocator);
+    try applyOnNodes(shovelFlashFix, file_tree, allocator);
 }
 
 const nodeCallbackDef = fn (node: *Node, allocator: Allocator) error{ ExpectedValue, InvalidCharacter, OutOfMemory }!void;
@@ -1457,18 +1457,16 @@ fn maxLengthToOffsets(node: *Node, allocator: Allocator) !void {
     }
 }
 
-fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var actors_ = properties.get("AddActor");
-
-    if (actors_) |actors| {
-        for (actors.items) |actor| {
-            for (actor.children.items) |*child| {
+fn maxMassToMaxInventoryMass(node: *Node, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (str_eql(property, "AddActor")) {
+            for (node.children.items) |*child| {
                 if (child.property) |child_property| {
                     if (str_eql(child_property, "MaxMass")) {
                         if (child.value) |v| {
                             const max_mass = try parseFloat(f32, v);
 
-                            for (actor.children.items) |child2| {
+                            for (node.children.items) |child2| {
                                 if (child2.property) |child_property2| {
                                     if (str_eql(child_property2, "Mass")) {
                                         if (child2.value) |v2| {
@@ -1493,11 +1491,9 @@ fn maxMassToMaxInventoryMass(properties: *StringHashMap(ArrayList(*Node)), alloc
     }
 }
 
-fn maxThrottleRangeToPositiveThrottleMultiplier(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var max_throttle_ranges_ = properties.get("MaxThrottleRange");
-
-    if (max_throttle_ranges_) |max_throttle_ranges| {
-        for (max_throttle_ranges.items) |node| {
+fn maxThrottleRangeToPositiveThrottleMultiplier(node: *Node, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (str_eql(property, "MaxThrottleRange")) {
             node.property = "PositiveThrottleMultiplier";
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
@@ -1510,11 +1506,9 @@ fn maxThrottleRangeToPositiveThrottleMultiplier(properties: *StringHashMap(Array
     }
 }
 
-fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var min_throttle_ranges_ = properties.get("MinThrottleRange");
-
-    if (min_throttle_ranges_) |min_throttle_ranges| {
-        for (min_throttle_ranges.items) |node| {
+fn minThrottleRangeToNegativeThrottleMultiplier(node: *Node, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (str_eql(property, "MinThrottleRange")) {
             node.property = "NegativeThrottleMultiplier";
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
@@ -1527,80 +1521,95 @@ fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(Array
     }
 }
 
-fn pieMenu(actor_name: []const u8, default_copy_of_name: []const u8, starting_direction_count_up: u32, starting_direction_count_down: u32, starting_direction_count_left: u32, starting_direction_count_right: u32, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    var crabs_ = property_value_pairs.get(PropertyValuePair{
-        .property = "AddActor",
-        .value = actor_name,
-    });
+fn pieMenu(actor_name: []const u8, default_copy_of_name: []const u8, starting_direction_count_up: u32, starting_direction_count_down: u32, starting_direction_count_left: u32, starting_direction_count_right: u32, file_tree: *IniFolder, allocator: Allocator) !void {
+    for (file_tree.folders.items) |*folder| {
+        try pieMenu(actor_name, default_copy_of_name, starting_direction_count_up, starting_direction_count_down, starting_direction_count_left, starting_direction_count_right, folder, allocator);
+    }
 
-    if (crabs_) |crabs| {
-        for (crabs.items) |crab| {
-            var children = &crab.children;
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try pieMenuRecursivelyNode(node, actor_name, default_copy_of_name, starting_direction_count_up, starting_direction_count_down, starting_direction_count_left, starting_direction_count_right, allocator);
+        }
+    }
+}
 
-            var contains_pie_slice = false;
-            for (children.items) |*child| {
-                if (child.property) |property| {
-                    if (str_eql(property, "AddPieSlice")) {
-                        if (child.value) |value| {
-                            if (str_eql(value, "PieSlice")) {
-                                contains_pie_slice = true;
-                            }
-                        } else {
-                            return UpdateIniFileTreeErrors.ExpectedValue;
-                        }
-                    }
-                }
-            }
+fn pieMenuRecursivelyNode(node: *Node, actor_name: []const u8, default_copy_of_name: []const u8, starting_direction_count_up: u32, starting_direction_count_down: u32, starting_direction_count_left: u32, starting_direction_count_right: u32, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (str_eql(property, "AddActor")) {
+            if (node.value) |value| {
+                if (str_eql(value, actor_name)) {
+                    var children = &node.children;
 
-            if (contains_pie_slice) {
-                var pie_menu = Node{
-                    .property = "PieMenu",
-                    .value = "PieMenu",
-                    .comments = ArrayList([]const u8).init(allocator),
-                    .children = ArrayList(Node).init(allocator),
-                };
-
-                try pie_menu.children.append(Node{
-                    .property = "CopyOf",
-                    .value = default_copy_of_name,
-                    .comments = ArrayList([]const u8).init(allocator),
-                    .children = ArrayList(Node).init(allocator),
-                });
-
-                for (children.items) |*child| {
-                    if (child.property) |property| {
-                        if (str_eql(property, "AddPieSlice")) {
-                            if (child.value) |value| {
-                                if (str_eql(value, "PieSlice")) {
-                                    // Make a copy of the PieSlice in the PieMenu
-                                    try pie_menu.children.append(Node{
-                                        .property = "AddPieSlice",
-                                        .value = "PieSlice",
-                                        .comments = child.comments,
-                                        .children = child.children,
-                                    });
-
-                                    // Remove the PieSlice from the root of the crab
-                                    child.property = null;
-                                    child.value = null;
-                                    child.comments = ArrayList([]const u8).init(allocator);
-                                    child.children = ArrayList(Node).init(allocator);
+                    var contains_pie_slice = false;
+                    for (children.items) |*child| {
+                        if (child.property) |child_property| {
+                            if (str_eql(child_property, "AddPieSlice")) {
+                                if (child.value) |child_value| {
+                                    if (str_eql(child_value, "PieSlice")) {
+                                        contains_pie_slice = true;
+                                    }
+                                } else {
+                                    return UpdateIniFileTreeErrors.ExpectedValue;
                                 }
-                            } else {
-                                return UpdateIniFileTreeErrors.ExpectedValue;
                             }
                         }
                     }
+
+                    if (contains_pie_slice) {
+                        var pie_menu = Node{
+                            .property = "PieMenu",
+                            .value = "PieMenu",
+                            .comments = ArrayList([]const u8).init(allocator),
+                            .children = ArrayList(Node).init(allocator),
+                        };
+
+                        try pie_menu.children.append(Node{
+                            .property = "CopyOf",
+                            .value = default_copy_of_name,
+                            .comments = ArrayList([]const u8).init(allocator),
+                            .children = ArrayList(Node).init(allocator),
+                        });
+
+                        for (children.items) |*child| {
+                            if (child.property) |child_property| {
+                                if (str_eql(child_property, "AddPieSlice")) {
+                                    if (child.value) |child_value| {
+                                        if (str_eql(child_value, "PieSlice")) {
+                                            // Make a copy of the PieSlice in the PieMenu
+                                            try pie_menu.children.append(Node{
+                                                .property = "AddPieSlice",
+                                                .value = "PieSlice",
+                                                .comments = child.comments,
+                                                .children = child.children,
+                                            });
+
+                                            // Remove the PieSlice from the root of the Actor
+                                            child.property = null;
+                                            child.value = null;
+                                            child.comments = ArrayList([]const u8).init(allocator);
+                                            child.children = ArrayList(Node).init(allocator);
+                                        }
+                                    } else {
+                                        return UpdateIniFileTreeErrors.ExpectedValue;
+                                    }
+                                }
+                            }
+                        }
+
+                        try applyPieQuadrantSlotLimit(&pie_menu, "Up", starting_direction_count_up);
+                        try applyPieQuadrantSlotLimit(&pie_menu, "Down", starting_direction_count_down);
+                        try applyPieQuadrantSlotLimit(&pie_menu, "Left", starting_direction_count_left);
+                        try applyPieQuadrantSlotLimit(&pie_menu, "Right", starting_direction_count_right);
+
+                        try children.append(pie_menu);
+                    }
                 }
-
-                try applyPieQuadrantSlotLimit(&pie_menu, "Up", starting_direction_count_up);
-                try applyPieQuadrantSlotLimit(&pie_menu, "Down", starting_direction_count_down);
-                try applyPieQuadrantSlotLimit(&pie_menu, "Left", starting_direction_count_left);
-                try applyPieQuadrantSlotLimit(&pie_menu, "Right", starting_direction_count_right);
-
-                try children.append(pie_menu);
             }
         }
+    }
+
+    for (node.children.items) |*child| {
+        try pieMenuRecursivelyNode(child, actor_name, default_copy_of_name, starting_direction_count_up, starting_direction_count_down, starting_direction_count_left, starting_direction_count_right, allocator);
     }
 }
 
@@ -1641,61 +1650,48 @@ fn applyPieQuadrantSlotLimit(pie_menu: *Node, direction: []const u8, starting_di
     }
 }
 
-fn removeSlTerrainProperties(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    var terrains_ = property_value_pairs.get(PropertyValuePair{
-        .property = "Terrain",
-        .value = "SLTerrain",
-    });
-
-    if (terrains_) |terrains| {
-        // Remove Offset from the Terrain
-        for (terrains.items) |terrain| {
-            for (terrain.children.items) |*terrain_child| {
-                if (terrain_child.property) |terrain_child_property| {
-                    if (str_eql(terrain_child_property, "Offset")) {
-                        if (terrain_child.value) |terrain_child_value| {
-                            if (str_eql(terrain_child_value, "Vector")) {
-                                terrain_child.property = null;
-                                terrain_child.value = null;
-                                terrain_child.comments = ArrayList([]const u8).init(allocator);
-                                terrain_child.children = ArrayList(Node).init(allocator);
+fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (str_eql(property, "Terrain")) {
+            if (node.value) |value| {
+                if (str_eql(value, "SLTerrain")) {
+                    for (node.children.items) |*child| {
+                        if (child.property) |child_property| {
+                            // Remove Offset from the Terrain
+                            if (str_eql(child_property, "Offset")) {
+                                if (child.value) |child_value| {
+                                    if (str_eql(child_value, "Vector")) {
+                                        child.property = null;
+                                        child.value = null;
+                                        child.comments = ArrayList([]const u8).init(allocator);
+                                        child.children = ArrayList(Node).init(allocator);
+                                    }
+                                } else {
+                                    return UpdateIniFileTreeErrors.ExpectedValue;
+                                }
                             }
-                        } else {
-                            return UpdateIniFileTreeErrors.ExpectedValue;
-                        }
-                    }
-                }
-            }
-        }
 
-        // Remove DrawTransparent from the Terrain
-        for (terrains.items) |terrain| {
-            for (terrain.children.items) |*terrain_child| {
-                if (terrain_child.property) |terrain_child_property| {
-                    if (str_eql(terrain_child_property, "DrawTransparent")) {
-                        terrain_child.property = null;
-                        terrain_child.value = null;
-                        terrain_child.comments = ArrayList([]const u8).init(allocator);
-                        terrain_child.children = ArrayList(Node).init(allocator);
-                    }
-                }
-            }
-        }
-
-        // Remove ScrollRatio from the Terrain
-        for (terrains.items) |terrain| {
-            for (terrain.children.items) |*terrain_child| {
-                if (terrain_child.property) |terrain_child_property| {
-                    if (str_eql(terrain_child_property, "ScrollRatio")) {
-                        if (terrain_child.value) |terrain_child_value| {
-                            if (str_eql(terrain_child_value, "Vector")) {
-                                terrain_child.property = null;
-                                terrain_child.value = null;
-                                terrain_child.comments = ArrayList([]const u8).init(allocator);
-                                terrain_child.children = ArrayList(Node).init(allocator);
+                            // Remove DrawTransparent from the Terrain
+                            if (str_eql(child_property, "DrawTransparent")) {
+                                child.property = null;
+                                child.value = null;
+                                child.comments = ArrayList([]const u8).init(allocator);
+                                child.children = ArrayList(Node).init(allocator);
                             }
-                        } else {
-                            return UpdateIniFileTreeErrors.ExpectedValue;
+
+                            // Remove ScrollRatio from the Terrain
+                            if (str_eql(child_property, "ScrollRatio")) {
+                                if (child.value) |child_value| {
+                                    if (str_eql(child_value, "Vector")) {
+                                        child.property = null;
+                                        child.value = null;
+                                        child.comments = ArrayList([]const u8).init(allocator);
+                                        child.children = ArrayList(Node).init(allocator);
+                                    }
+                                } else {
+                                    return UpdateIniFileTreeErrors.ExpectedValue;
+                                }
+                            }
                         }
                     }
                 }
@@ -1704,54 +1700,54 @@ fn removeSlTerrainProperties(property_value_pairs: *HashMap(PropertyValuePair, A
     }
 }
 
-fn shovelFlashFix(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
-    var firearms_ = property_value_pairs.get(PropertyValuePair{
-        .property = "AddDevice",
-        .value = "HDFirearm",
-    });
+fn shovelFlashFix(node: *Node, allocator: Allocator) !void {
+    _ = allocator;
+    if (node.property) |property| {
+        if (str_eql(property, "AddDevice")) {
+            if (node.value) |value| {
+                if (str_eql(value, "HDFirearm")) {
+                    var changed_shovel_sprite = false;
 
-    if (firearms_) |firearms| {
-        for (firearms.items) |firearm| {
-            var changed_shovel_sprite = false;
+                    for (node.children.items) |firearm_child| {
+                        if (firearm_child.property) |firearm_child_property| {
+                            if (str_eql(firearm_child_property, "SpriteFile")) {
+                                if (firearm_child.value) |firearm_child_value| {
+                                    if (str_eql(firearm_child_value, "ContentFile")) {
+                                        for (firearm_child.children.items) |*content_file_child| {
+                                            if (content_file_child.property) |content_file_child_property| {
+                                                if (str_eql(content_file_child_property, "FilePath")) {
+                                                    if (content_file_child.value) |content_file_child_value| {
+                                                        if (str_eql(content_file_child_value, "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png")) {
+                                                            content_file_child.value = "Ronin.rte/Devices/Tools/Shovel/Effects/ShovelFlash.png";
 
-            for (firearm.children.items) |firearm_child| {
-                if (firearm_child.property) |firearm_child_property| {
-                    if (str_eql(firearm_child_property, "SpriteFile")) {
-                        if (firearm_child.value) |firearm_child_value| {
-                            if (str_eql(firearm_child_value, "ContentFile")) {
-                                for (firearm_child.children.items) |*content_file_child| {
-                                    if (content_file_child.property) |content_file_child_property| {
-                                        if (str_eql(content_file_child_property, "FilePath")) {
-                                            if (content_file_child.value) |content_file_child_value| {
-                                                if (str_eql(content_file_child_value, "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png")) {
-                                                    content_file_child.value = "Ronin.rte/Devices/Tools/Shovel/Effects/ShovelFlash.png";
-
-                                                    changed_shovel_sprite = true;
+                                                            changed_shovel_sprite = true;
+                                                        }
+                                                    } else {
+                                                        return UpdateIniFileTreeErrors.ExpectedValue;
+                                                    }
                                                 }
-                                            } else {
-                                                return UpdateIniFileTreeErrors.ExpectedValue;
                                             }
                                         }
                                     }
+                                } else {
+                                    return UpdateIniFileTreeErrors.ExpectedValue;
                                 }
                             }
-                        } else {
-                            return UpdateIniFileTreeErrors.ExpectedValue;
                         }
                     }
-                }
-            }
 
-            if (changed_shovel_sprite) {
-                for (firearm.children.items) |*firearm_child| {
-                    if (firearm_child.property) |firearm_child_property| {
-                        if (str_eql(firearm_child_property, "FrameCount")) {
-                            if (firearm_child.value) |firearm_child_value| {
-                                if (str_eql(firearm_child_value, "2")) {
-                                    firearm_child.value = "1";
+                    if (changed_shovel_sprite) {
+                        for (node.children.items) |*firearm_child| {
+                            if (firearm_child.property) |firearm_child_property| {
+                                if (str_eql(firearm_child_property, "FrameCount")) {
+                                    if (firearm_child.value) |firearm_child_value| {
+                                        if (str_eql(firearm_child_value, "2")) {
+                                            firearm_child.value = "1";
+                                        }
+                                    } else {
+                                        return UpdateIniFileTreeErrors.ExpectedValue;
+                                    }
                                 }
-                            } else {
-                                return UpdateIniFileTreeErrors.ExpectedValue;
                             }
                         }
                     }
