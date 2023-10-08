@@ -229,13 +229,7 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     std.debug.print("Getting INI file tree...\n", .{});
     var file_tree = try getIniFileTree(input_folder_path, allocator, diagnostics);
 
-    // Create a hashmap, where the key is a property,
-    // and the value is a list of Nodes that have this key
-    var properties = StringHashMap(ArrayList(*Node)).init(allocator);
-    std.debug.print("Adding properties...\n", .{});
-    try addProperties(&file_tree, &properties, allocator);
-
-    try pathToFilePath(&properties, allocator);
+    pathToFilePath(&file_tree);
 
     // It also HAS to be called before applyIniFilePathRules(),
     // because otherwise this could happen:
@@ -244,44 +238,38 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     // "Base.rte/foo.png": "Base.rte/bar.png"
     // The game reports that Base.rte/foo.png *still* doesn't exist,
     // due to the parsed input mod containing "Base.rte/foo.bmp"!
-    std.debug.print("Bmp extension to png...\n", .{});
-    try bmpExtensionToPng(&properties, allocator);
+    // std.debug.print("Bmp extension to png...\n", .{});
+    try bmpExtensionToPng(&file_tree, allocator);
 
-    std.debug.print("Wav extension to flac...\n", .{});
-    try wavExtensionToFlac(&properties, allocator);
-
-    // Create a hashmap, where the key is a PropertyValuePair,
-    // and the value is a list of Nodes that have this key
-    var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
-    std.debug.print("Adding property-value pairs...\n", .{});
-    try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
+    // std.debug.print("Wav extension to flac...\n", .{});
+    try wavExtensionToFlac(&file_tree, allocator);
 
     const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
     std.debug.print("Applying INI CopyOf rules...\n", .{});
-    try applyIniCopyOfRules(ini_copy_of_rules, &property_value_pairs);
+    applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
 
     const ini_file_path_rules = try parseIniFilePathRules(allocator);
     std.debug.print("Applying INI FilePath rules...\n", .{});
-    try applyIniFilePathRules(ini_file_path_rules, &property_value_pairs);
+    applyIniFilePathRules(ini_file_path_rules, &file_tree);
 
     const ini_script_path_rules = try parseIniScriptPathRules(allocator);
     std.debug.print("Applying INI ScriptPath rules...\n", .{});
-    try applyIniScriptPathRules(ini_script_path_rules, &property_value_pairs);
+    applyIniScriptPathRules(ini_script_path_rules, &file_tree);
 
     const ini_property_rules = try parseIniPropertyRules(allocator);
     std.debug.print("Applying INI property rules...\n", .{});
-    try applyIniPropertyRules(ini_property_rules, &properties);
+    applyIniPropertyRules(ini_property_rules, &file_tree);
 
     const ini_rules = try parseIniRules(allocator);
     std.debug.print("Applying INI rules...\n", .{});
-    applyIniRules(ini_rules, &property_value_pairs);
+    applyIniRules(ini_rules, &file_tree);
 
     const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
     std.debug.print("Applying INI SoundContainer rules...\n", .{});
-    applyIniSoundContainerRules(ini_sound_container_rules, &property_value_pairs);
+    applyIniSoundContainerRules(ini_sound_container_rules, &file_tree);
 
     std.debug.print("Updating INI file tree...\n", .{});
-    try updateIniFileTree(&properties, &property_value_pairs, allocator);
+    try updateIniFileTree(&file_tree, allocator);
 
     std.debug.print("Writing INI file tree...\n", .{});
     try writeIniFileTree(&file_tree, output_folder_path, allocator);
@@ -915,62 +903,49 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
-fn addProperties(file_tree: *IniFolder, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    for (file_tree.files.items) |file| {
-        for (file.ast.items) |*node| {
-            try addFileProperties(node, properties, allocator);
-        }
+fn pathToFilePath(file_tree: *IniFolder) void {
+    for (file_tree.folders.items) |*folder| {
+        pathToFilePath(folder);
     }
 
-    for (file_tree.folders.items) |*folder| {
-        try addProperties(folder, properties, allocator);
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            pathToFilePathRecursivelyNode(node);
+        }
     }
 }
 
-fn addFileProperties(node: *Node, properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
+fn pathToFilePathRecursivelyNode(node: *Node) void {
     if (node.property) |property| {
-        var result = try properties.getOrPut(property);
-
-        if (!result.found_existing) {
-            result.value_ptr.* = ArrayList(*Node).init(allocator);
+        if (eql(u8, property, "Path")) {
+            node.property = "FilePath";
         }
-
-        try result.value_ptr.append(node);
     }
 
     for (node.children.items) |*child| {
-        try addFileProperties(child, properties, allocator);
+        pathToFilePathRecursivelyNode(child);
     }
 }
 
-fn pathToFilePath(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var paths_ = properties.get("Path");
+fn bmpExtensionToPng(file_tree: *IniFolder, allocator: Allocator) !void {
+    for (file_tree.folders.items) |*folder| {
+        try bmpExtensionToPng(folder, allocator);
+    }
 
-    if (paths_) |paths| {
-        for (paths.items) |path| {
-            path.property = "FilePath";
-
-            var file_paths = try properties.getOrPut("FilePath");
-
-            if (!file_paths.found_existing) {
-                file_paths.value_ptr.* = ArrayList(*Node).init(allocator);
-            }
-
-            try file_paths.value_ptr.append(path);
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try bmpExtensionToPngRecursivelyNode(node, allocator);
         }
     }
-
-    // TODO: Figure out a way to remove the Path key, or the list of Node pointers at that key
 }
 
-fn bmpExtensionToPng(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var file_path = properties.get("FilePath");
-    if (file_path) |nodes| {
-        for (nodes.items) |node| {
-            if (node.value) |*path| {
-                if (endsWith(u8, path.*, ".bmp") and !eql(u8, path.*, "palette.bmp") and !eql(u8, path.*, "palettemat.bmp")) {
+fn bmpExtensionToPngRecursivelyNode(node: *Node, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (eql(u8, property, "FilePath")) {
+            if (node.value) |path| {
+                if (endsWith(u8, path, ".bmp") and !eql(u8, path, "palette.bmp") and !eql(u8, path, "palettemat.bmp")) {
                     // We have to dupe, since the u8s in path are const
-                    var new_path = try allocator.dupe(u8, path.*);
+                    var new_path = try allocator.dupe(u8, path);
 
                     new_path[new_path.len - 1] = 'g';
                     new_path[new_path.len - 2] = 'n';
@@ -981,17 +956,32 @@ fn bmpExtensionToPng(properties: *StringHashMap(ArrayList(*Node)), allocator: Al
             }
         }
     }
+
+    for (node.children.items) |*child| {
+        try bmpExtensionToPngRecursivelyNode(child, allocator);
+    }
 }
 
-fn wavExtensionToFlac(properties: *StringHashMap(ArrayList(*Node)), allocator: Allocator) !void {
-    var file_path = properties.get("FilePath");
-    if (file_path) |nodes| {
-        for (nodes.items) |node| {
-            if (node.value) |*path| {
-                if (endsWith(u8, path.*, ".wav")) {
+fn wavExtensionToFlac(file_tree: *IniFolder, allocator: Allocator) !void {
+    for (file_tree.folders.items) |*folder| {
+        try wavExtensionToFlac(folder, allocator);
+    }
+
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try wavExtensionToFlacRecursivelyNode(node, allocator);
+        }
+    }
+}
+
+fn wavExtensionToFlacRecursivelyNode(node: *Node, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (eql(u8, property, "FilePath")) {
+            if (node.value) |path| {
+                if (endsWith(u8, path, ".wav")) {
                     // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
                     var new_path = try allocator.alloc(u8, path.len + 1);
-                    @memcpy(new_path[0..path.len], path.*);
+                    @memcpy(new_path[0..path.len], path);
 
                     new_path[new_path.len - 1] = 'c';
                     new_path[new_path.len - 2] = 'a';
@@ -1003,36 +993,9 @@ fn wavExtensionToFlac(properties: *StringHashMap(ArrayList(*Node)), allocator: A
             }
         }
     }
-}
-
-fn addPropertyValuePairs(file_tree: *IniFolder, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    for (file_tree.files.items) |file| {
-        for (file.ast.items) |*node| {
-            try addFilePropertyValuePairs(node, property_value_pairs, allocator);
-        }
-    }
-
-    for (file_tree.folders.items) |*folder| {
-        try addPropertyValuePairs(folder, property_value_pairs, allocator);
-    }
-}
-
-fn addFilePropertyValuePairs(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    if (node.property != null and node.value != null) {
-        var result = try property_value_pairs.getOrPut(PropertyValuePair{
-            .property = node.property.?,
-            .value = node.value.?,
-        });
-
-        if (!result.found_existing) {
-            result.value_ptr.* = ArrayList(*Node).init(allocator);
-        }
-
-        try result.value_ptr.append(node);
-    }
 
     for (node.children.items) |*child| {
-        try addFilePropertyValuePairs(child, property_value_pairs, allocator);
+        try wavExtensionToFlacRecursivelyNode(child, allocator);
     }
 }
 
@@ -1041,26 +1004,45 @@ fn parseIniCopyOfRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) 
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
-    var ini_copy_of_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
-    return ini_copy_of_rules;
+    var rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    return rules;
 }
 
-fn applyIniCopyOfRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
-    var map_iterator = ini_copy_of_rules.map.iterator();
+fn applyIniCopyOfRules(rules: std.json.ArrayHashMap([]const u8), file_tree: *IniFolder) void {
+    var map_iterator = rules.map.iterator();
     while (map_iterator.next()) |map_entry| {
         const old_value = map_entry.key_ptr.*;
         const new_value = map_entry.value_ptr.*;
 
-        var result_ = property_value_pairs.get(PropertyValuePair{
-            .property = "CopyOf",
-            .value = old_value,
-        });
+        applyIniValueReplacementRulesRecursivelyFolder(file_tree, "CopyOf", old_value, new_value);
+    }
+}
 
-        if (result_) |result| {
-            for (result.items) |line| {
-                line.value = new_value;
+fn applyIniValueReplacementRulesRecursivelyFolder(file_tree: *IniFolder, comptime property: []const u8, old_value: []const u8, new_value: []const u8) void {
+    for (file_tree.folders.items) |*folder| {
+        applyIniValueReplacementRulesRecursivelyFolder(folder, property, old_value, new_value);
+    }
+
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            applyIniValueReplacementRulesRecursivelyNode(node, property, old_value, new_value);
+        }
+    }
+}
+
+fn applyIniValueReplacementRulesRecursivelyNode(node: *Node, comptime property: []const u8, old_value: []const u8, new_value: []const u8) void {
+    if (node.property) |node_property| {
+        if (eql(u8, node_property, property)) {
+            if (node.value) |value| {
+                if (eql(u8, value, old_value)) {
+                    node.value = new_value;
+                }
             }
         }
+    }
+
+    for (node.children.items) |*child| {
+        applyIniValueReplacementRulesRecursivelyNode(child, property, old_value, new_value);
     }
 }
 
@@ -1069,26 +1051,17 @@ fn parseIniFilePathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
-    var ini_copy_of_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
-    return ini_copy_of_rules;
+    var rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    return rules;
 }
 
-fn applyIniFilePathRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
-    var map_iterator = ini_copy_of_rules.map.iterator();
+fn applyIniFilePathRules(rules: std.json.ArrayHashMap([]const u8), file_tree: *IniFolder) void {
+    var map_iterator = rules.map.iterator();
     while (map_iterator.next()) |map_entry| {
         const old_value = map_entry.key_ptr.*;
         const new_value = map_entry.value_ptr.*;
 
-        var result_ = property_value_pairs.get(PropertyValuePair{
-            .property = "FilePath",
-            .value = old_value,
-        });
-
-        if (result_) |result| {
-            for (result.items) |line| {
-                line.value = new_value;
-            }
-        }
+        applyIniValueReplacementRulesRecursivelyFolder(file_tree, "FilePath", old_value, new_value);
     }
 }
 
@@ -1097,26 +1070,17 @@ fn parseIniScriptPathRules(allocator: Allocator) !std.json.ArrayHashMap([]const 
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
-    var ini_copy_of_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
-    return ini_copy_of_rules;
+    var rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    return rules;
 }
 
-fn applyIniScriptPathRules(ini_copy_of_rules: std.json.ArrayHashMap([]const u8), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
-    var map_iterator = ini_copy_of_rules.map.iterator();
+fn applyIniScriptPathRules(rules: std.json.ArrayHashMap([]const u8), file_tree: *IniFolder) void {
+    var map_iterator = rules.map.iterator();
     while (map_iterator.next()) |map_entry| {
         const old_value = map_entry.key_ptr.*;
         const new_value = map_entry.value_ptr.*;
 
-        var result_ = property_value_pairs.get(PropertyValuePair{
-            .property = "ScriptPath",
-            .value = old_value,
-        });
-
-        if (result_) |result| {
-            for (result.items) |line| {
-                line.value = new_value;
-            }
-        }
+        applyIniValueReplacementRulesRecursivelyFolder(file_tree, "ScriptPath", old_value, new_value);
     }
 }
 
@@ -1129,18 +1093,37 @@ fn parseIniPropertyRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8
     return ini_property_rules;
 }
 
-fn applyIniPropertyRules(ini_property_rules: std.json.ArrayHashMap([]const u8), properties: *StringHashMap(ArrayList(*Node))) !void {
+fn applyIniPropertyRules(ini_property_rules: std.json.ArrayHashMap([]const u8), file_tree: *IniFolder) void {
     var map_iterator = ini_property_rules.map.iterator();
     while (map_iterator.next()) |map_entry| {
         const old_property = map_entry.key_ptr.*;
         const new_property = map_entry.value_ptr.*;
 
-        var result = properties.get(old_property);
-        if (result) |r| {
-            for (r.items) |line| {
-                line.property = new_property;
-            }
+        applyIniPropertyRulesRecursivelyFolder(file_tree, old_property, new_property);
+    }
+}
+
+fn applyIniPropertyRulesRecursivelyFolder(file_tree: *IniFolder, old_property: []const u8, new_property: []const u8) void {
+    for (file_tree.folders.items) |*folder| {
+        applyIniPropertyRulesRecursivelyFolder(folder, old_property, new_property);
+    }
+
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            applyIniPropertyRulesRecursivelyNode(node, old_property, new_property);
         }
+    }
+}
+
+fn applyIniPropertyRulesRecursivelyNode(node: *Node, old_property: []const u8, new_property: []const u8) void {
+    if (node.property) |node_property| {
+        if (eql(u8, node_property, old_property)) {
+            node.property = new_property;
+        }
+    }
+
+    for (node.children.items) |*child| {
+        applyIniPropertyRulesRecursivelyNode(child, old_property, new_property);
     }
 }
 
@@ -1149,19 +1132,38 @@ fn parseIniRules(allocator: Allocator) ![]Rule {
     return try parseFromSliceLeaky([]Rule, allocator, text, .{});
 }
 
-fn applyIniRules(ini_rules: []Rule, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) void {
-    for (ini_rules) |rule| {
-        var result_ = property_value_pairs.get(PropertyValuePair{
-            .property = rule.old_property,
-            .value = rule.old_value,
-        });
+fn applyIniRules(ini_rules: []Rule, file_tree: *IniFolder) void {
+    for (ini_rules) |*rule| {
+        applyIniRulesRecursivelyFolder(file_tree, rule);
+    }
+}
 
-        if (result_) |result| {
-            for (result.items) |line| {
-                line.property = rule.new_property;
-                line.value = rule.new_value;
+fn applyIniRulesRecursivelyFolder(file_tree: *IniFolder, rule: *Rule) void {
+    for (file_tree.folders.items) |*folder| {
+        applyIniRulesRecursivelyFolder(folder, rule);
+    }
+
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            applyIniRulesRecursivelyNode(node, rule);
+        }
+    }
+}
+
+fn applyIniRulesRecursivelyNode(node: *Node, rule: *Rule) void {
+    if (node.property) |node_property| {
+        if (eql(u8, node_property, rule.old_property)) {
+            if (node.value) |node_value| {
+                if (eql(u8, node_value, rule.old_value)) {
+                    node.property = rule.new_property;
+                    node.value = rule.new_value;
+                }
             }
         }
+    }
+
+    for (node.children.items) |*child| {
+        applyIniRulesRecursivelyNode(child, rule);
     }
 }
 
@@ -1170,40 +1172,61 @@ fn parseIniSoundContainerRules(allocator: Allocator) ![][]const u8 {
     return try parseFromSliceLeaky([][]const u8, allocator, text, .{});
 }
 
-fn applyIniSoundContainerRules(ini_sound_container_rules: [][]const u8, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) void {
+fn applyIniSoundContainerRules(ini_sound_container_rules: [][]const u8, file_tree: *IniFolder) void {
     for (ini_sound_container_rules) |property| {
-        var result_ = property_value_pairs.get(PropertyValuePair{
-            .property = property,
-            .value = "Sound",
-        });
+        applyIniSoundContainerRulesRecursivelyFolder(file_tree, property);
+    }
+}
 
-        if (result_) |result| {
-            for (result.items) |line| {
-                line.value = "SoundContainer";
-            }
+fn applyIniSoundContainerRulesRecursivelyFolder(file_tree: *IniFolder, property: []const u8) void {
+    for (file_tree.folders.items) |*folder| {
+        applyIniSoundContainerRulesRecursivelyFolder(folder, property);
+    }
+
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            applyIniSoundContainerRulesRecursivelyNode(node, property);
         }
     }
 }
 
-fn updateIniFileTree(properties: *StringHashMap(ArrayList(*Node)), property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
-    try addGripStrength(property_value_pairs, allocator);
-    try addOrUpdateSupportedGameVersion(properties, allocator);
-    try aemitterFuelToPemitter(property_value_pairs);
-    try aemitterToAejetpack(property_value_pairs);
-    try maxLengthToOffsets(property_value_pairs, allocator);
-    try maxMassToMaxInventoryMass(properties, allocator);
-    try maxThrottleRangeToPositiveThrottleMultiplier(properties, allocator);
-    try minThrottleRangeToNegativeThrottleMultiplier(properties, allocator);
+fn applyIniSoundContainerRulesRecursivelyNode(node: *Node, property: []const u8) void {
+    if (node.property) |node_property| {
+        if (eql(u8, node_property, property)) {
+            if (node.value) |node_value| {
+                if (eql(u8, node_value, "Sound")) {
+                    node.value = "SoundContainer";
+                }
+            }
+        }
+    }
 
-    try pieMenu("ACDropShip", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
-    try pieMenu("ACrab", "Default Crab Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
-    try pieMenu("ACRocket", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
-    try pieMenu("Actor", "Default Actor Pie Menu", 1, 0, 0, 0, property_value_pairs, allocator);
-    try pieMenu("AHuman", "Default Human Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
-    try pieMenu("Turret", "Default Turret Pie Menu", 2, 0, 0, 1, property_value_pairs, allocator);
+    for (node.children.items) |*child| {
+        applyIniSoundContainerRulesRecursivelyNode(child, property);
+    }
+}
 
-    try removeSlTerrainProperties(property_value_pairs, allocator);
-    try shovelFlashFix(property_value_pairs);
+fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
+    _ = allocator;
+    _ = file_tree;
+    // try addGripStrength(property_value_pairs, allocator);
+    // try addOrUpdateSupportedGameVersion(properties, allocator);
+    // try aemitterFuelToPemitter(property_value_pairs);
+    // try aemitterToAejetpack(property_value_pairs);
+    // try maxLengthToOffsets(property_value_pairs, allocator);
+    // try maxMassToMaxInventoryMass(properties, allocator);
+    // try maxThrottleRangeToPositiveThrottleMultiplier(properties, allocator);
+    // try minThrottleRangeToNegativeThrottleMultiplier(properties, allocator);
+
+    // try pieMenu("ACDropShip", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
+    // try pieMenu("ACrab", "Default Crab Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
+    // try pieMenu("ACRocket", "Default Craft Pie Menu", 2, 1, 1, 1, property_value_pairs, allocator);
+    // try pieMenu("Actor", "Default Actor Pie Menu", 1, 0, 0, 0, property_value_pairs, allocator);
+    // try pieMenu("AHuman", "Default Human Pie Menu", 2, 2, 2, 2, property_value_pairs, allocator);
+    // try pieMenu("Turret", "Default Turret Pie Menu", 2, 0, 0, 1, property_value_pairs, allocator);
+
+    // try removeSlTerrainProperties(property_value_pairs, allocator);
+    // try shovelFlashFix(property_value_pairs);
 }
 
 fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage), allocator: Allocator) !void {
@@ -1230,19 +1253,6 @@ fn addGripStrength(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*
                 .comments = ArrayList([]const u8).init(allocator),
                 .children = ArrayList(Node).init(allocator),
             });
-
-            // TODO: Make sure to keep both properties *and* property_value_pairs in sync
-            // TODO: with the changes made by all of these functions
-            // var result = try property_value_pairs.getOrPut(PropertyValuePair{
-            //     .property = "GripStrength",
-            //     .value = "424242",
-            // });
-
-            // if (!result.found_existing) {
-            //     result.value_ptr.* = ArrayList(*Node).init(allocator);
-            // }
-
-            // try result.value_ptr.append(arm);
         }
     }
 }
@@ -1310,7 +1320,7 @@ fn aemitterFuelToPemitter(property_value_pairs: *HashMap(PropertyValuePair, Arra
 }
 
 fn aemitterToAejetpack(property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
-    // Translate "Jetpack = AEmitter" to "Jetpack = AEJetpack" and its "AddEffect = AEmitter" children to "AddEffect = AEJetpack"
+    // 1. Translate "Jetpack = AEmitter" to "Jetpack = AEJetpack", and its "AddEffect = AEmitter" children to "AddEffect = AEJetpack"
     // Look up every "Jetpack = AEmitter"
     //   Change it to "Jetpack = AEJetpack"
     //   Remember the value of the "CopyOf" inside of the Jetpack
@@ -1330,12 +1340,12 @@ fn aemitterToAejetpack(property_value_pairs: *HashMap(PropertyValuePair, ArrayLi
         }
     }
 
-    // TODO: If an Actor's last Jetpack key has the value AEJetpack, recursively check whether the last thing the Actor is CopyOf-ing is an AEJetpack, and NOT any other Jetpack value than that, like None. If so, copy that jetpack's properties to its own jetpack
+    // TODO: 2. If an Actor doesn't contain any Jetpack key, and it is CopyOf-ing an Actor that has a Jetpack with the value AEJetpack as the last key, copy that Jetpack's properties to its own, new Jetpack (this has to be done recursively, since a copied Jetpack may be in a CopyOf of a CopyOf)
     // Look up every "AddActor = ACrab" and "AddActor = AHuman"
     //   If it contains "Jetpack = None", yeet any Jetpack key from the Actor (JetTime, JetReplenishRate, JetAngleRange, JumpTime, JumpReplenishRate, and JumpAngleRange)
     //   Else, if it recursively contains "Jetpack = AEmitter", move all Jetpack keys into its own "Jetpack = AEmitter", creating one if it doesn't have it already that contains its base object's jetpack keys at the start
 
-    // TODO: If an Actor's last Jetpack key has the value AEJetpack, move the Actor's jetpack properties to it
+    // TODO: 3. If an Actor's last Jetpack key has the value AEJetpack, move the Actor's jetpack properties to it, and remove them otherwise
 }
 
 fn addeffectAemitterToAddeffectAejetpack(node: *Node, property_value_pairs: *HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage)) !void {
@@ -1472,7 +1482,6 @@ fn maxThrottleRangeToPositiveThrottleMultiplier(properties: *StringHashMap(Array
 
     if (max_throttle_ranges_) |max_throttle_ranges| {
         for (max_throttle_ranges.items) |node| {
-            // TODO: This node should be removed from properties["MinThrottleRange"] its list
             node.property = "PositiveThrottleMultiplier";
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
@@ -1490,7 +1499,6 @@ fn minThrottleRangeToNegativeThrottleMultiplier(properties: *StringHashMap(Array
 
     if (min_throttle_ranges_) |min_throttle_ranges| {
         for (min_throttle_ranges.items) |node| {
-            // TODO: This node should be removed from properties["MinThrottleRange"] its list
             node.property = "NegativeThrottleMultiplier";
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
@@ -2007,40 +2015,34 @@ test "ini_rules" {
                 .ast = ast,
             });
 
-            var properties = StringHashMap(ArrayList(*Node)).init(allocator);
-            try addProperties(&file_tree, &properties, allocator);
+            pathToFilePath(&file_tree);
 
-            try pathToFilePath(&properties, allocator);
+            try bmpExtensionToPng(&file_tree, allocator);
 
-            try bmpExtensionToPng(&properties, allocator);
-
-            try wavExtensionToFlac(&properties, allocator);
-
-            var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
-            try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
+            try wavExtensionToFlac(&file_tree, allocator);
 
             const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
-            try applyIniCopyOfRules(ini_copy_of_rules, &property_value_pairs);
+            applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
 
             const ini_file_path_rules = try parseIniFilePathRules(allocator);
-            try applyIniFilePathRules(ini_file_path_rules, &property_value_pairs);
+            applyIniFilePathRules(ini_file_path_rules, &file_tree);
 
             const ini_script_path_rules = try parseIniScriptPathRules(allocator);
-            try applyIniScriptPathRules(ini_script_path_rules, &property_value_pairs);
+            applyIniScriptPathRules(ini_script_path_rules, &file_tree);
 
-            // TODO: Figure out a way to remove all these function calls that are already done by convert()
-            // TODO: At the moment I am literally keeping these in sync manually
+            // // TODO: Figure out a way to remove all these function calls that are already done by convert()
+            // // TODO: At the moment I am literally keeping these in sync manually
 
             const ini_property_rules = try parseIniPropertyRules(allocator);
-            try applyIniPropertyRules(ini_property_rules, &properties);
+            applyIniPropertyRules(ini_property_rules, &file_tree);
 
             const ini_rules = try parseIniRules(allocator);
-            applyIniRules(ini_rules, &property_value_pairs);
+            applyIniRules(ini_rules, &file_tree);
 
             const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
-            applyIniSoundContainerRules(ini_sound_container_rules, &property_value_pairs);
+            applyIniSoundContainerRules(ini_sound_container_rules, &file_tree);
 
-            try updateIniFileTree(&properties, &property_value_pairs, allocator);
+            try updateIniFileTree(&file_tree, allocator);
 
             try writeAst(&ast, output_path);
 
@@ -2117,40 +2119,34 @@ test "updated" {
                 .ast = ast,
             });
 
-            var properties = StringHashMap(ArrayList(*Node)).init(allocator);
-            try addProperties(&file_tree, &properties, allocator);
+            pathToFilePath(&file_tree);
 
-            try pathToFilePath(&properties, allocator);
+            try bmpExtensionToPng(&file_tree, allocator);
 
-            try bmpExtensionToPng(&properties, allocator);
-
-            try wavExtensionToFlac(&properties, allocator);
-
-            var property_value_pairs = HashMap(PropertyValuePair, ArrayList(*Node), PropertyValuePairContext, default_max_load_percentage).init(allocator);
-            try addPropertyValuePairs(&file_tree, &property_value_pairs, allocator);
+            try wavExtensionToFlac(&file_tree, allocator);
 
             const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
-            try applyIniCopyOfRules(ini_copy_of_rules, &property_value_pairs);
+            applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
 
             const ini_file_path_rules = try parseIniFilePathRules(allocator);
-            try applyIniFilePathRules(ini_file_path_rules, &property_value_pairs);
+            applyIniFilePathRules(ini_file_path_rules, &file_tree);
 
             const ini_script_path_rules = try parseIniScriptPathRules(allocator);
-            try applyIniScriptPathRules(ini_script_path_rules, &property_value_pairs);
+            applyIniScriptPathRules(ini_script_path_rules, &file_tree);
 
-            // TODO: Figure out a way to remove all these function calls that are already done by convert()
-            // TODO: At the moment I am literally keeping these in sync manually
+            // // TODO: Figure out a way to remove all these function calls that are already done by convert()
+            // // TODO: At the moment I am literally keeping these in sync manually
 
             const ini_property_rules = try parseIniPropertyRules(allocator);
-            try applyIniPropertyRules(ini_property_rules, &properties);
+            applyIniPropertyRules(ini_property_rules, &file_tree);
 
             const ini_rules = try parseIniRules(allocator);
-            applyIniRules(ini_rules, &property_value_pairs);
+            applyIniRules(ini_rules, &file_tree);
 
             const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
-            applyIniSoundContainerRules(ini_sound_container_rules, &property_value_pairs);
+            applyIniSoundContainerRules(ini_sound_container_rules, &file_tree);
 
-            try updateIniFileTree(&properties, &property_value_pairs, allocator);
+            try updateIniFileTree(&file_tree, allocator);
 
             try writeAst(&ast, output_path);
 
