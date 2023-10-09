@@ -135,30 +135,6 @@ const PropertyValuePair = struct {
     value: []const u8,
 };
 
-fn str_eql(str1: []const u8, str2: []const u8) bool {
-    return eql(u8, str1, str2);
-}
-
-const PropertyValuePairContext = struct {
-    pub fn hash(self: PropertyValuePairContext, x: PropertyValuePair) u64 {
-        _ = self;
-        // TODO: XOR is shite; it returns 0 when the property and value are identical
-        // I tried replacing it with this one, but it panics with integer overflow:
-        // Source: https://stackoverflow.com/a/27952689/13279557
-        // var property_hash = std.hash_map.hashString(x.property);
-        // const value_hash = std.hash_map.hashString(x.value);
-        // property_hash ^= value_hash + 0x517cc1b727220a95 + (property_hash << 6) + (property_hash >> 2);
-        // return property_hash;
-
-        return std.hash_map.hashString(x.property) ^ std.hash_map.hashString(x.value);
-    }
-
-    pub fn eql(self: PropertyValuePairContext, a: PropertyValuePair, b: PropertyValuePair) bool {
-        _ = self;
-        return str_eql(a.property, b.property) and str_eql(a.value, b.value);
-    }
-};
-
 const UpdateIniFileTreeErrors = error{
     ExpectedValue,
 };
@@ -306,7 +282,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
 
     while (try dir_iterator.next()) |entry| {
         if (entry.kind == std.fs.File.Kind.file) {
-            if (str_eql(extension(entry.name), ".bmp")) {
+            if (strEql(extension(entry.name), ".bmp")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
 
                 var output_name = try allocator.dupe(u8, entry.name);
@@ -339,7 +315,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 } else { // Else return the access error
                     return output_file_access;
                 }
-            } else if (str_eql(extension(entry.name), ".wav")) {
+            } else if (strEql(extension(entry.name), ".wav")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
 
                 // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
@@ -373,7 +349,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 } else { // Else return the access error
                     return output_file_access;
                 }
-            } else if (!str_eql(extension(entry.name), ".ini")) {
+            } else if (!strEql(extension(entry.name), ".ini")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
                 const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
 
@@ -403,6 +379,10 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
             try copyFiles(child_input_folder_path, child_output_folder_path, allocator);
         }
     }
+}
+
+fn strEql(str1: []const u8, str2: []const u8) bool {
+    return eql(u8, str1, str2);
 }
 
 fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
@@ -446,7 +426,7 @@ fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []co
 
     while (try dir_iterator.next()) |dir_entry| {
         if (dir_entry.kind == std.fs.File.Kind.file) {
-            if (str_eql(extension(dir_entry.name), ".lua")) {
+            if (strEql(extension(dir_entry.name), ".lua")) {
                 const file_path = try join(allocator, &.{ folder_path, dir_entry.name });
                 var text = try readFile(file_path, allocator);
 
@@ -498,7 +478,7 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
         // std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
         if (entry.kind == std.fs.File.Kind.file) {
             const file_path = try join(allocator, &.{ folder_path, entry.name });
-            if (str_eql(extension(entry.name), ".ini")) {
+            if (strEql(extension(entry.name), ".ini")) {
                 diagnostics.file_path = file_path;
                 // std.debug.print("file path '{s}'\n", .{file_path});
                 const text = try readFile(file_path, allocator);
@@ -921,7 +901,7 @@ fn pathToFilePath(file_tree: *IniFolder) void {
 
 fn pathToFilePathRecursivelyNode(node: *Node) void {
     if (node.property) |property| {
-        if (str_eql(property, "Path")) {
+        if (strEql(property, "Path")) {
             node.property = "FilePath";
         }
     }
@@ -945,9 +925,9 @@ fn bmpExtensionToPng(file_tree: *IniFolder, allocator: Allocator) !void {
 
 fn bmpExtensionToPngRecursivelyNode(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "FilePath")) {
+        if (strEql(property, "FilePath")) {
             if (node.value) |path| {
-                if (endsWith(u8, path, ".bmp") and !str_eql(path, "palette.bmp") and !str_eql(path, "palettemat.bmp")) {
+                if (endsWith(u8, path, ".bmp") and !strEql(path, "palette.bmp") and !strEql(path, "palettemat.bmp")) {
                     // We have to dupe, since the u8s in path are const
                     var new_path = try allocator.dupe(u8, path);
 
@@ -980,7 +960,7 @@ fn wavExtensionToFlac(file_tree: *IniFolder, allocator: Allocator) !void {
 
 fn wavExtensionToFlacRecursivelyNode(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "FilePath")) {
+        if (strEql(property, "FilePath")) {
             if (node.value) |path| {
                 if (endsWith(u8, path, ".wav")) {
                     // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
@@ -1036,9 +1016,9 @@ fn applyIniValueReplacementRulesRecursivelyFolder(file_tree: *IniFolder, comptim
 
 fn applyIniValueReplacementRulesRecursivelyNode(node: *Node, comptime property: []const u8, old_value: []const u8, new_value: []const u8) void {
     if (node.property) |node_property| {
-        if (str_eql(node_property, property)) {
+        if (strEql(node_property, property)) {
             if (node.value) |value| {
-                if (str_eql(value, old_value)) {
+                if (strEql(value, old_value)) {
                     node.value = new_value;
                 }
             }
@@ -1121,7 +1101,7 @@ fn applyIniPropertyRulesRecursivelyFolder(file_tree: *IniFolder, old_property: [
 
 fn applyIniPropertyRulesRecursivelyNode(node: *Node, old_property: []const u8, new_property: []const u8) void {
     if (node.property) |node_property| {
-        if (str_eql(node_property, old_property)) {
+        if (strEql(node_property, old_property)) {
             node.property = new_property;
         }
     }
@@ -1156,9 +1136,9 @@ fn applyIniRulesRecursivelyFolder(file_tree: *IniFolder, rule: *Rule) void {
 
 fn applyIniRulesRecursivelyNode(node: *Node, rule: *Rule) void {
     if (node.property) |node_property| {
-        if (str_eql(node_property, rule.old_property)) {
+        if (strEql(node_property, rule.old_property)) {
             if (node.value) |node_value| {
-                if (str_eql(node_value, rule.old_value)) {
+                if (strEql(node_value, rule.old_value)) {
                     node.property = rule.new_property;
                     node.value = rule.new_value;
                 }
@@ -1196,9 +1176,9 @@ fn applyIniSoundContainerRulesRecursivelyFolder(file_tree: *IniFolder, property:
 
 fn applyIniSoundContainerRulesRecursivelyNode(node: *Node, property: []const u8) void {
     if (node.property) |node_property| {
-        if (str_eql(node_property, property)) {
+        if (strEql(node_property, property)) {
             if (node.value) |node_value| {
-                if (str_eql(node_value, "Sound")) {
+                if (strEql(node_value, "Sound")) {
                     node.value = "SoundContainer";
                 }
             }
@@ -1257,14 +1237,14 @@ fn applyOnNode(comptime nodeCallbackFn: nodeCallbackDef, node: *Node, allocator:
 
 fn addGripStrength(node: *Node, allocator: Allocator) !void {
     if (node.property) |node_property| {
-        if (str_eql(node_property, "AddActor")) {
+        if (strEql(node_property, "AddActor")) {
             if (node.value) |node_value| {
-                if (str_eql(node_value, "Arm")) {
+                if (strEql(node_value, "Arm")) {
                     var children = &node.children;
 
                     for (children.items) |child| {
                         if (child.property) |property| {
-                            if (str_eql(property, "GripStrength")) {
+                            if (strEql(property, "GripStrength")) {
                                 return;
                             }
                         }
@@ -1284,16 +1264,16 @@ fn addGripStrength(node: *Node, allocator: Allocator) !void {
 
 fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "DataModule")) {
+        if (strEql(property, "DataModule")) {
             var has_supported_game_version = false;
 
             for (node.children.items) |*child| {
                 if (child.property) |child_property| {
-                    if (str_eql(child_property, "SupportedGameVersion")) {
+                    if (strEql(child_property, "SupportedGameVersion")) {
                         has_supported_game_version = true;
 
                         if (child.value) |child_value| {
-                            if (!str_eql(child_value, "Pre-Release 5.0")) {
+                            if (!strEql(child_value, "Pre-Release 5.0")) {
                                 child.value = "Pre-Release 5.0";
                             }
                         }
@@ -1316,14 +1296,14 @@ fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
 fn aemitterFuelToPemitter(node: *Node, allocator: Allocator) !void {
     _ = allocator;
     if (node.property) |property| {
-        if (str_eql(property, "GibParticle")) {
+        if (strEql(property, "GibParticle")) {
             if (node.value) |value| {
-                if (str_eql(value, "AEmitter")) {
+                if (strEql(value, "AEmitter")) {
                     for (node.children.items) |*child| {
                         if (child.property) |child_property| {
-                            if (str_eql(child_property, "CopyOf")) {
+                            if (strEql(child_property, "CopyOf")) {
                                 if (child.value) |child_value| {
-                                    if (str_eql(child_value, "Fuel Fire Trace Black")) {
+                                    if (strEql(child_value, "Fuel Fire Trace Black")) {
                                         node.value = "PEmitter";
                                     }
                                 } else {
@@ -1360,9 +1340,9 @@ fn aemitterToAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, alloca
     //       Remember its "CopyOf" value
     //       Recurse back to the "Iterate over" step
     if (node.property) |property| {
-        if (str_eql(property, "Jetpack")) {
+        if (strEql(property, "Jetpack")) {
             if (node.value) |value| {
-                if (str_eql(value, "AEmitter")) {
+                if (strEql(value, "AEmitter")) {
                     node.value = "AEJetpack";
 
                     try addEffectAemitterToAddEffectAejetpackCopyOfFinder(node, file_tree);
@@ -1386,7 +1366,7 @@ fn aemitterToAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, alloca
 fn addEffectAemitterToAddEffectAejetpackCopyOfFinder(node: *Node, file_tree: *IniFolder) error{ExpectedValue}!void {
     for (node.children.items) |*node_child| {
         if (node_child.property) |node_child_property| {
-            if (str_eql(node_child_property, "CopyOf")) {
+            if (strEql(node_child_property, "CopyOf")) {
                 if (node_child.value) |copy_of_value| {
                     try addEffectAemitterToAddEffectAejetpackRecursivelyFolder(file_tree, file_tree, copy_of_value);
                 } else {
@@ -1411,14 +1391,14 @@ fn addEffectAemitterToAddEffectAejetpackRecursivelyFolder(folder: *IniFolder, fi
 
 fn addEffectAemitterToAddEffectAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, copy_of_value: []const u8) !void {
     if (node.property) |property| {
-        if (str_eql(property, "AddEffect")) {
+        if (strEql(property, "AddEffect")) {
             if (node.value) |value| {
-                if (str_eql(value, "AEmitter")) {
+                if (strEql(value, "AEmitter")) {
                     for (node.children.items) |*child| {
                         if (child.property) |child_property| {
-                            if (str_eql(child_property, "PresetName")) {
+                            if (strEql(child_property, "PresetName")) {
                                 if (child.value) |child_value| {
-                                    if (str_eql(child_value, copy_of_value)) {
+                                    if (strEql(child_value, copy_of_value)) {
                                         node.value = "AEJetpack";
 
                                         try addEffectAemitterToAddEffectAejetpackCopyOfFinder(node, file_tree);
@@ -1439,14 +1419,14 @@ fn addEffectAemitterToAddEffectAejetpackRecursivelyNode(node: *Node, file_tree: 
 
 fn maxLengthToOffsets(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "AddActor")) {
+        if (strEql(property, "AddActor")) {
             if (node.value) |value| {
-                if (str_eql(value, "Leg")) {
+                if (strEql(value, "Leg")) {
                     var children = &node.children;
 
                     for (children.items) |*child| {
                         if (child.property) |child_property| {
-                            if (str_eql(child_property, "MaxLength")) {
+                            if (strEql(child_property, "MaxLength")) {
                                 if (child.value) |child_value| {
                                     child.property = "ContractedOffset";
                                     child.value = "Vector";
@@ -1496,16 +1476,16 @@ fn maxLengthToOffsets(node: *Node, allocator: Allocator) !void {
 
 fn maxMassToMaxInventoryMass(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "AddActor")) {
+        if (strEql(property, "AddActor")) {
             for (node.children.items) |*child| {
                 if (child.property) |child_property| {
-                    if (str_eql(child_property, "MaxMass")) {
+                    if (strEql(child_property, "MaxMass")) {
                         if (child.value) |v| {
                             const max_mass = try parseFloat(f32, v);
 
                             for (node.children.items) |child2| {
                                 if (child2.property) |child_property2| {
-                                    if (str_eql(child_property2, "Mass")) {
+                                    if (strEql(child_property2, "Mass")) {
                                         if (child2.value) |v2| {
                                             child.property = "MaxInventoryMass";
 
@@ -1530,7 +1510,7 @@ fn maxMassToMaxInventoryMass(node: *Node, allocator: Allocator) !void {
 
 fn maxThrottleRangeToPositiveThrottleMultiplier(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "MaxThrottleRange")) {
+        if (strEql(property, "MaxThrottleRange")) {
             node.property = "PositiveThrottleMultiplier";
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
@@ -1545,7 +1525,7 @@ fn maxThrottleRangeToPositiveThrottleMultiplier(node: *Node, allocator: Allocato
 
 fn minThrottleRangeToNegativeThrottleMultiplier(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "MinThrottleRange")) {
+        if (strEql(property, "MinThrottleRange")) {
             node.property = "NegativeThrottleMultiplier";
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
@@ -1572,17 +1552,17 @@ fn pieMenu(actor_name: []const u8, default_copy_of_name: []const u8, starting_di
 
 fn pieMenuRecursivelyNode(node: *Node, actor_name: []const u8, default_copy_of_name: []const u8, starting_direction_count_up: u32, starting_direction_count_down: u32, starting_direction_count_left: u32, starting_direction_count_right: u32, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "AddActor")) {
+        if (strEql(property, "AddActor")) {
             if (node.value) |value| {
-                if (str_eql(value, actor_name)) {
+                if (strEql(value, actor_name)) {
                     var children = &node.children;
 
                     var contains_pie_slice = false;
                     for (children.items) |*child| {
                         if (child.property) |child_property| {
-                            if (str_eql(child_property, "AddPieSlice")) {
+                            if (strEql(child_property, "AddPieSlice")) {
                                 if (child.value) |child_value| {
-                                    if (str_eql(child_value, "PieSlice")) {
+                                    if (strEql(child_value, "PieSlice")) {
                                         contains_pie_slice = true;
                                     }
                                 } else {
@@ -1609,9 +1589,9 @@ fn pieMenuRecursivelyNode(node: *Node, actor_name: []const u8, default_copy_of_n
 
                         for (children.items) |*child| {
                             if (child.property) |child_property| {
-                                if (str_eql(child_property, "AddPieSlice")) {
+                                if (strEql(child_property, "AddPieSlice")) {
                                     if (child.value) |child_value| {
-                                        if (str_eql(child_value, "PieSlice")) {
+                                        if (strEql(child_value, "PieSlice")) {
                                             // Make a copy of the PieSlice in the PieMenu
                                             try pie_menu.children.append(Node{
                                                 .property = "AddPieSlice",
@@ -1658,14 +1638,14 @@ fn applyPieQuadrantSlotLimit(pie_menu: *Node, direction: []const u8, starting_di
 
     for (pie_menu.children.items) |menu_child| {
         if (menu_child.property) |meny_child_property| {
-            if (str_eql(meny_child_property, "AddPieSlice")) {
+            if (strEql(meny_child_property, "AddPieSlice")) {
                 if (menu_child.value) |value| {
-                    if (str_eql(value, "PieSlice")) {
+                    if (strEql(value, "PieSlice")) {
                         for (menu_child.children.items) |*slice_child| {
                             if (slice_child.property) |slice_child_property| {
-                                if (str_eql(slice_child_property, "Direction")) {
+                                if (strEql(slice_child_property, "Direction")) {
                                     if (slice_child.value) |slice_child_value| {
-                                        if (str_eql(slice_child_value, direction)) {
+                                        if (strEql(slice_child_value, direction)) {
                                             if (direction_count == PieQuadrantSlotCount) {
                                                 slice_child.value = "Any";
                                             } else {
@@ -1689,15 +1669,15 @@ fn applyPieQuadrantSlotLimit(pie_menu: *Node, direction: []const u8, starting_di
 
 fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (str_eql(property, "Terrain")) {
+        if (strEql(property, "Terrain")) {
             if (node.value) |value| {
-                if (str_eql(value, "SLTerrain")) {
+                if (strEql(value, "SLTerrain")) {
                     for (node.children.items) |*child| {
                         if (child.property) |child_property| {
                             // Remove Offset from the Terrain
-                            if (str_eql(child_property, "Offset")) {
+                            if (strEql(child_property, "Offset")) {
                                 if (child.value) |child_value| {
-                                    if (str_eql(child_value, "Vector")) {
+                                    if (strEql(child_value, "Vector")) {
                                         child.property = null;
                                         child.value = null;
                                         child.comments = ArrayList([]const u8).init(allocator);
@@ -1709,7 +1689,7 @@ fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
                             }
 
                             // Remove DrawTransparent from the Terrain
-                            if (str_eql(child_property, "DrawTransparent")) {
+                            if (strEql(child_property, "DrawTransparent")) {
                                 child.property = null;
                                 child.value = null;
                                 child.comments = ArrayList([]const u8).init(allocator);
@@ -1717,9 +1697,9 @@ fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
                             }
 
                             // Remove ScrollRatio from the Terrain
-                            if (str_eql(child_property, "ScrollRatio")) {
+                            if (strEql(child_property, "ScrollRatio")) {
                                 if (child.value) |child_value| {
-                                    if (str_eql(child_value, "Vector")) {
+                                    if (strEql(child_value, "Vector")) {
                                         child.property = null;
                                         child.value = null;
                                         child.comments = ArrayList([]const u8).init(allocator);
@@ -1740,21 +1720,21 @@ fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
 fn shovelFlashFix(node: *Node, allocator: Allocator) !void {
     _ = allocator;
     if (node.property) |property| {
-        if (str_eql(property, "AddDevice")) {
+        if (strEql(property, "AddDevice")) {
             if (node.value) |value| {
-                if (str_eql(value, "HDFirearm")) {
+                if (strEql(value, "HDFirearm")) {
                     var changed_shovel_sprite = false;
 
                     for (node.children.items) |firearm_child| {
                         if (firearm_child.property) |firearm_child_property| {
-                            if (str_eql(firearm_child_property, "SpriteFile")) {
+                            if (strEql(firearm_child_property, "SpriteFile")) {
                                 if (firearm_child.value) |firearm_child_value| {
-                                    if (str_eql(firearm_child_value, "ContentFile")) {
+                                    if (strEql(firearm_child_value, "ContentFile")) {
                                         for (firearm_child.children.items) |*content_file_child| {
                                             if (content_file_child.property) |content_file_child_property| {
-                                                if (str_eql(content_file_child_property, "FilePath")) {
+                                                if (strEql(content_file_child_property, "FilePath")) {
                                                     if (content_file_child.value) |content_file_child_value| {
-                                                        if (str_eql(content_file_child_value, "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png")) {
+                                                        if (strEql(content_file_child_value, "Ronin.rte/Effects/Pyro/Flashes/ShovelFlash.png")) {
                                                             content_file_child.value = "Ronin.rte/Devices/Tools/Shovel/Effects/ShovelFlash.png";
 
                                                             changed_shovel_sprite = true;
@@ -1776,9 +1756,9 @@ fn shovelFlashFix(node: *Node, allocator: Allocator) !void {
                     if (changed_shovel_sprite) {
                         for (node.children.items) |*firearm_child| {
                             if (firearm_child.property) |firearm_child_property| {
-                                if (str_eql(firearm_child_property, "FrameCount")) {
+                                if (strEql(firearm_child_property, "FrameCount")) {
                                     if (firearm_child.value) |firearm_child_value| {
-                                        if (str_eql(firearm_child_value, "2")) {
+                                        if (strEql(firearm_child_value, "2")) {
                                             firearm_child.value = "1";
                                         }
                                     } else {
@@ -1911,9 +1891,9 @@ test "general" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'general/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and str_eql(entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
@@ -1975,7 +1955,7 @@ test "lua_rules" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.lua")) {
+        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.lua")) {
             std.debug.print("\nSubtest 'lua_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
 
             const input_path = try join(allocator, &.{ dir_path, "in.lua" });
@@ -2035,9 +2015,9 @@ test "ini_rules" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'ini_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and str_eql(entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
@@ -2139,9 +2119,9 @@ test "updated" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'updated/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and str_eql(entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
@@ -2237,9 +2217,9 @@ test "invalid" {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
         const dir_path = try entry.dir.realpath(".", &out_buffer);
 
-        if (entry.kind == std.fs.File.Kind.file and str_eql(entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'invalid/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and str_eql(entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), dir_path });
 
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const error_path = try join(allocator, &.{ dir_path, "error.txt" });
@@ -2317,7 +2297,7 @@ fn zip_mod_recursively(zip: *ziplib.zip_t, full_path: []const u8, sub_path: []co
 
         if (entry.kind == std.fs.File.Kind.file) {
             // TODO: Not sure whether these files are ever actually returned by Zig's dir iterator
-            if (str_eql(entry.name, ".") or str_eql(entry.name, ".."))
+            if (strEql(entry.name, ".") or strEql(entry.name, ".."))
                 continue;
 
             if (ziplib.zip_entry_open(zip, child_sub_path) < 0) return error.ZipEntryOpen;
