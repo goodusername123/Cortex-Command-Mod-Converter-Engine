@@ -209,7 +209,7 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     std.debug.print("Getting INI file tree...\n", .{});
     var file_tree = try getIniFileTree(input_folder_path, allocator, diagnostics);
 
-    pathToFilePath(&file_tree);
+    try applyOnNodes(pathToFilePath, &file_tree);
 
     // It also HAS to be called before applyIniFilePathRules(),
     // because otherwise this could happen:
@@ -219,10 +219,10 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     // The game reports that Base.rte/foo.png *still* doesn't exist,
     // due to the parsed input mod containing "Base.rte/foo.bmp"!
     std.debug.print("Bmp extension to png...\n", .{});
-    try bmpExtensionToPng(&file_tree, allocator);
+    try applyOnNodesAlloc(bmpExtensionToPng, &file_tree, allocator);
 
     std.debug.print("Wav extension to flac...\n", .{});
-    try wavExtensionToFlac(&file_tree, allocator);
+    try applyOnNodesAlloc(wavExtensionToFlac, &file_tree, allocator);
 
     const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
     std.debug.print("Applying INI CopyOf rules...\n", .{});
@@ -887,43 +887,59 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
-fn pathToFilePath(file_tree: *IniFolder) void {
+const nodeCallbackDef = fn (node: *Node) error{ ExpectedValue, InvalidCharacter, OutOfMemory }!void;
+
+fn applyOnNodes(comptime nodeCallbackFn: nodeCallbackDef, file_tree: *IniFolder) !void {
     for (file_tree.folders.items) |*folder| {
-        pathToFilePath(folder);
+        try applyOnNodes(nodeCallbackFn, folder);
     }
 
     for (file_tree.files.items) |file| {
         for (file.ast.items) |*node| {
-            pathToFilePathRecursivelyNode(node);
+            try applyOnNode(nodeCallbackFn, node);
         }
     }
 }
 
-fn pathToFilePathRecursivelyNode(node: *Node) void {
+fn applyOnNode(comptime nodeCallbackFn: nodeCallbackDef, node: *Node) !void {
+    try nodeCallbackFn(node);
+
+    for (node.children.items) |*child| {
+        try applyOnNode(nodeCallbackFn, child);
+    }
+}
+
+const nodeAllocCallbackDef = fn (node: *Node, allocator: Allocator) error{ ExpectedValue, InvalidCharacter, OutOfMemory }!void;
+
+fn applyOnNodesAlloc(comptime nodeAllocCallbackFn: nodeAllocCallbackDef, file_tree: *IniFolder, allocator: Allocator) !void {
+    for (file_tree.folders.items) |*folder| {
+        try applyOnNodesAlloc(nodeAllocCallbackFn, folder, allocator);
+    }
+
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try applyOnNodeAlloc(nodeAllocCallbackFn, node, allocator);
+        }
+    }
+}
+
+fn applyOnNodeAlloc(comptime nodeAllocCallbackFn: nodeAllocCallbackDef, node: *Node, allocator: Allocator) !void {
+    try nodeAllocCallbackFn(node, allocator);
+
+    for (node.children.items) |*child| {
+        try applyOnNodeAlloc(nodeAllocCallbackFn, child, allocator);
+    }
+}
+
+fn pathToFilePath(node: *Node) !void {
     if (node.property) |property| {
         if (strEql(property, "Path")) {
             node.property = "FilePath";
         }
     }
-
-    for (node.children.items) |*child| {
-        pathToFilePathRecursivelyNode(child);
-    }
 }
 
-fn bmpExtensionToPng(file_tree: *IniFolder, allocator: Allocator) !void {
-    for (file_tree.folders.items) |*folder| {
-        try bmpExtensionToPng(folder, allocator);
-    }
-
-    for (file_tree.files.items) |file| {
-        for (file.ast.items) |*node| {
-            try bmpExtensionToPngRecursivelyNode(node, allocator);
-        }
-    }
-}
-
-fn bmpExtensionToPngRecursivelyNode(node: *Node, allocator: Allocator) !void {
+fn bmpExtensionToPng(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
         if (strEql(property, "FilePath")) {
             if (node.value) |path| {
@@ -940,25 +956,9 @@ fn bmpExtensionToPngRecursivelyNode(node: *Node, allocator: Allocator) !void {
             }
         }
     }
-
-    for (node.children.items) |*child| {
-        try bmpExtensionToPngRecursivelyNode(child, allocator);
-    }
 }
 
-fn wavExtensionToFlac(file_tree: *IniFolder, allocator: Allocator) !void {
-    for (file_tree.folders.items) |*folder| {
-        try wavExtensionToFlac(folder, allocator);
-    }
-
-    for (file_tree.files.items) |file| {
-        for (file.ast.items) |*node| {
-            try wavExtensionToFlacRecursivelyNode(node, allocator);
-        }
-    }
-}
-
-fn wavExtensionToFlacRecursivelyNode(node: *Node, allocator: Allocator) !void {
+fn wavExtensionToFlac(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
         if (strEql(property, "FilePath")) {
             if (node.value) |path| {
@@ -976,10 +976,6 @@ fn wavExtensionToFlacRecursivelyNode(node: *Node, allocator: Allocator) !void {
                 }
             }
         }
-    }
-
-    for (node.children.items) |*child| {
-        try wavExtensionToFlacRecursivelyNode(child, allocator);
     }
 }
 
@@ -1191,16 +1187,16 @@ fn applyIniSoundContainerRulesRecursivelyNode(node: *Node, property: []const u8)
 }
 
 fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
-    try applyOnNodes(addGripStrength, file_tree, allocator);
-    try applyOnNodes(addOrUpdateSupportedGameVersion, file_tree, allocator);
-    try applyOnNodes(aemitterFuelToPemitter, file_tree, allocator);
+    try applyOnNodesAlloc(addGripStrength, file_tree, allocator);
+    try applyOnNodesAlloc(addOrUpdateSupportedGameVersion, file_tree, allocator);
+    try applyOnNodes(aemitterFuelToPemitter, file_tree);
 
     try aemitterToAejetpack(file_tree, file_tree, allocator);
 
-    try applyOnNodes(maxLengthToOffsets, file_tree, allocator);
-    try applyOnNodes(maxMassToMaxInventoryMass, file_tree, allocator);
-    try applyOnNodes(maxThrottleRangeToPositiveThrottleMultiplier, file_tree, allocator);
-    try applyOnNodes(minThrottleRangeToNegativeThrottleMultiplier, file_tree, allocator);
+    try applyOnNodesAlloc(maxLengthToOffsets, file_tree, allocator);
+    try applyOnNodesAlloc(maxMassToMaxInventoryMass, file_tree, allocator);
+    try applyOnNodesAlloc(maxThrottleRangeToPositiveThrottleMultiplier, file_tree, allocator);
+    try applyOnNodesAlloc(minThrottleRangeToNegativeThrottleMultiplier, file_tree, allocator);
 
     try pieMenu("ACDropShip", "Default Craft Pie Menu", 2, 1, 1, 1, file_tree, allocator);
     try pieMenu("ACrab", "Default Crab Pie Menu", 2, 2, 2, 2, file_tree, allocator);
@@ -1209,30 +1205,8 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     try pieMenu("AHuman", "Default Human Pie Menu", 2, 2, 2, 2, file_tree, allocator);
     try pieMenu("Turret", "Default Turret Pie Menu", 2, 0, 0, 1, file_tree, allocator);
 
-    try applyOnNodes(removeSlTerrainProperties, file_tree, allocator);
-    try applyOnNodes(shovelFlashFix, file_tree, allocator);
-}
-
-const nodeCallbackDef = fn (node: *Node, allocator: Allocator) error{ ExpectedValue, InvalidCharacter, OutOfMemory }!void;
-
-fn applyOnNodes(comptime nodeCallbackFn: nodeCallbackDef, file_tree: *IniFolder, allocator: Allocator) !void {
-    for (file_tree.folders.items) |*folder| {
-        try applyOnNodes(nodeCallbackFn, folder, allocator);
-    }
-
-    for (file_tree.files.items) |file| {
-        for (file.ast.items) |*node| {
-            try applyOnNode(nodeCallbackFn, node, allocator);
-        }
-    }
-}
-
-fn applyOnNode(comptime nodeCallbackFn: nodeCallbackDef, node: *Node, allocator: Allocator) !void {
-    try nodeCallbackFn(node, allocator);
-
-    for (node.children.items) |*child| {
-        try applyOnNode(nodeCallbackFn, child, allocator);
-    }
+    try applyOnNodesAlloc(removeSlTerrainProperties, file_tree, allocator);
+    try applyOnNodes(shovelFlashFix, file_tree);
 }
 
 fn addGripStrength(node: *Node, allocator: Allocator) !void {
@@ -1293,8 +1267,7 @@ fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
     }
 }
 
-fn aemitterFuelToPemitter(node: *Node, allocator: Allocator) !void {
-    _ = allocator;
+fn aemitterFuelToPemitter(node: *Node) !void {
     if (node.property) |property| {
         if (strEql(property, "GibParticle")) {
             if (node.value) |value| {
@@ -1717,8 +1690,7 @@ fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
     }
 }
 
-fn shovelFlashFix(node: *Node, allocator: Allocator) !void {
-    _ = allocator;
+fn shovelFlashFix(node: *Node) !void {
     if (node.property) |property| {
         if (strEql(property, "AddDevice")) {
             if (node.value) |value| {
@@ -2044,11 +2016,11 @@ test "ini_rules" {
                 .ast = ast,
             });
 
-            pathToFilePath(&file_tree);
+            try applyOnNodes(pathToFilePath, &file_tree);
 
-            try bmpExtensionToPng(&file_tree, allocator);
+            try applyOnNodesAlloc(bmpExtensionToPng, &file_tree, allocator);
 
-            try wavExtensionToFlac(&file_tree, allocator);
+            try applyOnNodesAlloc(wavExtensionToFlac, &file_tree, allocator);
 
             const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
             applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
@@ -2148,11 +2120,11 @@ test "updated" {
                 .ast = ast,
             });
 
-            pathToFilePath(&file_tree);
+            try applyOnNodes(pathToFilePath, &file_tree);
 
-            try bmpExtensionToPng(&file_tree, allocator);
+            try applyOnNodesAlloc(bmpExtensionToPng, &file_tree, allocator);
 
-            try wavExtensionToFlac(&file_tree, allocator);
+            try applyOnNodesAlloc(wavExtensionToFlac, &file_tree, allocator);
 
             const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
             applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
