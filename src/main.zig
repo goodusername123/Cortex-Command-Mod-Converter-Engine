@@ -1191,7 +1191,14 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     try applyOnNodesAlloc(addOrUpdateSupportedGameVersion, file_tree, allocator);
     try applyOnNodes(aemitterFuelToPemitter, file_tree);
 
-    try aemitterToAejetpack(file_tree, file_tree, allocator);
+    // AEJetpacks being made first-class citizens by Causeless
+    {
+        try aemitterToAejetpack(file_tree, file_tree, allocator);
+        try moveJetpackModifiers(file_tree, file_tree, allocator);
+        try copyJetpack(file_tree, file_tree, allocator);
+        try moveJetpackModifiers(file_tree, file_tree, allocator);
+        try removeJetpackModifiersFromActors(file_tree, file_tree, allocator);
+    }
 
     try applyOnNodesAlloc(maxLengthToOffsets, file_tree, allocator);
     try applyOnNodesAlloc(maxMassToMaxInventoryMass, file_tree, allocator);
@@ -1303,15 +1310,9 @@ fn aemitterToAejetpack(folder: *IniFolder, file_tree: *IniFolder, allocator: All
     }
 }
 
+// Translate "Jetpack = AEmitter" to "Jetpack = AEJetpack",
+// and its "AddEffect = AEmitter" children to "AddEffect = AEJetpack"
 fn aemitterToAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
-    // 1. Translate "Jetpack = AEmitter" to "Jetpack = AEJetpack", and its "AddEffect = AEmitter" children to "AddEffect = AEJetpack"
-    // Look up every "Jetpack = AEmitter"
-    //   Change it to "Jetpack = AEJetpack"
-    //   Remember the value of the "CopyOf" inside of the Jetpack
-    //   Iterate over every "AddEffect = AEmitter" and look up "PresetName = <CopyOf value>"
-    //     If it's in there, change the "AddEffect = AEmitter" to "AddEffect = AEJetpack"
-    //       Remember its "CopyOf" value
-    //       Recurse back to the "Iterate over" step
     if (node.property) |property| {
         if (strEql(property, "Jetpack")) {
             if (node.value) |value| {
@@ -1324,13 +1325,6 @@ fn aemitterToAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, alloca
         }
     }
 
-    // TODO: 2. If an Actor doesn't contain any Jetpack key, and it is CopyOf-ing an Actor that has a Jetpack with the value AEJetpack as the last key, copy that Jetpack's properties to its own, new Jetpack (this has to be done recursively, since a copied Jetpack may be in a CopyOf of a CopyOf)
-    // Look up every "AddActor = ACrab" and "AddActor = AHuman"
-    //   If it contains "Jetpack = None", yeet any Jetpack key from the Actor (JetTime, JetReplenishRate, JetAngleRange, JumpTime, JumpReplenishRate, and JumpAngleRange)
-    //   Else, if it recursively contains "Jetpack = AEmitter", move all Jetpack keys into its own "Jetpack = AEmitter", creating one if it doesn't have it already that contains its base object's jetpack keys at the start
-
-    // TODO: 3. If an Actor's last Jetpack key has the value AEJetpack, move the Actor's jetpack properties to it, and remove them otherwise
-
     for (node.children.items) |*child| {
         try aemitterToAejetpackRecursivelyNode(child, file_tree, allocator);
     }
@@ -1340,8 +1334,8 @@ fn addEffectAemitterToAddEffectAejetpackCopyOfFinder(node: *Node, file_tree: *In
     for (node.children.items) |*node_child| {
         if (node_child.property) |node_child_property| {
             if (strEql(node_child_property, "CopyOf")) {
-                if (node_child.value) |copy_of_value| {
-                    try addEffectAemitterToAddEffectAejetpackRecursivelyFolder(file_tree, file_tree, copy_of_value);
+                if (node_child.value) |preset_name| {
+                    try addEffectAemitterToAddEffectAejetpackRecursivelyFolder(file_tree, file_tree, preset_name);
                 } else {
                     return UpdateIniFileTreeErrors.ExpectedValue;
                 }
@@ -1350,19 +1344,19 @@ fn addEffectAemitterToAddEffectAejetpackCopyOfFinder(node: *Node, file_tree: *In
     }
 }
 
-fn addEffectAemitterToAddEffectAejetpackRecursivelyFolder(folder: *IniFolder, file_tree: *IniFolder, copy_of_value: []const u8) !void {
+fn addEffectAemitterToAddEffectAejetpackRecursivelyFolder(folder: *IniFolder, file_tree: *IniFolder, preset_name: []const u8) !void {
     for (folder.folders.items) |*subfolder| {
-        try addEffectAemitterToAddEffectAejetpackRecursivelyFolder(subfolder, file_tree, copy_of_value);
+        try addEffectAemitterToAddEffectAejetpackRecursivelyFolder(subfolder, file_tree, preset_name);
     }
 
     for (folder.files.items) |file| {
         for (file.ast.items) |*node| {
-            try addEffectAemitterToAddEffectAejetpackRecursivelyNode(node, file_tree, copy_of_value);
+            try addEffectAemitterToAddEffectAejetpackRecursivelyNode(node, file_tree, preset_name);
         }
     }
 }
 
-fn addEffectAemitterToAddEffectAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, copy_of_value: []const u8) !void {
+fn addEffectAemitterToAddEffectAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, preset_name: []const u8) !void {
     if (node.property) |property| {
         if (strEql(property, "AddEffect")) {
             if (node.value) |value| {
@@ -1371,7 +1365,7 @@ fn addEffectAemitterToAddEffectAejetpackRecursivelyNode(node: *Node, file_tree: 
                         if (child.property) |child_property| {
                             if (strEql(child_property, "PresetName")) {
                                 if (child.value) |child_value| {
-                                    if (strEql(child_value, copy_of_value)) {
+                                    if (strEql(child_value, preset_name)) {
                                         node.value = "AEJetpack";
 
                                         try addEffectAemitterToAddEffectAejetpackCopyOfFinder(node, file_tree);
@@ -1386,8 +1380,251 @@ fn addEffectAemitterToAddEffectAejetpackRecursivelyNode(node: *Node, file_tree: 
     }
 
     for (node.children.items) |*child| {
-        try addEffectAemitterToAddEffectAejetpackRecursivelyNode(child, file_tree, copy_of_value);
+        try addEffectAemitterToAddEffectAejetpackRecursivelyNode(child, file_tree, preset_name);
     }
+}
+
+fn moveJetpackModifiers(folder: *IniFolder, file_tree: *IniFolder, allocator: Allocator) !void {
+    for (folder.folders.items) |*subfolder| {
+        try moveJetpackModifiers(subfolder, file_tree, allocator);
+    }
+
+    for (folder.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try moveJetpackModifiersRecursivelyNode(node, file_tree, allocator);
+        }
+    }
+}
+
+// Move the Actor's jetpack modifiers to its last "Jetpack = AEJetpack",
+// where the modifiers get pushed to the back of the AEJetpack if they came after it,
+// and inserted at the front of it if they came before it.
+// Make sure to do this by looping through the Actor's keys from back-to-front,
+// stopping the loop if a CopyOf of an Actor is encountered.
+fn moveJetpackModifiersRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (strEql(property, "AddActor")) {
+            if (node.value) |value| {
+                if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
+                    var contains_aejetpack = false;
+                    for (node.children.items) |*child| {
+                        if (child.property) |child_property| {
+                            if (strEql(child_property, "Jetpack")) {
+                                if (child.value) |child_value| {
+                                    if (strEql(child_value, "AEJetpack")) {
+                                        contains_aejetpack = true;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (contains_aejetpack) {
+                        var modifier_index = node.children.items.len;
+                        while (modifier_index > 0) {
+                            modifier_index -= 1;
+                            const modifier = node.children.items[modifier_index];
+                            if (modifier.property) |modifier_property| {
+                                if (isJetpackModifier(modifier_property)) {
+                                    for (node.children.items, 0..) |*aejetpack, aejetpack_index| {
+                                        if (aejetpack.property) |aejetpack_property| {
+                                            if (strEql(aejetpack_property, "Jetpack")) {
+                                                if (aejetpack.value) |aejetpack_value| {
+                                                    if (strEql(aejetpack_value, "AEJetpack")) {
+                                                        if (aejetpack_index > modifier_index) {
+                                                            try aejetpack.children.insert(0, modifier);
+                                                        } else {
+                                                            try aejetpack.children.append(modifier);
+                                                        }
+                                                    }
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    _ = node.children.orderedRemove(modifier_index);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (node.children.items) |*child| {
+        try moveJetpackModifiersRecursivelyNode(child, file_tree, allocator);
+    }
+}
+
+fn copyJetpack(folder: *IniFolder, file_tree: *IniFolder, allocator: Allocator) !void {
+    for (folder.folders.items) |*subfolder| {
+        try copyJetpack(subfolder, file_tree, allocator);
+    }
+
+    for (folder.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try copyJetpackRecursivelyNode(node, file_tree, allocator);
+        }
+    }
+}
+
+// Looping back-to-front through every ACrab and AHuman Actor child node, if
+// 1. we first encounter the Actor containing any of the six Jetpack modifiers, and
+// 2. after that we encounter it CopyOfs an Actor that has a Jetpack with the value AEJetpack,
+// before our Actor has any "Jetpack =", .insert() that Jetpack in our own Actor
+// directly after the CopyOf.
+// The CopyOf has to be searched recursively, since a copied Jetpack may be in a CopyOf of a CopyOf.
+fn copyJetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
+    if (node.property) |property| {
+        if (strEql(property, "AddActor")) {
+            if (node.value) |value| {
+                if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
+                    var seen_jetpack_modifier = false;
+                    var i = node.children.items.len;
+                    while (i > 0) {
+                        i -= 1;
+                        const child = node.children.items[i];
+                        if (child.property) |child_property| {
+                            if (strEql(child_property, "Jetpack")) {
+                                break;
+                            } else if (isJetpackModifier(child_property)) {
+                                seen_jetpack_modifier = true;
+                            } else if (strEql(child_property, "CopyOf")) {
+                                if (child.value) |preset_name| {
+                                    if (findJetpackRecursivelyFolder(file_tree, file_tree, preset_name)) |jetpack| {
+                                        const jetpack_deepcopy = try deepCopyNode(jetpack, allocator);
+                                        try node.children.insert(i + 1, jetpack_deepcopy);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (node.children.items) |*child| {
+        try copyJetpackRecursivelyNode(child, file_tree, allocator);
+    }
+}
+
+fn deepCopyNode(input_node: *Node, allocator: Allocator) !Node {
+    var returned_node = Node{
+        .property = if (input_node.property) |property| try allocator.dupe(u8, property) else null,
+        .value = if (input_node.value) |value| try allocator.dupe(u8, value) else null,
+        .comments = ArrayList([]const u8).init(allocator),
+        .children = ArrayList(Node).init(allocator),
+    };
+
+    for (input_node.comments.items) |comment| {
+        try returned_node.comments.append(try allocator.dupe(u8, comment));
+    }
+
+    for (input_node.children.items) |*child| {
+        try returned_node.children.append(try deepCopyNode(child, allocator));
+    }
+
+    return returned_node;
+}
+
+fn removeJetpackModifiersFromActors(folder: *IniFolder, file_tree: *IniFolder, allocator: Allocator) !void {
+    for (folder.folders.items) |*subfolder| {
+        try removeJetpackModifiersFromActors(subfolder, file_tree, allocator);
+    }
+
+    for (folder.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try removeJetpackModifiersFromActorsRecursivelyNode(node, file_tree, allocator);
+        }
+    }
+}
+
+fn removeJetpackModifiersFromActorsRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
+    // TODO:
+
+    for (node.children.items) |*child| {
+        try removeJetpackModifiersFromActorsRecursivelyNode(child, file_tree, allocator);
+    }
+}
+
+fn isJetpackModifier(property: []const u8) bool {
+    return strEql(property, "JumpTime") or strEql(property, "JetTime") or strEql(property, "JumpReplenishRate") or strEql(property, "JetReplenishRate") or strEql(property, "JumpAngleRange") or strEql(property, "JetAngleRange");
+}
+
+fn findJetpackRecursivelyFolder(folder: *IniFolder, file_tree: *IniFolder, preset_name: []const u8) ?*Node {
+    for (folder.folders.items) |*subfolder| {
+        if (findJetpackRecursivelyFolder(subfolder, file_tree, preset_name)) |returned| {
+            return returned;
+        }
+    }
+
+    for (folder.files.items) |file| {
+        for (file.ast.items) |*node| {
+            if (findJetpackRecursivelyNode(node, file_tree, preset_name)) |returned| {
+                return returned;
+            }
+        }
+    }
+
+    return null;
+}
+
+fn findJetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, preset_name: []const u8) ?*Node {
+    if (node.property) |property| {
+        if (strEql(property, "AddActor")) {
+            if (node.value) |value| {
+                if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
+                    var found_searched_for_preset_name = false;
+                    for (node.children.items) |*child| {
+                        if (child.property) |child_property| {
+                            if (strEql(child_property, "PresetName")) {
+                                if (child.value) |child_value| {
+                                    if (strEql(child_value, preset_name)) {
+                                        found_searched_for_preset_name = true;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (found_searched_for_preset_name) {
+                        var i = node.children.items.len;
+                        while (i > 0) {
+                            i -= 1;
+                            const child = &node.children.items[i];
+                            if (child.property) |child_property| {
+                                if (strEql(child_property, "Jetpack")) {
+                                    if (child.value) |child_value| {
+                                        if (strEql(child_value, "AEJetpack")) {
+                                            return child;
+                                        }
+                                    }
+                                } else if (strEql(child_property, "CopyOf")) {
+                                    if (child.value) |child_preset_name| {
+                                        return findJetpackRecursivelyFolder(file_tree, file_tree, child_preset_name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for (node.children.items) |*child| {
+        if (findJetpackRecursivelyNode(child, file_tree, preset_name)) |returned| {
+            return returned;
+        }
+    }
+
+    return null;
 }
 
 fn maxLengthToOffsets(node: *Node, allocator: Allocator) !void {
