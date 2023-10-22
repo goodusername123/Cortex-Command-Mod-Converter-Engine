@@ -1906,8 +1906,8 @@ fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
                                 child.children = ArrayList(Node).init(allocator);
                             }
 
-                            // Remove ScrollRatio from the Terrain
-                            if (strEql(child_property, "ScrollRatio")) {
+                            // Remove ScrollRatio and ScaleFactor from the Terrain
+                            if (strEql(child_property, "ScrollRatio") or strEql(child_property, "ScaleFactor")) {
                                 if (child.value) |child_value| {
                                     if (strEql(child_value, "Vector")) {
                                         child.property = null;
