@@ -1429,9 +1429,9 @@ fn moveJetpackModifiersRecursivelyNode(node: *Node, file_tree: *IniFolder, alloc
                                                     } else {
                                                         try aejetpack.children.append(modifier);
                                                     }
+                                                    _ = node.children.orderedRemove(modifier_index);
+                                                    break;
                                                 }
-                                                _ = node.children.orderedRemove(modifier_index);
-                                                break;
                                             }
                                         }
                                     }
