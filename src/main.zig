@@ -1191,7 +1191,7 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
     try applyOnNodesAlloc(addOrUpdateSupportedGameVersion, file_tree, allocator);
     try applyOnNodes(aemitterFuelToPemitter, file_tree);
 
-    // AEJetpacks being made first-class citizens by Causeless
+    // Handles AEJetpacks being made first-class citizens by Causeless
     {
         try aemitterToAejetpack(file_tree, file_tree, allocator);
         try moveJetpackModifiers(file_tree, file_tree, allocator);
@@ -1406,45 +1406,35 @@ fn moveJetpackModifiersRecursivelyNode(node: *Node, file_tree: *IniFolder, alloc
         if (strEql(property, "AddActor")) {
             if (node.value) |value| {
                 if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
-                    var contains_aejetpack = false;
-                    for (node.children.items) |*child| {
-                        if (child.property) |child_property| {
-                            if (strEql(child_property, "Jetpack")) {
-                                if (child.value) |child_value| {
-                                    if (strEql(child_value, "AEJetpack")) {
-                                        contains_aejetpack = true;
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
-                    if (contains_aejetpack) {
-                        var modifier_index = node.children.items.len;
-                        while (modifier_index > 0) {
-                            modifier_index -= 1;
-                            const modifier = node.children.items[modifier_index];
-                            if (modifier.property) |modifier_property| {
-                                if (isJetpackModifier(modifier_property)) {
-                                    for (node.children.items, 0..) |*aejetpack, aejetpack_index| {
-                                        if (aejetpack.property) |aejetpack_property| {
-                                            if (strEql(aejetpack_property, "Jetpack")) {
-                                                if (aejetpack.value) |aejetpack_value| {
-                                                    if (strEql(aejetpack_value, "AEJetpack")) {
-                                                        if (aejetpack_index > modifier_index) {
-                                                            try aejetpack.children.insert(0, modifier);
-                                                        } else {
-                                                            try aejetpack.children.append(modifier);
-                                                        }
+                    var modifier_index = node.children.items.len;
+                    blk: while (modifier_index > 0) {
+                        modifier_index -= 1;
+                        const modifier = node.children.items[modifier_index];
+                        if (modifier.property) |modifier_property| {
+                            if (strEql(modifier_property, "CopyOf")) {
+                                break;
+                            } else if (isJetpackModifier(modifier_property)) {
+                                var aejetpack_index = node.children.items.len;
+                                while (aejetpack_index > 0) {
+                                    aejetpack_index -= 1;
+                                    const aejetpack = &node.children.items[aejetpack_index];
+                                    if (aejetpack.property) |aejetpack_property| {
+                                        if (strEql(aejetpack_property, "CopyOf")) {
+                                            break :blk;
+                                        } else if (strEql(aejetpack_property, "Jetpack")) {
+                                            if (aejetpack.value) |aejetpack_value| {
+                                                if (strEql(aejetpack_value, "AEJetpack")) {
+                                                    if (aejetpack_index > modifier_index) {
+                                                        try aejetpack.children.insert(0, modifier);
+                                                    } else {
+                                                        try aejetpack.children.append(modifier);
                                                     }
-                                                    break;
                                                 }
+                                                _ = node.children.orderedRemove(modifier_index);
+                                                break;
                                             }
                                         }
                                     }
-
-                                    _ = node.children.orderedRemove(modifier_index);
                                 }
                             }
                         }
@@ -1492,7 +1482,7 @@ fn copyJetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: All
                                 break;
                             } else if (isJetpackModifier(child_property)) {
                                 seen_jetpack_modifier = true;
-                            } else if (strEql(child_property, "CopyOf")) {
+                            } else if (seen_jetpack_modifier and strEql(child_property, "CopyOf")) {
                                 if (child.value) |preset_name| {
                                     if (findJetpackRecursivelyFolder(file_tree, file_tree, preset_name)) |jetpack| {
                                         const jetpack_deepcopy = try deepCopyNode(jetpack, allocator);
@@ -1545,7 +1535,24 @@ fn removeJetpackModifiersFromActors(folder: *IniFolder, file_tree: *IniFolder, a
 }
 
 fn removeJetpackModifiersFromActorsRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
-    // TODO:
+    if (node.property) |property| {
+        if (strEql(property, "AddActor")) {
+            if (node.value) |value| {
+                if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
+                    var i = node.children.items.len;
+                    while (i > 0) {
+                        i -= 1;
+                        const child = node.children.items[i];
+                        if (child.property) |child_property| {
+                            if (isJetpackModifier(child_property)) {
+                                _ = node.children.orderedRemove(i);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     for (node.children.items) |*child| {
         try removeJetpackModifiersFromActorsRecursivelyNode(child, file_tree, allocator);
@@ -1884,20 +1891,6 @@ fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
                 if (strEql(value, "SLTerrain")) {
                     for (node.children.items) |*child| {
                         if (child.property) |child_property| {
-                            // Remove Offset from the Terrain
-                            if (strEql(child_property, "Offset")) {
-                                if (child.value) |child_value| {
-                                    if (strEql(child_value, "Vector")) {
-                                        child.property = null;
-                                        child.value = null;
-                                        child.comments = ArrayList([]const u8).init(allocator);
-                                        child.children = ArrayList(Node).init(allocator);
-                                    }
-                                } else {
-                                    return UpdateIniFileTreeErrors.ExpectedValue;
-                                }
-                            }
-
                             // Remove DrawTransparent from the Terrain
                             if (strEql(child_property, "DrawTransparent")) {
                                 child.property = null;
@@ -1906,8 +1899,8 @@ fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
                                 child.children = ArrayList(Node).init(allocator);
                             }
 
-                            // Remove ScrollRatio and ScaleFactor from the Terrain
-                            if (strEql(child_property, "ScrollRatio") or strEql(child_property, "ScaleFactor")) {
+                            // Remove Offset and ScrollRatio and ScaleFactor from the Terrain
+                            if (strEql(child_property, "Offset") or strEql(child_property, "ScrollRatio") or strEql(child_property, "ScaleFactor")) {
                                 if (child.value) |child_value| {
                                     if (strEql(child_value, "Vector")) {
                                         child.property = null;
