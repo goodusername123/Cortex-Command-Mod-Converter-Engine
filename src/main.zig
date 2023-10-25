@@ -1406,37 +1406,88 @@ fn moveJetpackModifiersRecursivelyNode(node: *Node, file_tree: *IniFolder, alloc
         if (strEql(property, "AddActor")) {
             if (node.value) |value| {
                 if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
-                    var modifier_index = node.children.items.len;
-                    blk: while (modifier_index > 0) {
-                        modifier_index -= 1;
-                        const modifier = node.children.items[modifier_index];
-                        if (modifier.property) |modifier_property| {
-                            if (strEql(modifier_property, "CopyOf")) {
-                                break;
-                            } else if (isJetpackModifier(modifier_property)) {
-                                var aejetpack_index = node.children.items.len;
-                                while (aejetpack_index > 0) {
-                                    aejetpack_index -= 1;
-                                    const aejetpack = &node.children.items[aejetpack_index];
-                                    if (aejetpack.property) |aejetpack_property| {
-                                        if (strEql(aejetpack_property, "CopyOf")) {
-                                            break :blk;
-                                        } else if (strEql(aejetpack_property, "Jetpack")) {
-                                            if (aejetpack.value) |aejetpack_value| {
-                                                if (strEql(aejetpack_value, "AEJetpack")) {
-                                                    if (aejetpack_index > modifier_index) {
-                                                        try aejetpack.children.insert(0, modifier);
-                                                    } else {
-                                                        try aejetpack.children.append(modifier);
+                    no_copyof_blk: while (true) {
+                        var modifier_index: usize = 0;
+                        var removed = false;
+                        modifier_blk: while (modifier_index < node.children.items.len) {
+                            const modifier = node.children.items[modifier_index];
+                            if (modifier.property) |modifier_property| {
+                                if (isJetpackModifier(modifier_property)) {
+                                    // The AEJetpack *HAS* to be refound every time,
+                                    // in order for aejetpack_index to stay accurate
+                                    var aejetpack_index = node.children.items.len;
+                                    aejetpack_blk: while (aejetpack_index > 0) {
+                                        aejetpack_index -= 1;
+                                        const aejetpack = &node.children.items[aejetpack_index];
+                                        if (aejetpack.property) |aejetpack_property| {
+                                            // If there is no AEJetpack for it to be copied to
+                                            if (strEql(aejetpack_property, "CopyOf")) {
+                                                break :no_copyof_blk;
+                                            } else if (strEql(aejetpack_property, "Jetpack")) {
+                                                if (aejetpack.value) |aejetpack_value| {
+                                                    if (strEql(aejetpack_value, "AEJetpack")) {
+                                                        if (modifier_index > aejetpack_index) {
+                                                            try aejetpack.children.append(modifier);
+                                                            _ = node.children.orderedRemove(modifier_index);
+                                                            removed = true;
+                                                            break :modifier_blk;
+                                                        } else {
+                                                            break :aejetpack_blk;
+                                                        }
                                                     }
-                                                    _ = node.children.orderedRemove(modifier_index);
-                                                    break;
                                                 }
                                             }
                                         }
                                     }
                                 }
                             }
+                            modifier_index += 1;
+                        }
+                        if (!removed) {
+                            break;
+                        }
+                    }
+                    no_copyof_blk: while (true) {
+                        var modifier_index = node.children.items.len;
+                        var removed = false;
+                        modifier_blk: while (modifier_index > 0) {
+                            modifier_index -= 1;
+                            const modifier = node.children.items[modifier_index];
+                            if (modifier.property) |modifier_property| {
+                                if (strEql(modifier_property, "CopyOf")) {
+                                    break :no_copyof_blk;
+                                } else if (isJetpackModifier(modifier_property)) {
+                                    // The AEJetpack *HAS* to be refound every time,
+                                    // in order for aejetpack_index to stay accurate
+                                    var aejetpack_index = node.children.items.len;
+                                    aejetpack_blk: while (aejetpack_index > 0) {
+                                        aejetpack_index -= 1;
+                                        const aejetpack = &node.children.items[aejetpack_index];
+                                        if (aejetpack.property) |aejetpack_property| {
+                                            // If there is no AEJetpack for it to be copied to
+                                            if (strEql(aejetpack_property, "CopyOf")) {
+                                                break :no_copyof_blk;
+                                            } else if (strEql(aejetpack_property, "Jetpack")) {
+                                                if (aejetpack.value) |aejetpack_value| {
+                                                    if (strEql(aejetpack_value, "AEJetpack")) {
+                                                        if (modifier_index < aejetpack_index) {
+                                                            try aejetpack.children.insert(0, modifier);
+                                                            _ = node.children.orderedRemove(modifier_index);
+                                                            removed = true;
+                                                            break :modifier_blk;
+                                                        } else {
+                                                            break :aejetpack_blk;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (!removed) {
+                            break;
                         }
                     }
                 }
