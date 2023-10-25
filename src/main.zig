@@ -123,6 +123,8 @@ const IniFolder = struct {
     folders: ArrayList(IniFolder),
 };
 
+/// Updated by `convert()` to record what it is doing.
+/// If `convert()` crashed, look inside this struct to see why and where it did.
 pub const Diagnostics = struct {
     file_path: ?[]const u8 = null,
     token: ?[]const u8 = null,
@@ -139,6 +141,7 @@ const UpdateIniFileTreeErrors = error{
     ExpectedValue,
 };
 
+// TODO: Refactor into a CLI
 pub fn main() !void {
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
@@ -195,6 +198,8 @@ pub fn main() !void {
     try zip_mods(input_folder_path, output_folder_path, allocator);
 }
 
+/// For every mod directory in `input_folder_path`, it creates a copy of the mod directory in `output_folder_path` with the required changes to make it compatible with the latest version of the game.
+/// If `convert()` crashed, the `diagnostics` argument allows you to know why and where it did.
 pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
     std.debug.print("Making all output dirs...\n", .{});
     try makeOutputDirs(input_folder_path, output_folder_path, allocator);
@@ -1396,11 +1401,12 @@ fn moveJetpackModifiers(folder: *IniFolder, file_tree: *IniFolder, allocator: Al
     }
 }
 
-// Move the Actor's jetpack modifiers to its last "Jetpack = AEJetpack",
-// where the modifiers get pushed to the back of the AEJetpack if they came after it,
-// and inserted at the front of it if they came before it.
-// Make sure to do this by looping through the Actor's keys from back-to-front,
-// stopping the loop if a CopyOf of an Actor is encountered.
+/// Move the Actor's jetpack modifiers to its last "Jetpack = AEJetpack",
+/// where the modifiers get pushed to the back of the AEJetpack if they came after it,
+/// and inserted to the front of it if they came before it.
+/// Modifiers that come after the AEJetpack are .appended() in a forwards loop.
+/// Modifiers that come before the AEJetpack are .inserted() in a backwards loop,
+/// where the loop is stopped if a CopyOf is encountered.
 fn moveJetpackModifiersRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
     if (node.property) |property| {
         if (strEql(property, "AddActor")) {
@@ -2511,6 +2517,8 @@ fn verifyInvalidTestThrowsError(text: *const []const u8, allocator: Allocator) !
     unreachable;
 }
 
+/// For every directory name in `input_folder_path`, it looks in `output_folder_path` for a directory with the same name.
+/// If there is a directory with the same name, it creates a zip of that directory next to it.
 pub fn zip_mods(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
     var iterable_dir = try std.fs.openIterableDirAbsolute(input_folder_path, .{});
     defer iterable_dir.close();
