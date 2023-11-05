@@ -2,14 +2,10 @@
 !*/
 !.vscode/launch.json
 !.vscode/tasks.json
-!docker/Dockerfile
-!docker/get_url.py
-!src/**/*.py
-!src/cortex_command_mod_converter_engine/conversion_rules/**/*.json
-!src/cortex_command_mod_converter_engine/stylua_executables/linux/stylua
-!src/cortex_command_mod_converter_engine/stylua_executables/windows/stylua.exe
 !src/*.json
-!src/**/*.zig
+!src/main.zig
+!stylua_executables/linux/stylua
+!stylua_executables/windows/stylua.exe
 !submodules/*
 !tests/**/*.ini
 !tests/**/*.txt
