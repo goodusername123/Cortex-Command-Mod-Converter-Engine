@@ -180,6 +180,8 @@ pub fn main() !void {
                 line,
                 column,
             });
+
+            return err;
         },
         error.TooManyTabs => {
             const file_path = diagnostics.file_path orelse "null";
@@ -191,6 +193,8 @@ pub fn main() !void {
                 line,
                 column,
             });
+
+            return err;
         },
         else => |e| return e,
     };
