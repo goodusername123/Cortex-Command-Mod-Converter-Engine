@@ -1259,8 +1259,8 @@ fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
                         has_supported_game_version = true;
 
                         if (child.value) |child_value| {
-                            if (!strEql(child_value, "Pre-Release 5.0")) {
-                                child.value = "Pre-Release 5.0";
+                            if (!strEql(child_value, "5.1.0")) {
+                                child.value = "5.1.0";
                             }
                         }
                     }
@@ -1270,7 +1270,7 @@ fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
             if (!has_supported_game_version) {
                 try node.children.append(Node{
                     .property = "SupportedGameVersion",
-                    .value = "Pre-Release 5.0",
+                    .value = "5.1.0",
                     .comments = ArrayList([]const u8).init(allocator),
                     .children = ArrayList(Node).init(allocator),
                 });
