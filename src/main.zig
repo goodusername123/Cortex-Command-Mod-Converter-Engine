@@ -1959,7 +1959,7 @@ fn applyPieQuadrantSlotLimit(pie_menu: *Node, direction: []const u8, starting_di
 
 fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (strEql(property, "Terrain")) {
+        if (strEql(property, "Terrain") or strEql(property, "AddTerrain")) {
             if (node.value) |value| {
                 if (strEql(value, "SLTerrain")) {
                     for (node.children.items) |*child| {
