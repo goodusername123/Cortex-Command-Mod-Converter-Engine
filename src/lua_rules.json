@@ -4,6 +4,7 @@
 	":Running(": ":IsRunning(",
 	":Paused(": ":IsPaused(",
 	":ActivityOver(": ":IsOver(",
+	"SceneMan:GetOffset(": "CameraMan:GetOffset(",
 	"SceneMan:SetOffset(": "CameraMan:SetOffset(",
 	"SceneMan:GetScreenOcclusion(": "CameraMan:GetScreenOcclusion(",
 	"SceneMan:SetScreenOcclusion(": "CameraMan:SetScreenOcclusion(",
