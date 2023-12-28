@@ -904,7 +904,7 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
-// Uninitialized is for detecting SupportedGameVersion being seen a second time
+// Uninitialized is used to detect SupportedGameVersion being seen a second time
 const ModVersion = enum {
     Uninitialized,
     BeforePre6,
@@ -948,6 +948,7 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
                     return ModVersionErrors.AlreadySeenAModVersion;
                 }
                 if (strEql(value, "5.1.0")) {
+                    // TODO: Should this be "= ModVersion.Pre5" instead?
                     mod_version.* = ModVersion.Pre6;
                 } else if (!strEql(value, "Pre-Release 3.0")) {
                     return ModVersionErrors.UnrecognizedModVersion;
@@ -1261,6 +1262,7 @@ fn applyIniSoundContainerRulesRecursivelyNode(node: *Node, property: []const u8)
 }
 
 fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
+    try applyOnNodesAlloc(addGetsHitByMosWhenHeldToShields, file_tree, allocator);
     try applyOnNodesAlloc(addGripStrength, file_tree, allocator);
     try applyOnNodesAlloc(addOrUpdateSupportedGameVersion, file_tree, allocator);
     try applyOnNodes(aemitterFuelToPemitter, file_tree);
@@ -1288,6 +1290,46 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
 
     try applyOnNodesAlloc(removeSlTerrainProperties, file_tree, allocator);
     try applyOnNodes(shovelFlashFix, file_tree);
+}
+
+fn addGetsHitByMosWhenHeldToShields(node: *Node, allocator: Allocator) !void {
+    if (node.property) |node_property| {
+        if (strEql(node_property, "AddDevice")) {
+            if (node.value) |node_value| {
+                if (strEql(node_value, "HeldDevice")) {
+                    var children = &node.children;
+
+                    var is_in_shield_group = false;
+
+                    for (children.items) |child| {
+                        if (child.property) |property| {
+                            if (strEql(property, "GetsHitByMOsWhenHeld")) {
+                                return;
+                            }
+                            if (strEql(property, "AddToGroup")) {
+                                if (child.value) |value| {
+                                    if (strEql(value, "Shields")) {
+                                        is_in_shield_group = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!is_in_shield_group) {
+                        return;
+                    }
+
+                    try children.append(Node{
+                        .property = "GetsHitByMOsWhenHeld",
+                        .value = "1",
+                        .comments = ArrayList([]const u8).init(allocator),
+                        .children = ArrayList(Node).init(allocator),
+                    });
+                }
+            }
+        }
+    }
 }
 
 fn addGripStrength(node: *Node, allocator: Allocator) !void {
