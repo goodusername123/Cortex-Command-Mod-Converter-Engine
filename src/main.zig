@@ -141,6 +141,8 @@ const UpdateIniFileTreeErrors = error{
     ExpectedValue,
 };
 
+const converter_game_version = "5.1.0";
+
 // TODO: Refactor into a CLI
 pub fn main() !void {
     var arena = ArenaAllocator.init(page_allocator);
@@ -219,6 +221,10 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
 
     std.debug.print("Getting INI file tree...\n", .{});
     var file_tree = try getIniFileTree(input_folder_path, allocator, diagnostics);
+
+    std.debug.print("Getting the mod's game version...\n", .{});
+    const mod_version = try getModVersion(&file_tree);
+    _ = mod_version;
 
     try applyOnNodes(pathToFilePath, &file_tree);
 
@@ -898,6 +904,63 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
+// Uninitialized is for detecting SupportedGameVersion being seen a second time
+const ModVersion = enum {
+    Uninitialized,
+    BeforePre6,
+    Pre6,
+};
+
+const ModVersionErrors = error{
+    AlreadySeenAModVersion,
+    UnrecognizedModVersion,
+};
+
+fn getModVersion(file_tree: *IniFolder) !ModVersion {
+    var mod_version = ModVersion.Uninitialized;
+
+    try getModVersionRecursivelyFolder(file_tree, &mod_version);
+
+    if (mod_version == ModVersion.Uninitialized) {
+        mod_version = ModVersion.BeforePre6;
+    }
+
+    return mod_version;
+}
+
+fn getModVersionRecursivelyFolder(file_tree: *IniFolder, mod_version: *ModVersion) !void {
+    for (file_tree.folders.items) |*folder| {
+        try getModVersionRecursivelyFolder(folder, mod_version);
+    }
+
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            try getModVersionRecursivelyNode(node, mod_version);
+        }
+    }
+}
+
+fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
+    if (node.property) |node_property| {
+        if (strEql(node_property, "SupportedGameVersion")) {
+            if (node.value) |value| {
+                if (mod_version.* != ModVersion.Uninitialized) {
+                    return ModVersionErrors.AlreadySeenAModVersion;
+                }
+                if (strEql(value, "5.1.0")) {
+                    mod_version.* = ModVersion.Pre6;
+                } else if (!strEql(value, "Pre-Release 3.0")) {
+                    return ModVersionErrors.UnrecognizedModVersion;
+                }
+            }
+        }
+    }
+
+    for (node.children.items) |*child| {
+        try getModVersionRecursivelyNode(child, mod_version);
+    }
+}
+
 const nodeCallbackDef = fn (node: *Node) error{ ExpectedValue, InvalidCharacter, OutOfMemory }!void;
 
 fn applyOnNodes(comptime nodeCallbackFn: nodeCallbackDef, file_tree: *IniFolder) !void {
@@ -1265,8 +1328,8 @@ fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
                         has_supported_game_version = true;
 
                         if (child.value) |child_value| {
-                            if (!strEql(child_value, "5.1.0")) {
-                                child.value = "5.1.0";
+                            if (!strEql(child_value, converter_game_version)) {
+                                child.value = converter_game_version;
                             }
                         }
 
@@ -1278,7 +1341,7 @@ fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
             if (!has_supported_game_version) {
                 try node.children.append(Node{
                     .property = "SupportedGameVersion",
-                    .value = "5.1.0",
+                    .value = converter_game_version,
                     .comments = ArrayList([]const u8).init(allocator),
                     .children = ArrayList(Node).init(allocator),
                 });
@@ -2319,6 +2382,10 @@ test "ini_rules" {
                 .ast = ast,
             });
 
+            std.debug.print("Getting the mod's game version...\n", .{});
+            const mod_version = try getModVersion(&file_tree);
+            _ = mod_version;
+
             try applyOnNodes(pathToFilePath, &file_tree);
 
             try applyOnNodesAlloc(bmpExtensionToPng, &file_tree, allocator);
@@ -2422,6 +2489,10 @@ test "updated" {
                 .name = "",
                 .ast = ast,
             });
+
+            std.debug.print("Getting the mod's game version...\n", .{});
+            const mod_version = try getModVersion(&file_tree);
+            _ = mod_version;
 
             try applyOnNodes(pathToFilePath, &file_tree);
 
@@ -2527,7 +2598,20 @@ fn verifyInvalidTestThrowsError(text: *const []const u8, allocator: Allocator) !
 
     var diagnostics: Diagnostics = .{};
     var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
-    _ = ast;
+
+    var file_tree = IniFolder{
+        .name = "",
+        .files = ArrayList(IniFile).init(allocator),
+        .folders = ArrayList(IniFolder).init(allocator),
+    };
+
+    try file_tree.files.append(IniFile{
+        .name = "",
+        .ast = ast,
+    });
+
+    const mod_version = try getModVersion(&file_tree);
+    _ = mod_version;
 
     // Tests from the invalid/ folder should always return an error from this function before reaching this
     unreachable;
