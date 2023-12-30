@@ -950,11 +950,6 @@ const ModVersion = enum {
     Pre6,
 };
 
-const ModVersionErrors = error{
-    AlreadySeenASupportedGameVersion,
-    UnrecognizedModVersion,
-};
-
 fn getModVersion(file_tree: *IniFolder) !ModVersion {
     var mod_version = ModVersion.Uninitialized;
 
@@ -980,6 +975,11 @@ fn getModVersionRecursivelyFolder(file_tree: *IniFolder, mod_version: *ModVersio
 }
 
 fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
+    const ModVersionErrors = error{
+        AlreadySeenASupportedGameVersion,
+        UnrecognizedModVersion,
+    };
+
     if (node.property) |node_property| {
         if (strEql(node_property, "SupportedGameVersion")) {
             if (node.value) |value| {
@@ -987,7 +987,7 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
                     return ModVersionErrors.AlreadySeenASupportedGameVersion;
                 }
                 if (strEql(value, "5.1.0")) {
-                    // TODO: Should this be "= ModVersion.Pre5" instead?
+                    // TODO: Change this to "= ModVersion.Pre5" once Pre6 is released
                     mod_version.* = ModVersion.Pre6;
                 } else if (strEql(value, "Pre-Release 3.0")) {
                     mod_version.* = ModVersion.BeforePre6;
@@ -2293,12 +2293,6 @@ fn writeBuffered(buffered_writer: anytype, string: []const u8) !void {
 }
 
 test "general" {
-    var tmpdir = tmpDir(.{});
-    defer tmpdir.cleanup();
-
-    var output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const output_folder_path = try tmpdir.dir.realpath(".", &output_folder_path_buffer);
-
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/general", .{});
     defer iterable_tests.close();
 
@@ -2309,24 +2303,36 @@ test "general" {
     var tests_walker = try iterable_tests.walk(allocator);
 
     while (try tests_walker.next()) |entry| {
-        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const input_folder_path = try entry.dir.realpath(".", &out_buffer);
-
         if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
+            var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+            const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
+            const input_path = try join(allocator, &.{ input_folder_path, "in.ini" });
+
+            var tmpdir_input_folder = tmpDir(.{});
+            defer tmpdir_input_folder.cleanup();
+            var tmpdir_input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+            const tmpdir_input_folder_path = try tmpdir_input_folder.dir.realpath(".", &tmpdir_input_folder_path_buffer);
+            const tmpdir_input_path = try join(allocator, &.{ tmpdir_input_folder_path, "in.ini" });
+
+            try copyFileAbsolute(input_path, tmpdir_input_path, .{});
+
+            var tmpdir_output_folder = tmpDir(.{});
+            defer tmpdir_output_folder.cleanup();
+            var tmpdir_output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+            const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
+
             std.debug.print("\nSubtest 'general/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
             // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
 
-            const expected_path = try join(allocator, &.{ input_folder_path, "out.ini" });
-            const output_path = try join(allocator, &.{ output_folder_path, "out.ini" });
-
-            // std.debug.print("input_folder_path: {s}\noutput_folder_path: {s}\n\n", .{ input_folder_path, output_folder_path });
+            // std.debug.print("input_folder_path: {s}\ntmpdir_output_folder_path: {s}\n\n", .{ input_folder_path, tmpdir_output_folder_path });
             // std.debug.print("expected_path: {s}\noutput_path: {s}\n\n", .{ expected_path, output_path });
 
             var diagnostics: Diagnostics = .{};
-            try convert(input_folder_path, output_folder_path, allocator, &diagnostics);
+            try convert(tmpdir_input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics);
 
             const cwd = std.fs.cwd();
 
+            const expected_path = try join(allocator, &.{ input_folder_path, "out.ini" });
             const expected_file = try cwd.openFile(expected_path, .{});
             defer expected_file.close();
             var expected_buf_reader = bufferedReader(expected_file.reader());
@@ -2334,6 +2340,7 @@ test "general" {
             const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
             const expected_text = try crlfToLf(expected_text_crlf, allocator);
 
+            const output_path = try join(allocator, &.{ tmpdir_output_folder_path, "in.ini" });
             const output_file = try cwd.openFile(output_path, .{});
             defer output_file.close();
             var output_buf_reader = bufferedReader(output_file.reader());
@@ -2366,21 +2373,21 @@ test "lua_rules" {
     var tests_walker = try iterable_tests.walk(allocator);
 
     while (try tests_walker.next()) |entry| {
-        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const dir_path = try entry.dir.realpath(".", &out_buffer);
+        var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+        const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
 
         if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.lua")) {
             std.debug.print("\nSubtest 'lua_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
 
-            const input_path = try join(allocator, &.{ dir_path, "in.lua" });
-            const expected_path = try join(allocator, &.{ dir_path, "out.lua" });
+            const input_path = try join(allocator, &.{ input_folder_path, "in.lua" });
+            const expected_path = try join(allocator, &.{ input_folder_path, "out.lua" });
             const output_path = try join(allocator, &.{ tmpdir_path, "output.lua" });
 
             // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
 
             // const text = try readFile(input_path, allocator);
 
-            _ = try updateFileAbsolute(input_path, output_path, .{});
+            _ = try copyFileAbsolute(input_path, output_path, .{});
 
             const lua_rules = try parseLuaRules(allocator);
             try applyLuaRules(lua_rules, tmpdir_path, allocator);
@@ -2483,15 +2490,15 @@ test "updated" {
     var tests_walker = try iterable_tests.walk(allocator);
 
     while (try tests_walker.next()) |entry| {
-        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const dir_path = try entry.dir.realpath(".", &out_buffer);
+        var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+        const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
 
         if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'updated/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
 
-            const input_path = try join(allocator, &.{ dir_path, "in.ini" });
-            const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
+            const input_path = try join(allocator, &.{ input_folder_path, "in.ini" });
+            const expected_path = try join(allocator, &.{ input_folder_path, "out.ini" });
 
             const output_path = try join(allocator, &.{ tmpdir_path, "out.ini" });
 
@@ -2575,6 +2582,12 @@ test "updated" {
 }
 
 test "invalid" {
+    var tmpdir = tmpDir(.{});
+    defer tmpdir.cleanup();
+
+    var output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    const output_folder_path = try tmpdir.dir.realpath(".", &output_folder_path_buffer);
+
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/invalid", .{});
     defer iterable_tests.close();
 
@@ -2586,14 +2599,14 @@ test "invalid" {
 
     while (try tests_walker.next()) |entry| {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const dir_path = try entry.dir.realpath(".", &out_buffer);
+        const input_folder_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'invalid/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
 
-            const input_path = try join(allocator, &.{ dir_path, "in.ini" });
-            const error_path = try join(allocator, &.{ dir_path, "error.txt" });
+            const input_path = try join(allocator, &.{ input_folder_path, "in.ini" });
+            const error_path = try join(allocator, &.{ input_folder_path, "error.txt" });
 
             // std.debug.print("{s}\n{s}\n\n", .{ input_path, error_path });
 
@@ -2606,40 +2619,22 @@ test "invalid" {
             const error_text = try crlfToLf(error_text_crlf, allocator);
 
             const text = try readFile(input_path, allocator);
+            _ = text;
 
-            verifyInvalidTestThrowsError(&text, allocator) catch |err| {
+            var diagnostics: Diagnostics = .{};
+            convert(input_folder_path, output_folder_path, allocator, &diagnostics) catch |err| {
                 try expectEqualStrings(error_text, @errorName(err));
+                std.debug.print(" passed", .{});
+                continue;
             };
 
-            std.debug.print(" passed", .{});
+            // All tests from the invalid/ folder should return an error in convert()
+            // before reaching this
+            unreachable;
         }
     }
 
     std.debug.print("\n\n", .{});
-}
-
-fn verifyInvalidTestThrowsError(text: *const []const u8, allocator: Allocator) !void {
-    var tokens = try getTokens(text.*, allocator);
-
-    var diagnostics: Diagnostics = .{};
-    var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
-
-    var file_tree = IniFolder{
-        .name = "",
-        .files = ArrayList(IniFile).init(allocator),
-        .folders = ArrayList(IniFolder).init(allocator),
-    };
-
-    try file_tree.files.append(IniFile{
-        .name = "",
-        .ast = ast,
-    });
-
-    const mod_version = try getModVersion(&file_tree);
-    _ = mod_version;
-
-    // Tests from the invalid/ folder should always return an error from this function before reaching this
-    unreachable;
 }
 
 pub fn beautifyLua(output_folder_path: []const u8, allocator: Allocator) !void {
