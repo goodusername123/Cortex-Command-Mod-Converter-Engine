@@ -176,7 +176,7 @@ pub fn main() !void {
             const line = diagnostics.line orelse -1;
             const column = diagnostics.column orelse -1;
 
-            std.debug.print("Error: Unexpected '{s}' at {s}:{}:{}\n", .{
+            std.log.info("Error: Unexpected '{s}' at {s}:{}:{}\n", .{
                 token,
                 file_path,
                 line,
@@ -190,7 +190,7 @@ pub fn main() !void {
             const line = diagnostics.line orelse -1;
             const column = diagnostics.column orelse -1;
 
-            std.debug.print("Error: Too many tabs at {s}:{}:{}\n", .{
+            std.log.info("Error: Too many tabs at {s}:{}:{}\n", .{
                 file_path,
                 line,
                 column,
@@ -209,20 +209,20 @@ pub fn main() !void {
 /// For every mod directory in `input_folder_path`, it creates a copy of the mod directory in `output_folder_path` with the required changes to make it compatible with the latest version of the game.
 /// If `convert()` crashed, the `diagnostics` argument allows you to know why and where it did.
 pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
-    std.debug.print("Making all output dirs...\n", .{});
+    std.log.info("Making all output dirs...\n", .{});
     try makeOutputDirs(input_folder_path, output_folder_path, allocator);
 
-    std.debug.print("Copying files...\n", .{});
+    std.log.info("Copying files...\n", .{});
     try copyFiles(input_folder_path, output_folder_path, allocator);
 
     const lua_rules = try parseLuaRules(allocator);
-    std.debug.print("Applying Lua rules...\n", .{});
+    std.log.info("Applying Lua rules...\n", .{});
     try applyLuaRules(lua_rules, output_folder_path, allocator);
 
-    std.debug.print("Getting INI file tree...\n", .{});
+    std.log.info("Getting INI file tree...\n", .{});
     var file_tree = try getIniFileTree(input_folder_path, allocator, diagnostics);
 
-    std.debug.print("Getting the mod's game version...\n", .{});
+    std.log.info("Getting the mod's game version...\n", .{});
     const mod_version = try getModVersion(&file_tree);
 
     // TODO: Use this!
@@ -242,40 +242,40 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     // "Base.rte/foo.png": "Base.rte/bar.png"
     // The game reports that Base.rte/foo.png *still* doesn't exist,
     // due to the parsed input mod containing "Base.rte/foo.bmp"!
-    std.debug.print("Bmp extension to png...\n", .{});
+    std.log.info("Bmp extension to png...\n", .{});
     try applyOnNodesAlloc(bmpExtensionToPng, &file_tree, allocator);
 
-    std.debug.print("Wav extension to flac...\n", .{});
+    std.log.info("Wav extension to flac...\n", .{});
     try applyOnNodesAlloc(wavExtensionToFlac, &file_tree, allocator);
 
     const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
-    std.debug.print("Applying INI CopyOf rules...\n", .{});
+    std.log.info("Applying INI CopyOf rules...\n", .{});
     applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
 
     const ini_file_path_rules = try parseIniFilePathRules(allocator);
-    std.debug.print("Applying INI FilePath rules...\n", .{});
+    std.log.info("Applying INI FilePath rules...\n", .{});
     applyIniFilePathRules(ini_file_path_rules, &file_tree);
 
     const ini_script_path_rules = try parseIniScriptPathRules(allocator);
-    std.debug.print("Applying INI ScriptPath rules...\n", .{});
+    std.log.info("Applying INI ScriptPath rules...\n", .{});
     applyIniScriptPathRules(ini_script_path_rules, &file_tree);
 
     const ini_property_rules = try parseIniPropertyRules(allocator);
-    std.debug.print("Applying INI property rules...\n", .{});
+    std.log.info("Applying INI property rules...\n", .{});
     applyIniPropertyRules(ini_property_rules, &file_tree);
 
     const ini_rules = try parseIniRules(allocator);
-    std.debug.print("Applying INI rules...\n", .{});
+    std.log.info("Applying INI rules...\n", .{});
     applyIniRules(ini_rules, &file_tree);
 
     const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
-    std.debug.print("Applying INI SoundContainer rules...\n", .{});
+    std.log.info("Applying INI SoundContainer rules...\n", .{});
     applyIniSoundContainerRules(ini_sound_container_rules, &file_tree);
 
-    std.debug.print("Updating INI file tree...\n", .{});
+    std.log.info("Updating INI file tree...\n", .{});
     try updateIniFileTree(&file_tree, allocator);
 
-    std.debug.print("Writing INI file tree...\n", .{});
+    std.log.info("Writing INI file tree...\n", .{});
     try writeIniFileTree(&file_tree, output_folder_path, allocator);
 }
 
@@ -330,10 +330,10 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const input_stat = try iterable_dir.dir.statFile(input_file_path);
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
 
-                    // std.debug.print("{}\n{}\n\n", .{ input_stat.mtime, output_stat.mtime });
+                    // std.log.info("{}\n{}\n\n", .{ input_stat.mtime, output_stat.mtime });
 
                     if (input_stat.mtime > output_stat.mtime) {
-                        // std.debug.print("Converted bmp to png\n", .{});
+                        // std.log.info("Converted bmp to png\n", .{});
                         // TODO: Figure out whether a different function should be called in this case,
                         // similar to below where updateFileAbsolute() can be called instead of copyFileAbsolute()
                         try convertBmpToPng(input_file_path, output_file_path, allocator);
@@ -367,7 +367,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
 
                     if (input_stat.mtime > output_stat.mtime) {
-                        // std.debug.print("Converted wav to flac\n", .{});
+                        // std.log.info("Converted wav to flac\n", .{});
                         // TODO: Figure out whether a different function should be called in this case,
                         // similar to below where updateFileAbsolute() can be called instead of copyFileAbsolute()
                         try convertWavToFlac(input_file_path, output_file_path, allocator);
@@ -391,7 +391,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
 
                     if (input_stat.mtime > output_stat.mtime) {
-                        // std.debug.print("Copied something else\n", .{});
+                        // std.log.info("Copied something else\n", .{});
                         // TODO: Reverify that this is faster than the plain copyFileAbsolute()
                         _ = try updateFileAbsolute(input_file_path, output_file_path, .{});
                     }
@@ -427,9 +427,9 @@ fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, a
     // var line_iter = std.mem.split(u8, result.stderr, "\n");
     // while (line_iter.next()) |line| {
     //     if (line.len == 0) continue;
-    //     std.debug.print("{s}\n", .{line});
+    //     std.log.info("{s}\n", .{line});
     // }
-    // std.debug.print("\n", .{});
+    // std.log.info("\n", .{});
 }
 
 fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
@@ -488,7 +488,7 @@ fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []co
 }
 
 fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !IniFolder {
-    // std.debug.print("folder_path: '{s}'\n", .{folder_path});
+    // std.log.info("folder_path: '{s}'\n", .{folder_path});
 
     var folder = IniFolder{
         .name = basename(folder_path),
@@ -501,12 +501,12 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
     var dir_iterator = iterable_dir.iterate();
 
     while (try dir_iterator.next()) |entry| {
-        // std.debug.print("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
+        // std.log.info("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
         if (entry.kind == std.fs.File.Kind.file) {
             const file_path = try join(allocator, &.{ folder_path, entry.name });
             if (strEql(extension(entry.name), ".ini")) {
                 diagnostics.file_path = file_path;
-                // std.debug.print("file path '{s}'\n", .{file_path});
+                // std.log.info("file path '{s}'\n", .{file_path});
                 const text = try readFile(file_path, allocator);
 
                 var tokens = try getTokens(text, allocator);
@@ -567,7 +567,7 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
 
     while (slice.len > 0) {
         const token = getToken(&slice, &multiline_comment_depth, &seen_property);
-        // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
+        // std.log.info("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
         try tokens.append(token);
     }
 
@@ -768,7 +768,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
     var token = tokens.items[token_index.*];
 
     var line_depth = getLineDepth(tokens, token_index.*);
-    // std.debug.print("a {}\n", .{line_depth});
+    // std.log.info("a {}\n", .{line_depth});
     if (line_depth > depth) {
         calculateLineAndColumnDiagnostics(tokens, token_index.*, diagnostics);
         return NodeError.TooManyTabs;
@@ -782,7 +782,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
         token = tokens.items[token_index.*];
 
         // TODO: Figure out why {s: <42} doesn't set the width to 42
-        // std.debug.print("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
+        // std.log.info("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
 
         if (seen == .Start and token.type == .Sentence) {
             // This if-statement is deliberately in a loop,
@@ -794,7 +794,7 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             checked_line_depth = true;
 
             line_depth = getLineDepth(tokens, token_index.*);
-            // std.debug.print("b {}\n", .{line_depth});
+            // std.log.info("b {}\n", .{line_depth});
 
             if (line_depth > depth + 1) {
                 calculateLineAndColumnDiagnostics(tokens, token_index.*, diagnostics);
@@ -2197,15 +2197,15 @@ fn shovelFlashFix(node: *Node) !void {
 
 fn writeIniFileTree(file_tree: *const IniFolder, output_folder_path: []const u8, allocator: Allocator) !void {
     for (file_tree.files.items) |file| {
-        // std.debug.print("output_folder_path: '{s}', file.name: '{s}'\n", .{ output_folder_path, file.name });
+        // std.log.info("output_folder_path: '{s}', file.name: '{s}'\n", .{ output_folder_path, file.name });
         const file_path = try join(allocator, &.{ output_folder_path, file.name });
-        // std.debug.print("file_path: '{s}'\n", .{file_path});
+        // std.log.info("file_path: '{s}'\n", .{file_path});
         try writeAst(&file.ast, file_path);
     }
 
     for (file_tree.folders.items) |folder| {
         const child_output_folder_path = try join(allocator, &.{ output_folder_path, folder.name });
-        // std.debug.print("{s}\n", .{child_output_folder_path});
+        // std.log.info("{s}\n", .{child_output_folder_path});
         try writeIniFileTree(&folder, child_output_folder_path, allocator);
     }
 }
@@ -2231,7 +2231,7 @@ fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
 }
 
 fn writeAstRecursively(node: *Node, buffered_writer: anytype, depth: usize) !void {
-    // std.debug.print("{}\n", .{node});
+    // std.log.info("{}\n", .{node});
 
     // Don't add an empty line
     if (node.property == null and node.comments.items.len == 0) {
@@ -2241,28 +2241,28 @@ fn writeAstRecursively(node: *Node, buffered_writer: anytype, depth: usize) !voi
     // Write tabs to file
     var i: usize = 0;
     while (i < depth) : (i += 1) {
-        // std.debug.print("'\t'\n", .{});
+        // std.log.info("'\t'\n", .{});
         try writeBuffered(buffered_writer, "\t");
     }
 
     // Write property to file
     if (node.property) |property| {
-        // std.debug.print("'{s}'\n", .{property});
+        // std.log.info("'{s}'\n", .{property});
         try writeBuffered(buffered_writer, property);
     }
 
     // Write value and equals to file
     if (node.value) |value| {
-        // std.debug.print("' = '\n", .{});
+        // std.log.info("' = '\n", .{});
         try writeBuffered(buffered_writer, " = ");
 
-        // std.debug.print("'{s}'\n", .{value});
+        // std.log.info("'{s}'\n", .{value});
         try writeBuffered(buffered_writer, value);
     }
 
     // Write comments to file
     if (node.comments.items.len > 0) {
-        // std.debug.print("' //'\n", .{});
+        // std.log.info("' //'\n", .{});
 
         if (node.property != null) {
             try writeBuffered(buffered_writer, " ");
@@ -2271,18 +2271,18 @@ fn writeAstRecursively(node: *Node, buffered_writer: anytype, depth: usize) !voi
         try writeBuffered(buffered_writer, "//");
 
         for (node.comments.items) |comment| {
-            // std.debug.print("' {s}'\n", .{comment});
+            // std.log.info("' {s}'\n", .{comment});
             try writeBuffered(buffered_writer, " ");
             try writeBuffered(buffered_writer, comment);
         }
     }
 
     // Write newline to file
-    // std.debug.print("'\\n'\n", .{});
+    // std.log.info("'\\n'\n", .{});
     try writeBuffered(buffered_writer, "\n");
 
     // Recursively enter child nodes
-    // std.debug.print("Recursing into child\n", .{});
+    // std.log.info("Recursing into child\n", .{});
     for (node.children.items) |*child| {
         try writeAstRecursively(child, buffered_writer, depth + 1);
     }
@@ -2643,7 +2643,7 @@ test "invalid" {
 }
 
 pub fn beautifyLua(output_folder_path: []const u8, allocator: Allocator) !void {
-    std.debug.print("Beautifying Lua...\n", .{});
+    std.log.info("Beautifying Lua...\n", .{});
     // TODO: Do we want to compile this from source?
     const argv = [_][]const u8{ "stylua", output_folder_path };
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
