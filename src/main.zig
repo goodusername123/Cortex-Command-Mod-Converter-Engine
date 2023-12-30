@@ -2292,8 +2292,8 @@ fn writeBuffered(buffered_writer: anytype, string: []const u8) !void {
     try buffered_writer.print("{s}", .{string});
 }
 
-test "general" {
-    var iterable_tests = try std.fs.cwd().openIterableDir("tests/general", .{});
+fn testDirectory(comptime directory_name: []const u8, comptime test_extension: []const u8) !void {
+    var iterable_tests = try std.fs.cwd().openIterableDir("tests/" ++ directory_name, .{});
     defer iterable_tests.close();
 
     var arena = ArenaAllocator.init(page_allocator);
@@ -2301,18 +2301,21 @@ test "general" {
     const allocator = arena.allocator();
 
     var tests_walker = try iterable_tests.walk(allocator);
+    defer tests_walker.deinit();
 
     while (try tests_walker.next()) |entry| {
-        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
+        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in" ++ test_extension)) {
+            std.debug.print("\nSubtest '" ++ directory_name ++ "/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
+
             var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
             const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
-            const input_path = try join(allocator, &.{ input_folder_path, "in.ini" });
+            const input_path = try join(allocator, &.{ input_folder_path, "in" ++ test_extension });
 
             var tmpdir_input_folder = tmpDir(.{});
             defer tmpdir_input_folder.cleanup();
             var tmpdir_input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
             const tmpdir_input_folder_path = try tmpdir_input_folder.dir.realpath(".", &tmpdir_input_folder_path_buffer);
-            const tmpdir_input_path = try join(allocator, &.{ tmpdir_input_folder_path, "in.ini" });
+            const tmpdir_input_path = try join(allocator, &.{ tmpdir_input_folder_path, "in" ++ test_extension });
 
             try copyFileAbsolute(input_path, tmpdir_input_path, .{});
 
@@ -2321,18 +2324,12 @@ test "general" {
             var tmpdir_output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
             const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
 
-            std.debug.print("\nSubtest 'general/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
-
-            // std.debug.print("input_folder_path: {s}\ntmpdir_output_folder_path: {s}\n\n", .{ input_folder_path, tmpdir_output_folder_path });
-            // std.debug.print("expected_path: {s}\noutput_path: {s}\n\n", .{ expected_path, output_path });
-
             var diagnostics: Diagnostics = .{};
             try convert(tmpdir_input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics);
 
             const cwd = std.fs.cwd();
 
-            const expected_path = try join(allocator, &.{ input_folder_path, "out.ini" });
+            const expected_path = try join(allocator, &.{ input_folder_path, "out" ++ test_extension });
             const expected_file = try cwd.openFile(expected_path, .{});
             defer expected_file.close();
             var expected_buf_reader = bufferedReader(expected_file.reader());
@@ -2340,7 +2337,7 @@ test "general" {
             const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
             const expected_text = try crlfToLf(expected_text_crlf, allocator);
 
-            const output_path = try join(allocator, &.{ tmpdir_output_folder_path, "in.ini" });
+            const output_path = try join(allocator, &.{ tmpdir_output_folder_path, "in" ++ test_extension });
             const output_file = try cwd.openFile(output_path, .{});
             defer output_file.close();
             var output_buf_reader = bufferedReader(output_file.reader());
@@ -2356,13 +2353,11 @@ test "general" {
     std.debug.print("\n\n", .{});
 }
 
+test "general" {
+    try testDirectory("general", ".ini");
+}
+
 test "lua_rules" {
-    var tmpdir = tmpDir(.{});
-    defer tmpdir.cleanup();
-
-    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
-
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/lua_rules", .{});
     defer iterable_tests.close();
 
@@ -2371,29 +2366,35 @@ test "lua_rules" {
     const allocator = arena.allocator();
 
     var tests_walker = try iterable_tests.walk(allocator);
+    defer tests_walker.deinit();
 
     while (try tests_walker.next()) |entry| {
-        var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
-
         if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.lua")) {
             std.debug.print("\nSubtest 'lua_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
 
+            var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+            const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
             const input_path = try join(allocator, &.{ input_folder_path, "in.lua" });
-            const expected_path = try join(allocator, &.{ input_folder_path, "out.lua" });
-            const output_path = try join(allocator, &.{ tmpdir_path, "output.lua" });
 
-            // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
+            var tmpdir_input_folder = tmpDir(.{});
+            defer tmpdir_input_folder.cleanup();
+            var tmpdir_input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+            const tmpdir_input_folder_path = try tmpdir_input_folder.dir.realpath(".", &tmpdir_input_folder_path_buffer);
+            const tmpdir_input_path = try join(allocator, &.{ tmpdir_input_folder_path, "in.lua" });
 
-            // const text = try readFile(input_path, allocator);
+            try copyFileAbsolute(input_path, tmpdir_input_path, .{});
 
-            _ = try copyFileAbsolute(input_path, output_path, .{});
+            var tmpdir_output_folder = tmpDir(.{});
+            defer tmpdir_output_folder.cleanup();
+            var tmpdir_output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+            const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
 
-            const lua_rules = try parseLuaRules(allocator);
-            try applyLuaRules(lua_rules, tmpdir_path, allocator);
+            var diagnostics: Diagnostics = .{};
+            try convert(tmpdir_input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics);
 
             const cwd = std.fs.cwd();
 
+            const expected_path = try join(allocator, &.{ input_folder_path, "out.lua" });
             const expected_file = try cwd.openFile(expected_path, .{});
             defer expected_file.close();
             var expected_buf_reader = bufferedReader(expected_file.reader());
@@ -2401,6 +2402,7 @@ test "lua_rules" {
             const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
             const expected_text = try crlfToLf(expected_text_crlf, allocator);
 
+            const output_path = try join(allocator, &.{ tmpdir_output_folder_path, "in.lua" });
             const output_file = try cwd.openFile(output_path, .{});
             defer output_file.close();
             var output_buf_reader = bufferedReader(output_file.reader());
@@ -2431,6 +2433,7 @@ test "ini_rules" {
     const allocator = arena.allocator();
 
     var tests_walker = try iterable_tests.walk(allocator);
+    defer tests_walker.deinit();
 
     while (try tests_walker.next()) |entry| {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
@@ -2488,6 +2491,7 @@ test "updated" {
     const allocator = arena.allocator();
 
     var tests_walker = try iterable_tests.walk(allocator);
+    defer tests_walker.deinit();
 
     while (try tests_walker.next()) |entry| {
         var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
@@ -2596,6 +2600,7 @@ test "invalid" {
     const allocator = arena.allocator();
 
     var tests_walker = try iterable_tests.walk(allocator);
+    defer tests_walker.deinit();
 
     while (try tests_walker.next()) |entry| {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
