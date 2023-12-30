@@ -12,7 +12,7 @@
 			"args": [],
 			"cwd": "${workspaceFolder}",
 			"console": "integratedTerminal",
-			"preLaunchTask": "build zig"
+			"preLaunchTask": "Build zig"
 		}
 	]
 }

@@ -224,7 +224,14 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
 
     std.debug.print("Getting the mod's game version...\n", .{});
     const mod_version = try getModVersion(&file_tree);
+
+    // TODO: Use this!
     _ = mod_version;
+
+    // TODO: Do we also want to throw an error if 0 are found?
+    if (getDataModuleCount(&file_tree) > 1) {
+        return error.MoreThanOneDataModule;
+    }
 
     try applyOnNodes(pathToFilePath, &file_tree);
 
@@ -299,7 +306,9 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
 
     while (try dir_iterator.next()) |entry| {
         if (entry.kind == std.fs.File.Kind.file) {
-            if (strEql(extension(entry.name), ".bmp")) {
+            const ext = extension(entry.name);
+
+            if (strEql(ext, ".bmp")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
 
                 var output_name = try allocator.dupe(u8, entry.name);
@@ -332,7 +341,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 } else { // Else return the access error
                     return output_file_access;
                 }
-            } else if (strEql(extension(entry.name), ".wav")) {
+            } else if (strEql(ext, ".wav")) {
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
 
                 // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
@@ -366,7 +375,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                 } else { // Else return the access error
                     return output_file_access;
                 }
-            } else if (!strEql(extension(entry.name), ".ini")) {
+            } else if (!strEql(ext, ".ini")) { // This function doesn't copy .ini files
                 const input_file_path = try join(allocator, &.{ input_folder_path, entry.name });
                 const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
 
@@ -904,6 +913,36 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     return 0;
 }
 
+fn getDataModuleCount(file_tree: *IniFolder) i32 {
+    var data_module_count: i32 = 0;
+    getDataModuleCountRecursivelyFolder(file_tree, &data_module_count);
+    return data_module_count;
+}
+
+fn getDataModuleCountRecursivelyFolder(file_tree: *IniFolder, data_module_count: *i32) void {
+    for (file_tree.folders.items) |*folder| {
+        getDataModuleCountRecursivelyFolder(folder, data_module_count);
+    }
+
+    for (file_tree.files.items) |file| {
+        for (file.ast.items) |*node| {
+            getDataModuleCountRecursivelyNode(node, data_module_count);
+        }
+    }
+}
+
+fn getDataModuleCountRecursivelyNode(node: *Node, data_module_count: *i32) void {
+    if (node.property) |node_property| {
+        if (strEql(node_property, "DataModule")) {
+            data_module_count.* += 1;
+        }
+    }
+
+    for (node.children.items) |*child| {
+        getDataModuleCountRecursivelyNode(child, data_module_count);
+    }
+}
+
 // Uninitialized is used to detect SupportedGameVersion being seen a second time
 const ModVersion = enum {
     Uninitialized,
@@ -912,7 +951,7 @@ const ModVersion = enum {
 };
 
 const ModVersionErrors = error{
-    AlreadySeenAModVersion,
+    AlreadySeenASupportedGameVersion,
     UnrecognizedModVersion,
 };
 
@@ -945,12 +984,14 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
         if (strEql(node_property, "SupportedGameVersion")) {
             if (node.value) |value| {
                 if (mod_version.* != ModVersion.Uninitialized) {
-                    return ModVersionErrors.AlreadySeenAModVersion;
+                    return ModVersionErrors.AlreadySeenASupportedGameVersion;
                 }
                 if (strEql(value, "5.1.0")) {
                     // TODO: Should this be "= ModVersion.Pre5" instead?
                     mod_version.* = ModVersion.Pre6;
-                } else if (!strEql(value, "Pre-Release 3.0")) {
+                } else if (strEql(value, "Pre-Release 3.0")) {
+                    mod_version.* = ModVersion.BeforePre6;
+                } else {
                     return ModVersionErrors.UnrecognizedModVersion;
                 }
             }
@@ -2255,8 +2296,8 @@ test "general" {
     var tmpdir = tmpDir(.{});
     defer tmpdir.cleanup();
 
-    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
+    var output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    const output_folder_path = try tmpdir.dir.realpath(".", &output_folder_path_buffer);
 
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/general", .{});
     defer iterable_tests.close();
@@ -2269,27 +2310,20 @@ test "general" {
 
     while (try tests_walker.next()) |entry| {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const dir_path = try entry.dir.realpath(".", &out_buffer);
+        const input_folder_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'general/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
 
-            const input_path = try join(allocator, &.{ dir_path, "in.ini" });
-            const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
+            const expected_path = try join(allocator, &.{ input_folder_path, "out.ini" });
+            const output_path = try join(allocator, &.{ output_folder_path, "out.ini" });
 
-            const output_path = try join(allocator, &.{ tmpdir_path, "output.ini" });
-
-            // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
-
-            const text = try readFile(input_path, allocator);
-
-            var tokens = try getTokens(text, allocator);
+            // std.debug.print("input_folder_path: {s}\noutput_folder_path: {s}\n\n", .{ input_folder_path, output_folder_path });
+            // std.debug.print("expected_path: {s}\noutput_path: {s}\n\n", .{ expected_path, output_path });
 
             var diagnostics: Diagnostics = .{};
-            var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
-
-            try writeAst(&ast, output_path);
+            try convert(input_folder_path, output_folder_path, allocator, &diagnostics);
 
             const cwd = std.fs.cwd();
 
@@ -2379,8 +2413,8 @@ test "ini_rules" {
     var tmpdir = tmpDir(.{});
     defer tmpdir.cleanup();
 
-    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
+    var output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+    const output_folder_path = try tmpdir.dir.realpath(".", &output_folder_path_buffer);
 
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_rules", .{});
     defer iterable_tests.close();
@@ -2393,71 +2427,20 @@ test "ini_rules" {
 
     while (try tests_walker.next()) |entry| {
         var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const dir_path = try entry.dir.realpath(".", &out_buffer);
+        const input_folder_path = try entry.dir.realpath(".", &out_buffer);
 
         if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
             std.debug.print("\nSubtest 'ini_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), dir_path });
+            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
 
-            const input_path = try join(allocator, &.{ dir_path, "in.ini" });
-            const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
+            const expected_path = try join(allocator, &.{ input_folder_path, "out.ini" });
+            const output_path = try join(allocator, &.{ output_folder_path, "out.ini" });
 
-            const output_path = try join(allocator, &.{ tmpdir_path, "output.ini" });
-
-            // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
-
-            const text = try readFile(input_path, allocator);
-
-            var tokens = try getTokens(text, allocator);
+            // std.debug.print("input_folder_path: {s}\noutput_folder_path: {s}\n\n", .{ input_folder_path, output_folder_path });
+            // std.debug.print("expected_path: {s}\noutput_path: {s}\n\n", .{ expected_path, output_path });
 
             var diagnostics: Diagnostics = .{};
-            var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
-
-            var file_tree = IniFolder{
-                .name = "",
-                .files = ArrayList(IniFile).init(allocator),
-                .folders = ArrayList(IniFolder).init(allocator),
-            };
-
-            try file_tree.files.append(IniFile{
-                .name = "",
-                .ast = ast,
-            });
-
-            std.debug.print("Getting the mod's game version...\n", .{});
-            const mod_version = try getModVersion(&file_tree);
-            _ = mod_version;
-
-            try applyOnNodes(pathToFilePath, &file_tree);
-
-            try applyOnNodesAlloc(bmpExtensionToPng, &file_tree, allocator);
-
-            try applyOnNodesAlloc(wavExtensionToFlac, &file_tree, allocator);
-
-            const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
-            applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
-
-            const ini_file_path_rules = try parseIniFilePathRules(allocator);
-            applyIniFilePathRules(ini_file_path_rules, &file_tree);
-
-            const ini_script_path_rules = try parseIniScriptPathRules(allocator);
-            applyIniScriptPathRules(ini_script_path_rules, &file_tree);
-
-            // // TODO: Figure out a way to remove all these function calls that are already done by convert()
-            // // TODO: At the moment I am literally keeping these in sync manually
-
-            const ini_property_rules = try parseIniPropertyRules(allocator);
-            applyIniPropertyRules(ini_property_rules, &file_tree);
-
-            const ini_rules = try parseIniRules(allocator);
-            applyIniRules(ini_rules, &file_tree);
-
-            const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
-            applyIniSoundContainerRules(ini_sound_container_rules, &file_tree);
-
-            try updateIniFileTree(&file_tree, allocator);
-
-            try writeAst(&ast, output_path);
+            try convert(input_folder_path, output_folder_path, allocator, &diagnostics);
 
             const cwd = std.fs.cwd();
 
@@ -2510,7 +2493,7 @@ test "updated" {
             const input_path = try join(allocator, &.{ dir_path, "in.ini" });
             const expected_path = try join(allocator, &.{ dir_path, "out.ini" });
 
-            const output_path = try join(allocator, &.{ tmpdir_path, "output.ini" });
+            const output_path = try join(allocator, &.{ tmpdir_path, "out.ini" });
 
             // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
 
@@ -2532,7 +2515,7 @@ test "updated" {
                 .ast = ast,
             });
 
-            std.debug.print("Getting the mod's game version...\n", .{});
+            // std.debug.print("Getting the mod's game version...\n", .{});
             const mod_version = try getModVersion(&file_tree);
             _ = mod_version;
 
