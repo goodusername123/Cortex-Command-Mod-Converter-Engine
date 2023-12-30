@@ -2292,7 +2292,7 @@ fn writeBuffered(buffered_writer: anytype, string: []const u8) !void {
     try buffered_writer.print("{s}", .{string});
 }
 
-fn testDirectory(comptime directory_name: []const u8, comptime test_extension: []const u8) !void {
+fn testDirectory(comptime directory_name: []const u8, comptime test_extension: []const u8, is_invalid_test: bool) !void {
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/" ++ directory_name, .{});
     defer iterable_tests.close();
 
@@ -2325,7 +2325,29 @@ fn testDirectory(comptime directory_name: []const u8, comptime test_extension: [
             const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
 
             var diagnostics: Diagnostics = .{};
-            try convert(tmpdir_input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics);
+            convert(tmpdir_input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics) catch |err| {
+                if (is_invalid_test) {
+                    const cwd = std.fs.cwd();
+                    const error_path = try join(allocator, &.{ input_folder_path, "error.txt" });
+                    const error_file = try cwd.openFile(error_path, .{});
+                    defer error_file.close();
+                    var error_buf_reader = bufferedReader(error_file.reader());
+                    const error_stream = error_buf_reader.reader();
+                    const error_text_crlf = try error_stream.readAllAlloc(allocator, maxInt(usize));
+                    const error_text = try crlfToLf(error_text_crlf, allocator);
+
+                    try expectEqualStrings(error_text, @errorName(err));
+                    std.debug.print(" passed", .{});
+
+                    continue;
+                } else {
+                    return err;
+                }
+            };
+
+            if (is_invalid_test) {
+                return error.InvalidTestDidntReturnError;
+            }
 
             const cwd = std.fs.cwd();
 
@@ -2354,292 +2376,23 @@ fn testDirectory(comptime directory_name: []const u8, comptime test_extension: [
 }
 
 test "general" {
-    try testDirectory("general", ".ini");
-}
-
-test "lua_rules" {
-    var iterable_tests = try std.fs.cwd().openIterableDir("tests/lua_rules", .{});
-    defer iterable_tests.close();
-
-    var arena = ArenaAllocator.init(page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    var tests_walker = try iterable_tests.walk(allocator);
-    defer tests_walker.deinit();
-
-    while (try tests_walker.next()) |entry| {
-        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.lua")) {
-            std.debug.print("\nSubtest 'lua_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-
-            var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-            const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
-            const input_path = try join(allocator, &.{ input_folder_path, "in.lua" });
-
-            var tmpdir_input_folder = tmpDir(.{});
-            defer tmpdir_input_folder.cleanup();
-            var tmpdir_input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-            const tmpdir_input_folder_path = try tmpdir_input_folder.dir.realpath(".", &tmpdir_input_folder_path_buffer);
-            const tmpdir_input_path = try join(allocator, &.{ tmpdir_input_folder_path, "in.lua" });
-
-            try copyFileAbsolute(input_path, tmpdir_input_path, .{});
-
-            var tmpdir_output_folder = tmpDir(.{});
-            defer tmpdir_output_folder.cleanup();
-            var tmpdir_output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-            const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
-
-            var diagnostics: Diagnostics = .{};
-            try convert(tmpdir_input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics);
-
-            const cwd = std.fs.cwd();
-
-            const expected_path = try join(allocator, &.{ input_folder_path, "out.lua" });
-            const expected_file = try cwd.openFile(expected_path, .{});
-            defer expected_file.close();
-            var expected_buf_reader = bufferedReader(expected_file.reader());
-            const expected_stream = expected_buf_reader.reader();
-            const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
-            const expected_text = try crlfToLf(expected_text_crlf, allocator);
-
-            const output_path = try join(allocator, &.{ tmpdir_output_folder_path, "in.lua" });
-            const output_file = try cwd.openFile(output_path, .{});
-            defer output_file.close();
-            var output_buf_reader = bufferedReader(output_file.reader());
-            const output_stream = output_buf_reader.reader();
-            const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
-            const output_text = try crlfToLf(output_text_crlf, allocator);
-
-            try expectEqualStrings(expected_text, output_text);
-            std.debug.print(" passed", .{});
-        }
-    }
-
-    std.debug.print("\n\n", .{});
+    try testDirectory("general", ".ini", false);
 }
 
 test "ini_rules" {
-    var tmpdir = tmpDir(.{});
-    defer tmpdir.cleanup();
-
-    var output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const output_folder_path = try tmpdir.dir.realpath(".", &output_folder_path_buffer);
-
-    var iterable_tests = try std.fs.cwd().openIterableDir("tests/ini_rules", .{});
-    defer iterable_tests.close();
-
-    var arena = ArenaAllocator.init(page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    var tests_walker = try iterable_tests.walk(allocator);
-    defer tests_walker.deinit();
-
-    while (try tests_walker.next()) |entry| {
-        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const input_folder_path = try entry.dir.realpath(".", &out_buffer);
-
-        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
-            std.debug.print("\nSubtest 'ini_rules/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
-
-            const expected_path = try join(allocator, &.{ input_folder_path, "out.ini" });
-            const output_path = try join(allocator, &.{ output_folder_path, "out.ini" });
-
-            // std.debug.print("input_folder_path: {s}\noutput_folder_path: {s}\n\n", .{ input_folder_path, output_folder_path });
-            // std.debug.print("expected_path: {s}\noutput_path: {s}\n\n", .{ expected_path, output_path });
-
-            var diagnostics: Diagnostics = .{};
-            try convert(input_folder_path, output_folder_path, allocator, &diagnostics);
-
-            const cwd = std.fs.cwd();
-
-            const expected_file = try cwd.openFile(expected_path, .{});
-            defer expected_file.close();
-            var expected_buf_reader = bufferedReader(expected_file.reader());
-            const expected_stream = expected_buf_reader.reader();
-            const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
-            const expected_text = try crlfToLf(expected_text_crlf, allocator);
-
-            const output_file = try cwd.openFile(output_path, .{});
-            defer output_file.close();
-            var output_buf_reader = bufferedReader(output_file.reader());
-            const output_stream = output_buf_reader.reader();
-            const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
-            const output_text = try crlfToLf(output_text_crlf, allocator);
-
-            try expectEqualStrings(expected_text, output_text);
-            std.debug.print(" passed", .{});
-        }
-    }
-
-    std.debug.print("\n\n", .{});
-}
-
-test "updated" {
-    var tmpdir = tmpDir(.{});
-    defer tmpdir.cleanup();
-
-    var tmpdir_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const tmpdir_path = try tmpdir.dir.realpath(".", &tmpdir_path_buffer);
-
-    var iterable_tests = try std.fs.cwd().openIterableDir("tests/updated", .{});
-    defer iterable_tests.close();
-
-    var arena = ArenaAllocator.init(page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    var tests_walker = try iterable_tests.walk(allocator);
-    defer tests_walker.deinit();
-
-    while (try tests_walker.next()) |entry| {
-        var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
-
-        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
-            std.debug.print("\nSubtest 'updated/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
-
-            const input_path = try join(allocator, &.{ input_folder_path, "in.ini" });
-            const expected_path = try join(allocator, &.{ input_folder_path, "out.ini" });
-
-            const output_path = try join(allocator, &.{ tmpdir_path, "out.ini" });
-
-            // std.debug.print("{s}\n{s}\n{s}\n\n", .{ input_path, expected_path, output_path });
-
-            const text = try readFile(input_path, allocator);
-
-            var tokens = try getTokens(text, allocator);
-
-            var diagnostics: Diagnostics = .{};
-            var ast = try getAstFromTokens(&tokens, allocator, &diagnostics);
-
-            var file_tree = IniFolder{
-                .name = "",
-                .files = ArrayList(IniFile).init(allocator),
-                .folders = ArrayList(IniFolder).init(allocator),
-            };
-
-            try file_tree.files.append(IniFile{
-                .name = "",
-                .ast = ast,
-            });
-
-            // std.debug.print("Getting the mod's game version...\n", .{});
-            const mod_version = try getModVersion(&file_tree);
-            _ = mod_version;
-
-            try applyOnNodes(pathToFilePath, &file_tree);
-
-            try applyOnNodesAlloc(bmpExtensionToPng, &file_tree, allocator);
-
-            try applyOnNodesAlloc(wavExtensionToFlac, &file_tree, allocator);
-
-            const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
-            applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
-
-            const ini_file_path_rules = try parseIniFilePathRules(allocator);
-            applyIniFilePathRules(ini_file_path_rules, &file_tree);
-
-            const ini_script_path_rules = try parseIniScriptPathRules(allocator);
-            applyIniScriptPathRules(ini_script_path_rules, &file_tree);
-
-            // // TODO: Figure out a way to remove all these function calls that are already done by convert()
-            // // TODO: At the moment I am literally keeping these in sync manually
-
-            const ini_property_rules = try parseIniPropertyRules(allocator);
-            applyIniPropertyRules(ini_property_rules, &file_tree);
-
-            const ini_rules = try parseIniRules(allocator);
-            applyIniRules(ini_rules, &file_tree);
-
-            const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
-            applyIniSoundContainerRules(ini_sound_container_rules, &file_tree);
-
-            try updateIniFileTree(&file_tree, allocator);
-
-            try writeAst(&ast, output_path);
-
-            const cwd = std.fs.cwd();
-
-            const expected_file = try cwd.openFile(expected_path, .{});
-            defer expected_file.close();
-            var expected_buf_reader = bufferedReader(expected_file.reader());
-            const expected_stream = expected_buf_reader.reader();
-            const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
-            const expected_text = try crlfToLf(expected_text_crlf, allocator);
-
-            const output_file = try cwd.openFile(output_path, .{});
-            defer output_file.close();
-            var output_buf_reader = bufferedReader(output_file.reader());
-            const output_stream = output_buf_reader.reader();
-            const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
-            const output_text = try crlfToLf(output_text_crlf, allocator);
-
-            try expectEqualStrings(expected_text, output_text);
-            std.debug.print(" passed", .{});
-        }
-    }
-
-    std.debug.print("\n\n", .{});
+    try testDirectory("ini_rules", ".ini", false);
 }
 
 test "invalid" {
-    var tmpdir = tmpDir(.{});
-    defer tmpdir.cleanup();
+    try testDirectory("invalid", ".ini", true);
+}
 
-    var output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    const output_folder_path = try tmpdir.dir.realpath(".", &output_folder_path_buffer);
+test "lua_rules" {
+    try testDirectory("lua_rules", ".lua", false);
+}
 
-    var iterable_tests = try std.fs.cwd().openIterableDir("tests/invalid", .{});
-    defer iterable_tests.close();
-
-    var arena = ArenaAllocator.init(page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-
-    var tests_walker = try iterable_tests.walk(allocator);
-    defer tests_walker.deinit();
-
-    while (try tests_walker.next()) |entry| {
-        var out_buffer: [MAX_PATH_BYTES]u8 = undefined;
-        const input_folder_path = try entry.dir.realpath(".", &out_buffer);
-
-        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in.ini")) {
-            std.debug.print("\nSubtest 'invalid/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
-            // std.debug.print("{s}\n{}\n{}\n{s}\n{}\n{s}\n", .{ entry.basename, entry.dir, entry.kind, entry.path, entry.kind == std.fs.File.Kind.File and strEql(entry.basename, "in.ini"), input_folder_path });
-
-            const input_path = try join(allocator, &.{ input_folder_path, "in.ini" });
-            const error_path = try join(allocator, &.{ input_folder_path, "error.txt" });
-
-            // std.debug.print("{s}\n{s}\n\n", .{ input_path, error_path });
-
-            const cwd = std.fs.cwd();
-            const error_file = try cwd.openFile(error_path, .{});
-            defer error_file.close();
-            var error_buf_reader = bufferedReader(error_file.reader());
-            const error_stream = error_buf_reader.reader();
-            const error_text_crlf = try error_stream.readAllAlloc(allocator, maxInt(usize));
-            const error_text = try crlfToLf(error_text_crlf, allocator);
-
-            const text = try readFile(input_path, allocator);
-            _ = text;
-
-            var diagnostics: Diagnostics = .{};
-            convert(input_folder_path, output_folder_path, allocator, &diagnostics) catch |err| {
-                try expectEqualStrings(error_text, @errorName(err));
-                std.debug.print(" passed", .{});
-                continue;
-            };
-
-            // All tests from the invalid/ folder should return an error in convert()
-            // before reaching this
-            unreachable;
-        }
-    }
-
-    std.debug.print("\n\n", .{});
+test "updated" {
+    try testDirectory("updated", ".ini", false);
 }
 
 pub fn beautifyLua(output_folder_path: []const u8, allocator: Allocator) !void {
