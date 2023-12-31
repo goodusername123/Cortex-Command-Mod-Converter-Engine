@@ -224,6 +224,8 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     std.log.info("Getting the mod's game version...\n", .{});
     const mod_version = try getModVersion(&file_tree);
 
+    // Check the version, since people since Pre6 are able to start using magenta
+    // as a regular color in their RGB pngs
     if (mod_version == ModVersion.BeforePre6) {
         try replaceMagentaInRgbPngsWithAlpha(output_folder_path, allocator);
     }
@@ -990,7 +992,7 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
                 }
                 if (strEql(value, "6.0.0")) {
                     mod_version.* = ModVersion.Pre6;
-                } else if (strEql(value, "Pre-Release 3.0") or strEql(value, "Pre-Release 4.0") or strEql(value, "5.1.0")) {
+                } else if (strEql(value, "Pre-Release 3.0") or strEql(value, "Pre-Release 4.0") or strEql(value, "Pre-Release 5.0") or strEql(value, "5.1.0")) {
                     mod_version.* = ModVersion.BeforePre6;
                 } else {
                     return ModVersionErrors.UnrecognizedModVersion;
@@ -1020,7 +1022,8 @@ fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: A
                 var tmpdir_output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
                 const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
 
-                const tmp_file_path = try join(allocator, &.{ tmpdir_output_folder_path, entry.name });
+                // This file will have (255, 0, 255) replaced with (255, 0, 255, 0)
+                const tmp_alpha_file_path = try join(allocator, &.{ tmpdir_output_folder_path, "alpha.png" });
 
                 // TODO: ffmpeg won't always be available, so include its source code and call that instead
                 // This replaces magenta with transparency
@@ -1030,12 +1033,20 @@ fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: A
                 // which means that colors that are very close to (255, 0, 255) also turn transparent.
                 // This is fine however, since I checked that the CC palette doesn't contain other colors
                 // that are close enough to magenta to be turned transparent.
-                const argv = [_][]const u8{ "ffmpeg", "-i", output_file_path, "-vf", "colorkey=magenta", "-y", tmp_file_path };
-                const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
-                _ = result;
+                const argv_alpha = [_][]const u8{ "ffmpeg", "-i", output_file_path, "-vf", "colorkey=magenta", "-y", tmp_alpha_file_path };
+                const result_alpha = try std.ChildProcess.exec(.{ .argv = &argv_alpha, .allocator = allocator });
+                _ = result_alpha;
+
+                // This file will have (r=255, g=0, b=255, a=0) replaced with (r=0, g=0, b=0, a=0), as CC requires all RGB to be 0 when alpha is 0
+                const tmp_zero_file_path = try join(allocator, &.{ tmpdir_output_folder_path, "zero.png" });
+
+                // This insanity is just asking ffmpeg to replace any (r=255, g=0, b=255, a=0) with (r=0, g=0, b=0, a=0)
+                const argv_zero = [_][]const u8{ "ffmpeg", "-i", tmp_alpha_file_path, "-vf", "geq=r='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,r(X,Y))':g='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,g(X,Y))':b='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,b(X,Y))':a='alpha(X,Y)'", "-y", tmp_zero_file_path };
+                const result_zero = try std.ChildProcess.exec(.{ .argv = &argv_zero, .allocator = allocator });
+                _ = result_zero;
 
                 // Overwrite the old png with the new one that has transparency
-                try copyFileAbsolute(tmp_file_path, output_file_path, .{});
+                try copyFileAbsolute(tmp_zero_file_path, output_file_path, .{});
             }
         } else if (entry.kind == std.fs.File.Kind.directory) {
             const child_output_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
@@ -1044,6 +1055,7 @@ fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: A
     }
 }
 
+// RGB, as opposed to indexed with a palette
 fn pngIsRgb(output_file_path: []const u8) !bool {
     const cwd = std.fs.cwd();
     const file = try cwd.openFile(output_file_path, .{});
