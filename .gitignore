@@ -2,6 +2,7 @@
 !*/
 !.vscode/launch.json
 !.vscode/tasks.json
+!src/old_python_implementation/**/*.py
 !src/*.json
 !src/main.zig
 !stylua_executables/linux/stylua
