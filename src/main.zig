@@ -25,6 +25,7 @@ const expectEqualStrings = std.testing.expectEqualStrings;
 const extension = std.fs.path.extension;
 const fabs = std.math.fabs;
 const fmtSliceEscapeUpper = std.fmt.fmtSliceEscapeUpper;
+const indexOfDiff = std.mem.indexOfDiff;
 const join = std.fs.path.join;
 const makeDirAbsolute = std.fs.makeDirAbsolute;
 const maxInt = std.math.maxInt;
@@ -989,7 +990,7 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
                 if (strEql(value, "5.1.0")) {
                     // TODO: Change this to "= ModVersion.Pre5" once Pre6 is released
                     mod_version.* = ModVersion.Pre6;
-                } else if (strEql(value, "Pre-Release 3.0")) {
+                } else if (strEql(value, "Pre-Release 3.0") or strEql(value, "Pre-Release 4.0")) {
                     mod_version.* = ModVersion.BeforePre6;
                 } else {
                     return ModVersionErrors.UnrecognizedModVersion;
@@ -2292,7 +2293,7 @@ fn writeBuffered(buffered_writer: anytype, string: []const u8) !void {
     try buffered_writer.print("{s}", .{string});
 }
 
-fn testDirectory(comptime directory_name: []const u8, comptime test_extension: []const u8, is_invalid_test: bool) !void {
+fn testDirectory(comptime directory_name: []const u8, is_invalid_test: bool) !void {
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/" ++ directory_name, .{});
     defer iterable_tests.close();
 
@@ -2304,20 +2305,13 @@ fn testDirectory(comptime directory_name: []const u8, comptime test_extension: [
     defer tests_walker.deinit();
 
     while (try tests_walker.next()) |entry| {
-        if (entry.kind == std.fs.File.Kind.file and strEql(entry.basename, "in" ++ test_extension)) {
+        if (entry.kind == std.fs.File.Kind.directory and strEql(entry.basename, "input")) {
             std.debug.print("\nSubtest '" ++ directory_name ++ "/{s}'", .{std.fs.path.dirname(entry.path) orelse "null"});
 
-            var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-            const input_folder_path = try entry.dir.realpath(".", &input_folder_path_buffer);
-            const input_path = try join(allocator, &.{ input_folder_path, "in" ++ test_extension });
+            var test_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+            const test_folder_path = try entry.dir.realpath(".", &test_folder_path_buffer);
 
-            var tmpdir_input_folder = tmpDir(.{});
-            defer tmpdir_input_folder.cleanup();
-            var tmpdir_input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-            const tmpdir_input_folder_path = try tmpdir_input_folder.dir.realpath(".", &tmpdir_input_folder_path_buffer);
-            const tmpdir_input_path = try join(allocator, &.{ tmpdir_input_folder_path, "in" ++ test_extension });
-
-            try copyFileAbsolute(input_path, tmpdir_input_path, .{});
+            const input_folder_path = try join(allocator, &.{ test_folder_path, "input" });
 
             var tmpdir_output_folder = tmpDir(.{});
             defer tmpdir_output_folder.cleanup();
@@ -2325,12 +2319,14 @@ fn testDirectory(comptime directory_name: []const u8, comptime test_extension: [
             const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
 
             var diagnostics: Diagnostics = .{};
-            convert(tmpdir_input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics) catch |err| {
+            convert(input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics) catch |err| {
                 if (is_invalid_test) {
+                    const error_path = try join(allocator, &.{ test_folder_path, "expected_error.txt" });
+
                     const cwd = std.fs.cwd();
-                    const error_path = try join(allocator, &.{ input_folder_path, "error.txt" });
                     const error_file = try cwd.openFile(error_path, .{});
                     defer error_file.close();
+
                     var error_buf_reader = bufferedReader(error_file.reader());
                     const error_stream = error_buf_reader.reader();
                     const error_text_crlf = try error_stream.readAllAlloc(allocator, maxInt(usize));
@@ -2349,25 +2345,52 @@ fn testDirectory(comptime directory_name: []const u8, comptime test_extension: [
                 return error.InvalidTestDidntReturnError;
             }
 
-            const cwd = std.fs.cwd();
+            const expected_result_path = try join(allocator, &.{ test_folder_path, "expected_result" });
+            var iterable_expected_result = try std.fs.cwd().openIterableDir(expected_result_path, .{});
+            defer iterable_expected_result.close();
 
-            const expected_path = try join(allocator, &.{ input_folder_path, "out" ++ test_extension });
-            const expected_file = try cwd.openFile(expected_path, .{});
-            defer expected_file.close();
-            var expected_buf_reader = bufferedReader(expected_file.reader());
-            const expected_stream = expected_buf_reader.reader();
-            const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
-            const expected_text = try crlfToLf(expected_text_crlf, allocator);
+            var expected_result_walker = try iterable_expected_result.walk(allocator);
+            defer expected_result_walker.deinit();
 
-            const output_path = try join(allocator, &.{ tmpdir_output_folder_path, "in" ++ test_extension });
-            const output_file = try cwd.openFile(output_path, .{});
-            defer output_file.close();
-            var output_buf_reader = bufferedReader(output_file.reader());
-            const output_stream = output_buf_reader.reader();
-            const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
-            const output_text = try crlfToLf(output_text_crlf, allocator);
+            while (try expected_result_walker.next()) |expected_result_entry| {
+                if (expected_result_entry.kind == std.fs.File.Kind.file) {
+                    const expected_file_path = try join(allocator, &.{ expected_result_path, expected_result_entry.path });
 
-            try expectEqualStrings(expected_text, output_text);
+                    const cwd = std.fs.cwd();
+                    const expected_file = try cwd.openFile(expected_file_path, .{});
+                    defer expected_file.close();
+
+                    var expected_buf_reader = bufferedReader(expected_file.reader());
+                    const expected_stream = expected_buf_reader.reader();
+                    const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+                    const expected_text = try crlfToLf(expected_text_crlf, allocator);
+
+                    const output_path = try join(allocator, &.{ tmpdir_output_folder_path, expected_result_entry.path });
+                    const output_file = try cwd.openFile(output_path, .{});
+                    defer output_file.close();
+
+                    var output_buf_reader = bufferedReader(output_file.reader());
+                    const output_stream = output_buf_reader.reader();
+                    const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
+                    const output_text = try crlfToLf(output_text_crlf, allocator);
+
+                    const ext = extension(expected_result_entry.basename);
+                    // Ignore .flac file differences since they always happen with ffmpeg conversion :(
+                    if (strEql(ext, ".flac")) {} else if (strEql(ext, ".png")) {
+                        if (indexOfDiff(u8, expected_text, output_text)) |diff_index| {
+                            const unequal_copy_path = try join(allocator, &.{ test_folder_path, expected_result_entry.basename });
+
+                            std.debug.print("\nUnequal file at index {} is '{s}'; copying it to `{s}`\n", .{ diff_index, output_path, unequal_copy_path });
+                            try copyFileAbsolute(output_path, unequal_copy_path, .{});
+
+                            return error.unequalFiles;
+                        }
+                    } else {
+                        try expectEqualStrings(expected_text, output_text);
+                    }
+                }
+            }
+
             std.debug.print(" passed", .{});
         }
     }
@@ -2376,23 +2399,27 @@ fn testDirectory(comptime directory_name: []const u8, comptime test_extension: [
 }
 
 test "general" {
-    try testDirectory("general", ".ini", false);
+    try testDirectory("general", false);
 }
 
 test "ini_rules" {
-    try testDirectory("ini_rules", ".ini", false);
+    try testDirectory("ini_rules", false);
 }
 
 test "invalid" {
-    try testDirectory("invalid", ".ini", true);
+    try testDirectory("invalid", true);
 }
 
 test "lua_rules" {
-    try testDirectory("lua_rules", ".lua", false);
+    try testDirectory("lua_rules", false);
+}
+
+test "mod" {
+    try testDirectory("mod", false);
 }
 
 test "updated" {
-    try testDirectory("updated", ".ini", false);
+    try testDirectory("updated", false);
 }
 
 pub fn beautifyLua(output_folder_path: []const u8, allocator: Allocator) !void {
