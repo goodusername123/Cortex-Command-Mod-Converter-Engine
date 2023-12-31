@@ -142,8 +142,6 @@ const UpdateIniFileTreeErrors = error{
     ExpectedValue,
 };
 
-const converter_game_version = "5.1.0";
-
 // TODO: Refactor into a CLI
 pub fn main() !void {
     var arena = ArenaAllocator.init(page_allocator);
@@ -987,10 +985,9 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
                 if (mod_version.* != ModVersion.Uninitialized) {
                     return ModVersionErrors.AlreadySeenASupportedGameVersion;
                 }
-                if (strEql(value, "5.1.0")) {
-                    // TODO: Change this to "= ModVersion.Pre5" once Pre6 is released
+                if (strEql(value, "6.0.0")) {
                     mod_version.* = ModVersion.Pre6;
-                } else if (strEql(value, "Pre-Release 3.0") or strEql(value, "Pre-Release 4.0")) {
+                } else if (strEql(value, "Pre-Release 3.0") or strEql(value, "Pre-Release 4.0") or strEql(value, "5.1.0")) {
                     mod_version.* = ModVersion.BeforePre6;
                 } else {
                     return ModVersionErrors.UnrecognizedModVersion;
@@ -1402,6 +1399,8 @@ fn addGripStrength(node: *Node, allocator: Allocator) !void {
 }
 
 fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
+    const converter_game_version = "6.0.0";
+
     if (node.property) |property| {
         if (strEql(property, "DataModule")) {
             var has_supported_game_version = false;
