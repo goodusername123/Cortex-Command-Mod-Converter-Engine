@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from cortex_command_mod_converter_engine.case_check.case_check_errors import (
+from old_python_implementation.case_check.case_check_errors import (
     error_could_not_locate,
     error_failed_to_find_module,
 )

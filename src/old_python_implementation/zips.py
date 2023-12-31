@@ -2,7 +2,7 @@ import os
 import shutil
 import zipfile
 
-import cortex_command_mod_converter_engine.cfg as cfg
+import old_python_implementation.cfg as cfg
 
 
 def unzip(input_mod_path, input_folder_path):

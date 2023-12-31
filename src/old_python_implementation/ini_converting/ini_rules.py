@@ -1,5 +1,5 @@
-from cortex_command_mod_converter_engine import cfg, thumbnail_generator
-from cortex_command_mod_converter_engine.ini_converting import (
+from old_python_implementation import cfg, thumbnail_generator
+from old_python_implementation.ini_converting import (
     ini_cst,
     ini_rules_utils,
     ini_tokenizer,

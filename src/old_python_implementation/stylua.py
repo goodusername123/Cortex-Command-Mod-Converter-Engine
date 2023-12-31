@@ -2,8 +2,8 @@ import os
 import subprocess
 from pathlib import Path
 
-import cortex_command_mod_converter_engine
-from cortex_command_mod_converter_engine import utils
+import old_python_implementation
+from old_python_implementation import utils
 
 
 class WronglyFormattedLuaFile(Exception):
@@ -17,7 +17,7 @@ def stylize(output_folder_path):
         executable_location = "linux/stylua"
 
     stylua_path = (
-        Path(cortex_command_mod_converter_engine.__path__[0])
+        Path(old_python_implementation.__path__[0])
         / "stylua_executables"
         / executable_location
     )

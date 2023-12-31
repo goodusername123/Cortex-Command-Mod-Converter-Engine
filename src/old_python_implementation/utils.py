@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-import cortex_command_mod_converter_engine
+import old_python_implementation
 
 
 def get_relative_subfolder(input_folder_path, input_subfolder_path):
@@ -36,4 +36,4 @@ def get_ini_files_in_dir_deep(path):
 
 
 def get_path(relative_path):
-    return Path(cortex_command_mod_converter_engine.__file__).parent / relative_path
+    return Path(old_python_implementation.__file__).parent / relative_path

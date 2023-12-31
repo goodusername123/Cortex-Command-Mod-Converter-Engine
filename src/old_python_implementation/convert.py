@@ -4,15 +4,15 @@ import shutil
 import zipfile
 from pathlib import Path
 
-from cortex_command_mod_converter_engine import (
+from old_python_implementation import (
     bmp_to_png,
     regex_rules,
     stylua,
     utils,
     zips,
 )
-from cortex_command_mod_converter_engine.case_check import case_check
-from cortex_command_mod_converter_engine.ini_converting import (
+from old_python_implementation.case_check import case_check
+from old_python_implementation.ini_converting import (
     ini_cst_builder,
     ini_rules,
     ini_writer,
