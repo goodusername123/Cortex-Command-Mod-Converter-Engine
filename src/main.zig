@@ -224,8 +224,9 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     std.log.info("Getting the mod's game version...\n", .{});
     const mod_version = try getModVersion(&file_tree);
 
-    // TODO: Use this!
-    _ = mod_version;
+    if (mod_version == ModVersion.BeforePre6) {
+        try replaceMagentaInRgbPngsWithAlpha(output_folder_path, allocator);
+    }
 
     // TODO: Do we also want to throw an error if 0 are found?
     if (getDataModuleCount(&file_tree) > 1) {
@@ -412,6 +413,7 @@ fn strEql(str1: []const u8, str2: []const u8) bool {
 
 fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
     // TODO: ffmpeg won't always be available, so include its source code and call that instead
+    // -y allows overwriting output files
     const argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path, "-y" };
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
     _ = result;
@@ -419,6 +421,7 @@ fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, al
 
 fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
     // TODO: ffmpeg won't always be available, so include its source code and call that instead
+    // -y allows overwriting output files
     const argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path, "-y" };
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
     _ = result;
@@ -999,6 +1002,62 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
     for (node.children.items) |*child| {
         try getModVersionRecursivelyNode(child, mod_version);
     }
+}
+
+fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: Allocator) !void {
+    var iterable_dir = try std.fs.openIterableDirAbsolute(output_folder_path, .{});
+    defer iterable_dir.close();
+    var dir_iterator = iterable_dir.iterate();
+
+    while (try dir_iterator.next()) |entry| {
+        if (entry.kind == std.fs.File.Kind.file and strEql(extension(entry.name), ".png")) {
+            const output_file_path = try join(allocator, &.{ output_folder_path, entry.name });
+
+            if (try pngIsRgb(output_file_path)) {
+                var tmpdir_output_folder = tmpDir(.{});
+                defer tmpdir_output_folder.cleanup();
+
+                var tmpdir_output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
+                const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
+
+                const tmp_file_path = try join(allocator, &.{ tmpdir_output_folder_path, entry.name });
+
+                // TODO: ffmpeg won't always be available, so include its source code and call that instead
+                // This replaces magenta with transparency
+                // -y allows overwriting output files
+                //
+                // Note that "colorkey" its "similarity" value has a default, and minimum, of 0.01,
+                // which means that colors that are very close to (255, 0, 255) also turn transparent.
+                // This is fine however, since I checked that the CC palette doesn't contain other colors
+                // that are close enough to magenta to be turned transparent.
+                const argv = [_][]const u8{ "ffmpeg", "-i", output_file_path, "-vf", "colorkey=magenta", "-y", tmp_file_path };
+                const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
+                _ = result;
+
+                // Overwrite the old png with the new one that has transparency
+                try copyFileAbsolute(tmp_file_path, output_file_path, .{});
+            }
+        } else if (entry.kind == std.fs.File.Kind.directory) {
+            const child_output_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
+            try replaceMagentaInRgbPngsWithAlpha(child_output_folder_path, allocator);
+        }
+    }
+}
+
+fn pngIsRgb(output_file_path: []const u8) !bool {
+    const cwd = std.fs.cwd();
+    const file = try cwd.openFile(output_file_path, .{});
+    defer file.close();
+
+    const color_type_offset = 0x19;
+    try file.seekTo(color_type_offset);
+
+    const color_type = try file.reader().readByte();
+
+    // Note that 2 means rgb, so we deliberately don't care about rgba,
+    // since that'd be 6:
+    // https://en.wikipedia.org/wiki/PNG#Pixel_format
+    return color_type == 2;
 }
 
 const nodeCallbackDef = fn (node: *Node) error{ ExpectedValue, InvalidCharacter, OutOfMemory }!void;

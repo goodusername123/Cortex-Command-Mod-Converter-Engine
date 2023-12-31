@@ -12,7 +12,9 @@
 !tests/**/*.txt
 !tests/**/*.lua
 !tests/**/*.bmp
+!tests/**/*.png
 !tests/**/*.wav
+!tests/**/*.flac
 !.gitignore
 !build.zig
 !example.py
