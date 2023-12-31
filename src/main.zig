@@ -2293,6 +2293,30 @@ fn writeBuffered(buffered_writer: anytype, string: []const u8) !void {
     try buffered_writer.print("{s}", .{string});
 }
 
+test "general" {
+    try testDirectory("general", false);
+}
+
+test "ini_rules" {
+    try testDirectory("ini_rules", false);
+}
+
+test "invalid" {
+    try testDirectory("invalid", true);
+}
+
+test "lua_rules" {
+    try testDirectory("lua_rules", false);
+}
+
+test "mod" {
+    try testDirectory("mod", false);
+}
+
+test "updated" {
+    try testDirectory("updated", false);
+}
+
 fn testDirectory(comptime directory_name: []const u8, is_invalid_test: bool) !void {
     var iterable_tests = try std.fs.cwd().openIterableDir("tests/" ++ directory_name, .{});
     defer iterable_tests.close();
@@ -2346,50 +2370,7 @@ fn testDirectory(comptime directory_name: []const u8, is_invalid_test: bool) !vo
             }
 
             const expected_result_path = try join(allocator, &.{ test_folder_path, "expected_result" });
-            var iterable_expected_result = try std.fs.cwd().openIterableDir(expected_result_path, .{});
-            defer iterable_expected_result.close();
-
-            var expected_result_walker = try iterable_expected_result.walk(allocator);
-            defer expected_result_walker.deinit();
-
-            while (try expected_result_walker.next()) |expected_result_entry| {
-                if (expected_result_entry.kind == std.fs.File.Kind.file) {
-                    const expected_file_path = try join(allocator, &.{ expected_result_path, expected_result_entry.path });
-
-                    const cwd = std.fs.cwd();
-                    const expected_file = try cwd.openFile(expected_file_path, .{});
-                    defer expected_file.close();
-
-                    var expected_buf_reader = bufferedReader(expected_file.reader());
-                    const expected_stream = expected_buf_reader.reader();
-                    const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
-                    const expected_text = try crlfToLf(expected_text_crlf, allocator);
-
-                    const output_path = try join(allocator, &.{ tmpdir_output_folder_path, expected_result_entry.path });
-                    const output_file = try cwd.openFile(output_path, .{});
-                    defer output_file.close();
-
-                    var output_buf_reader = bufferedReader(output_file.reader());
-                    const output_stream = output_buf_reader.reader();
-                    const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
-                    const output_text = try crlfToLf(output_text_crlf, allocator);
-
-                    const ext = extension(expected_result_entry.basename);
-                    // Ignore .flac file differences since they always happen with ffmpeg conversion :(
-                    if (strEql(ext, ".flac")) {} else if (strEql(ext, ".png")) {
-                        if (indexOfDiff(u8, expected_text, output_text)) |diff_index| {
-                            const unequal_copy_path = try join(allocator, &.{ test_folder_path, expected_result_entry.basename });
-
-                            std.debug.print("\nUnequal file at index {} is '{s}'; copying it to `{s}`\n", .{ diff_index, output_path, unequal_copy_path });
-                            try copyFileAbsolute(output_path, unequal_copy_path, .{});
-
-                            return error.unequalFiles;
-                        }
-                    } else {
-                        try expectEqualStrings(expected_text, output_text);
-                    }
-                }
-            }
+            try testDirectoryFiles(test_folder_path, expected_result_path, tmpdir_output_folder_path, allocator);
 
             std.debug.print(" passed", .{});
         }
@@ -2398,28 +2379,51 @@ fn testDirectory(comptime directory_name: []const u8, is_invalid_test: bool) !vo
     std.debug.print("\n\n", .{});
 }
 
-test "general" {
-    try testDirectory("general", false);
-}
+fn testDirectoryFiles(test_folder_path: []const u8, expected_result_path: []const u8, tmpdir_output_folder_path: []const u8, allocator: Allocator) !void {
+    var iterable_expected_result = try std.fs.cwd().openIterableDir(expected_result_path, .{});
+    defer iterable_expected_result.close();
 
-test "ini_rules" {
-    try testDirectory("ini_rules", false);
-}
+    var expected_result_walker = try iterable_expected_result.walk(allocator);
+    defer expected_result_walker.deinit();
 
-test "invalid" {
-    try testDirectory("invalid", true);
-}
+    while (try expected_result_walker.next()) |expected_result_entry| {
+        if (expected_result_entry.kind == std.fs.File.Kind.file) {
+            const expected_file_path = try join(allocator, &.{ expected_result_path, expected_result_entry.path });
 
-test "lua_rules" {
-    try testDirectory("lua_rules", false);
-}
+            const cwd = std.fs.cwd();
+            const expected_file = try cwd.openFile(expected_file_path, .{});
+            defer expected_file.close();
 
-test "mod" {
-    try testDirectory("mod", false);
-}
+            var expected_buf_reader = bufferedReader(expected_file.reader());
+            const expected_stream = expected_buf_reader.reader();
+            const expected_text_crlf = try expected_stream.readAllAlloc(allocator, maxInt(usize));
+            const expected_text = try crlfToLf(expected_text_crlf, allocator);
 
-test "updated" {
-    try testDirectory("updated", false);
+            const output_path = try join(allocator, &.{ tmpdir_output_folder_path, expected_result_entry.path });
+            const output_file = try cwd.openFile(output_path, .{});
+            defer output_file.close();
+
+            var output_buf_reader = bufferedReader(output_file.reader());
+            const output_stream = output_buf_reader.reader();
+            const output_text_crlf = try output_stream.readAllAlloc(allocator, maxInt(usize));
+            const output_text = try crlfToLf(output_text_crlf, allocator);
+
+            const ext = extension(expected_result_entry.basename);
+            // Ignore .flac file differences since they always happen with ffmpeg conversion :(
+            if (strEql(ext, ".flac")) {} else if (strEql(ext, ".png")) {
+                if (indexOfDiff(u8, expected_text, output_text)) |diff_index| {
+                    const unequal_copy_path = try join(allocator, &.{ test_folder_path, expected_result_entry.basename });
+
+                    std.debug.print("\nUnequal file at index {} is '{s}'; copying it to `{s}`\n", .{ diff_index, output_path, unequal_copy_path });
+                    try copyFileAbsolute(output_path, unequal_copy_path, .{});
+
+                    return error.unequalFiles;
+                }
+            } else {
+                try expectEqualStrings(expected_text, output_text);
+            }
+        }
+    }
 }
 
 pub fn beautifyLua(output_folder_path: []const u8, allocator: Allocator) !void {
