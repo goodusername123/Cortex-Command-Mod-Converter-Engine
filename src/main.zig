@@ -2409,8 +2409,7 @@ fn testDirectoryFiles(test_folder_path: []const u8, expected_result_path: []cons
             const output_text = try crlfToLf(output_text_crlf, allocator);
 
             const ext = extension(expected_result_entry.basename);
-            // Ignore .flac file differences since they always happen with ffmpeg conversion :(
-            if (strEql(ext, ".flac")) {} else if (strEql(ext, ".png")) {
+            if (strEql(ext, ".png") or strEql(ext, ".flac")) {
                 if (indexOfDiff(u8, expected_text, output_text)) |diff_index| {
                     const unequal_copy_path = try join(allocator, &.{ test_folder_path, expected_result_entry.basename });
 
