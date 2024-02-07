@@ -332,10 +332,7 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const input_stat = try iterable_dir.dir.statFile(input_file_path);
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
 
-                    // std.log.info("{}\n{}\n\n", .{ input_stat.mtime, output_stat.mtime });
-
                     if (input_stat.mtime > output_stat.mtime) {
-                        // std.log.info("Converted bmp to png\n", .{});
                         // TODO: Figure out whether a different function should be called in this case,
                         // similar to below where updateFileAbsolute() can be called instead of copyFileAbsolute()
                         try convertBmpToPng(input_file_path, output_file_path, allocator);
@@ -369,7 +366,6 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
 
                     if (input_stat.mtime > output_stat.mtime) {
-                        // std.log.info("Converted wav to flac\n", .{});
                         // TODO: Figure out whether a different function should be called in this case,
                         // similar to below where updateFileAbsolute() can be called instead of copyFileAbsolute()
                         try convertWavToFlac(input_file_path, output_file_path, allocator);
@@ -393,7 +389,6 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     const output_stat = try iterable_dir.dir.statFile(output_file_path);
 
                     if (input_stat.mtime > output_stat.mtime) {
-                        // std.log.info("Copied something else\n", .{});
                         // TODO: Reverify that this is faster than the plain copyFileAbsolute()
                         _ = try updateFileAbsolute(input_file_path, output_file_path, .{});
                     }
@@ -431,9 +426,7 @@ fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, a
     // var line_iter = std.mem.split(u8, result.stderr, "\n");
     // while (line_iter.next()) |line| {
     //     if (line.len == 0) continue;
-    //     std.log.info("{s}\n", .{line});
     // }
-    // std.log.info("\n", .{});
 }
 
 fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
@@ -492,8 +485,6 @@ fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []co
 }
 
 fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !IniFolder {
-    // std.log.info("folder_path: '{s}'\n", .{folder_path});
-
     var folder = IniFolder{
         .name = basename(folder_path),
         .files = ArrayList(IniFile).init(allocator),
@@ -505,12 +496,10 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
     var dir_iterator = iterable_dir.iterate();
 
     while (try dir_iterator.next()) |entry| {
-        // std.log.info("entry name '{s}', entry kind: '{}'\n", .{ entry.name, entry.kind });
         if (entry.kind == std.fs.File.Kind.file) {
             const file_path = try join(allocator, &.{ folder_path, entry.name });
             if (strEql(extension(entry.name), ".ini")) {
                 diagnostics.file_path = file_path;
-                // std.log.info("file path '{s}'\n", .{file_path});
                 const text = try readFile(file_path, allocator);
 
                 var tokens = try getTokens(text, allocator);
@@ -571,7 +560,6 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
 
     while (slice.len > 0) {
         const token = getToken(&slice, &multiline_comment_depth, &seen_property);
-        // std.log.info("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
         try tokens.append(token);
     }
 
@@ -583,8 +571,6 @@ fn getTokens(lf_text: []const u8, allocator: Allocator) !ArrayList(Token) {
 }
 
 fn getToken(slice: *[]const u8, multiline_comment_depth: *i32, seen_property: *bool) Token {
-    // TODO: Consistently use either while-loops or for-loops everywhere in this function
-
     if (slice.*[0] == '\n') {
         seen_property.* = false;
         const token = Token{ .type = .Newline, .slice = slice.*[0..1] };
@@ -685,7 +671,7 @@ fn getToken(slice: *[]const u8, multiline_comment_depth: *i32, seen_property: *b
     // A Sentence ends with a word, or the start of a comment
     var end_index: usize = 1;
     var sentence_end_index: usize = end_index;
-    while (end_index < slice.len) : (end_index += 1) {
+    while (end_index < slice.len) {
         if (slice.*[end_index] == '=' and !seen_property.*) {
             break;
         }
@@ -695,6 +681,7 @@ fn getToken(slice: *[]const u8, multiline_comment_depth: *i32, seen_property: *b
         if (slice.*[end_index] != ' ') {
             sentence_end_index = end_index + 1;
         }
+        end_index += 1;
     }
 
     seen_property.* = true;
@@ -706,8 +693,9 @@ fn getToken(slice: *[]const u8, multiline_comment_depth: *i32, seen_property: *b
 fn getAstFromTokens(tokens: *ArrayList(Token), allocator: Allocator, diagnostics: *Diagnostics) !ArrayList(Node) {
     var ast = ArrayList(Node).init(allocator);
 
+    // The game ignores the indentation of the first line of a file,
+    // but we choose to trim that indentation
     var token_index: usize = 0;
-
     if (lineHasSentence(tokens, token_index)) {
         token_index = leftTrimFirstLine(tokens);
     }
@@ -772,7 +760,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
     var token = tokens.items[token_index.*];
 
     var line_depth = getLineDepth(tokens, token_index.*);
-    // std.log.info("a {}\n", .{line_depth});
     if (line_depth > depth) {
         calculateLineAndColumnDiagnostics(tokens, token_index.*, diagnostics);
         return NodeError.TooManyTabs;
@@ -785,9 +772,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
     while (token_index.* < tokens.items.len) {
         token = tokens.items[token_index.*];
 
-        // TODO: Figure out why {s: <42} doesn't set the width to 42
-        // std.log.info("'{s}'\t\t{}\n", .{ fmtSliceEscapeUpper(token.slice), token.type });
-
         if (seen == .Start and token.type == .Sentence) {
             // This if-statement is deliberately in a loop,
             // since whitespace and multiline comments may come before it
@@ -798,7 +782,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
             checked_line_depth = true;
 
             line_depth = getLineDepth(tokens, token_index.*);
-            // std.log.info("b {}\n", .{line_depth});
 
             if (line_depth > depth + 1) {
                 calculateLineAndColumnDiagnostics(tokens, token_index.*, diagnostics);
@@ -836,25 +819,6 @@ fn getNode(tokens: *ArrayList(Token), token_index: *usize, depth: i32, allocator
     }
 
     return node;
-}
-
-fn calculateLineAndColumnDiagnostics(tokens: *ArrayList(Token), token_index: usize, diagnostics: *Diagnostics) void {
-    diagnostics.line = 1;
-    diagnostics.column = 1;
-
-    var i: usize = 0;
-    while (i < token_index) {
-        var token = tokens.items[i];
-
-        if (token.type == .Newline) {
-            diagnostics.line.? += 1;
-            diagnostics.column.? = 1;
-        } else {
-            diagnostics.column.? += @intCast(token.slice.len);
-        }
-
-        i += 1;
-    }
 }
 
 fn getLineDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
@@ -915,6 +879,25 @@ fn getNextSentenceDepth(tokens: *ArrayList(Token), token_index_: usize) i32 {
     // TODO: Find a way to return the same depth as the previous Sentence line
     // It isn't as easy as "return depth", since it can also be "return depth + 1"
     return 0;
+}
+
+fn calculateLineAndColumnDiagnostics(tokens: *ArrayList(Token), token_index: usize, diagnostics: *Diagnostics) void {
+    diagnostics.line = 1;
+    diagnostics.column = 1;
+
+    var i: usize = 0;
+    while (i < token_index) {
+        var token = tokens.items[i];
+
+        if (token.type == .Newline) {
+            diagnostics.line.? += 1;
+            diagnostics.column.? = 1;
+        } else {
+            diagnostics.column.? += @intCast(token.slice.len);
+        }
+
+        i += 1;
+    }
 }
 
 fn getDataModuleCount(file_tree: *IniFolder) i32 {
@@ -2268,15 +2251,12 @@ fn shovelFlashFix(node: *Node) !void {
 
 fn writeIniFileTree(file_tree: *const IniFolder, output_folder_path: []const u8, allocator: Allocator) !void {
     for (file_tree.files.items) |file| {
-        // std.log.info("output_folder_path: '{s}', file.name: '{s}'\n", .{ output_folder_path, file.name });
         const file_path = try join(allocator, &.{ output_folder_path, file.name });
-        // std.log.info("file_path: '{s}'\n", .{file_path});
         try writeAst(&file.ast, file_path);
     }
 
     for (file_tree.folders.items) |folder| {
         const child_output_folder_path = try join(allocator, &.{ output_folder_path, folder.name });
-        // std.log.info("{s}\n", .{child_output_folder_path});
         try writeIniFileTree(&folder, child_output_folder_path, allocator);
     }
 }
@@ -2292,7 +2272,8 @@ fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
     for (ast.items, 0..) |*node, index| {
         try writeAstRecursively(node, buffered_writer, 0);
 
-        // Doesn't add a trailing newline, because writeAstRecursively() already adds it
+        // Don't add a trailing newline,
+        // since writeAstRecursively() already adds it
         if (node.property != null and index < ast.items.len - 1) {
             try writeBuffered(buffered_writer, "\n");
         }
@@ -2302,39 +2283,26 @@ fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
 }
 
 fn writeAstRecursively(node: *Node, buffered_writer: anytype, depth: usize) !void {
-    // std.log.info("{}\n", .{node});
-
     // Don't add an empty line
     if (node.property == null and node.comments.items.len == 0) {
         return;
     }
 
-    // Write tabs to file
     var i: usize = 0;
     while (i < depth) : (i += 1) {
-        // std.log.info("'\t'\n", .{});
         try writeBuffered(buffered_writer, "\t");
     }
 
-    // Write property to file
     if (node.property) |property| {
-        // std.log.info("'{s}'\n", .{property});
         try writeBuffered(buffered_writer, property);
     }
 
-    // Write value and equals to file
     if (node.value) |value| {
-        // std.log.info("' = '\n", .{});
         try writeBuffered(buffered_writer, " = ");
-
-        // std.log.info("'{s}'\n", .{value});
         try writeBuffered(buffered_writer, value);
     }
 
-    // Write comments to file
     if (node.comments.items.len > 0) {
-        // std.log.info("' //'\n", .{});
-
         if (node.property != null) {
             try writeBuffered(buffered_writer, " ");
         }
@@ -2342,18 +2310,13 @@ fn writeAstRecursively(node: *Node, buffered_writer: anytype, depth: usize) !voi
         try writeBuffered(buffered_writer, "//");
 
         for (node.comments.items) |comment| {
-            // std.log.info("' {s}'\n", .{comment});
             try writeBuffered(buffered_writer, " ");
             try writeBuffered(buffered_writer, comment);
         }
     }
 
-    // Write newline to file
-    // std.log.info("'\\n'\n", .{});
     try writeBuffered(buffered_writer, "\n");
 
-    // Recursively enter child nodes
-    // std.log.info("Recursing into child\n", .{});
     for (node.children.items) |*child| {
         try writeAstRecursively(child, buffered_writer, depth + 1);
     }
