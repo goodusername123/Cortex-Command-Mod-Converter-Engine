@@ -1,1 +1,0 @@
-SUPPORTED_GAME_VERSION = "Pre-Release 5.0"
