@@ -9,7 +9,10 @@
 			"type": "cppvsdbg",
 			"request": "launch",
 			"program": "${workspaceFolder}/zig-out/bin/Cortex-Command-Mod-Converter-Engine",
-			"args": [],
+			"args": [
+				"I:/Programming/Cortex-Command-Mod.io-Updater/1_downloads/3170850/Stick.rte",
+				"I:/Programming/Cortex-Command-Community-Project/Mods/Stick.rte"
+			],
 			"cwd": "${workspaceFolder}",
 			"console": "integratedTerminal",
 			"preLaunchTask": "Build zig"

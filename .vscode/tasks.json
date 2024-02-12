@@ -6,7 +6,6 @@
 			"type": "shell",
 			"command": "zig",
 			"args": [
-				"-freference-trace",
 				"build",
 			],
 			"problemMatcher": [],

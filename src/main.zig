@@ -148,19 +148,13 @@ pub fn main() !void {
     defer arena.deinit();
     var allocator = arena.allocator();
 
-    const cwd = std.fs.cwd();
+    var args = try std.process.argsWithAllocator(allocator);
+    defer args.deinit();
 
-    var input_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    // const input_folder_path = try cwd.realpath("tests/mod/in", &input_folder_path_buffer);
-    const input_folder_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/LegacyModConverter-v1.0-pre5.2/Input", &input_folder_path_buffer);
-    // const input_folder_path = try cwd.realpath("I:/Programming/Cortex-Command-Mod-Converter-Engine/tons_of_mods/extra", &input_folder_path_buffer);
-    // const input_folder_path = try cwd.realpath("I:/Games/CCCP Pre5.2 - Copy/foo", &input_folder_path_buffer);
-
-    var output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
-    // const output_folder_path = try cwd.realpath("tests/mod/out", &output_folder_path_buffer);
-    const output_folder_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/Mods", &output_folder_path_buffer);
-    // const output_folder_path = try cwd.realpath("I:/Programming/Cortex-Command-Community-Project-Data/Mods/tmp", &output_folder_path_buffer);
-    // const output_folder_path = try cwd.realpath("I:/Games/CCCP Pre5.2 - Copy/Mods", &output_folder_path_buffer);
+    const program_name = args.next() orelse return error.ExpectedProgramName;
+    _ = program_name;
+    const input_folder_path = args.next() orelse return error.ExpectedInputFolderPath;
+    const output_folder_path = args.next() orelse return error.ExpectedOutputFolderPath;
 
     var diagnostics: Diagnostics = .{};
     convert(
