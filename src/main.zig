@@ -224,11 +224,6 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
         try replaceMagentaInRgbPngsWithAlpha(output_folder_path, allocator);
     }
 
-    // TODO: Do we also want to throw an error if 0 are found?
-    if (getDataModuleCount(&file_tree) > 1) {
-        return error.MoreThanOneDataModule;
-    }
-
     try applyOnNodes(pathToFilePath, &file_tree);
 
     // It also HAS to be called before applyIniFilePathRules(),
@@ -890,36 +885,6 @@ fn calculateLineAndColumnDiagnostics(tokens: *ArrayList(Token), token_index: usi
     }
 }
 
-fn getDataModuleCount(file_tree: *IniFolder) i32 {
-    var data_module_count: i32 = 0;
-    getDataModuleCountRecursivelyFolder(file_tree, &data_module_count);
-    return data_module_count;
-}
-
-fn getDataModuleCountRecursivelyFolder(file_tree: *IniFolder, data_module_count: *i32) void {
-    for (file_tree.folders.items) |*folder| {
-        getDataModuleCountRecursivelyFolder(folder, data_module_count);
-    }
-
-    for (file_tree.files.items) |file| {
-        for (file.ast.items) |*node| {
-            getDataModuleCountRecursivelyNode(node, data_module_count);
-        }
-    }
-}
-
-fn getDataModuleCountRecursivelyNode(node: *Node, data_module_count: *i32) void {
-    if (node.property) |node_property| {
-        if (strEql(node_property, "DataModule")) {
-            data_module_count.* += 1;
-        }
-    }
-
-    for (node.children.items) |*child| {
-        getDataModuleCountRecursivelyNode(child, data_module_count);
-    }
-}
-
 // Uninitialized is used to detect SupportedGameVersion being seen a second time
 const ModVersion = enum {
     Uninitialized,
@@ -930,8 +895,27 @@ const ModVersion = enum {
 fn getModVersion(file_tree: *IniFolder) !ModVersion {
     var mod_version = ModVersion.Uninitialized;
 
-    try getModVersionRecursivelyFolder(file_tree, &mod_version);
+    for (file_tree.files.items) |file| {
+        if (strEql(file.name, "Index.ini")) {
+            var data_module_count: i32 = 0;
 
+            for (file.ast.items) |*node| {
+                try getModVersionRecursivelyNode(node, &mod_version, &data_module_count);
+            }
+
+            if (data_module_count == 0) {
+                return error.ExpectedADataModule;
+            } else if (data_module_count > 1) {
+                return error.ContainsMoreThanOneDataModule;
+            }
+
+            break;
+        }
+    }
+
+    // Apply all updates to the mod if it has no Index.ini,
+    // as we want tests without an Index.ini to pass,
+    // as well as CC Steam Workshop mods that have no SupportedGameVersion
     if (mod_version == ModVersion.Uninitialized) {
         mod_version = ModVersion.BeforePre6;
     }
@@ -939,22 +923,10 @@ fn getModVersion(file_tree: *IniFolder) !ModVersion {
     return mod_version;
 }
 
-fn getModVersionRecursivelyFolder(file_tree: *IniFolder, mod_version: *ModVersion) !void {
-    for (file_tree.folders.items) |*folder| {
-        try getModVersionRecursivelyFolder(folder, mod_version);
-    }
-
-    for (file_tree.files.items) |file| {
-        for (file.ast.items) |*node| {
-            try getModVersionRecursivelyNode(node, mod_version);
-        }
-    }
-}
-
-fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
+fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion, data_module_count: *i32) !void {
     const ModVersionErrors = error{
         AlreadySeenASupportedGameVersion,
-        UnrecognizedModVersion,
+        UnrecognizedSupportedGameVersion,
     };
 
     if (node.property) |node_property| {
@@ -968,14 +940,16 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion) !void {
                 } else if (strEql(value, "Pre-Release 3.0") or strEql(value, "Pre-Release 4.0") or strEql(value, "Pre-Release 5.0") or strEql(value, "5.1.0")) {
                     mod_version.* = ModVersion.BeforePre6;
                 } else {
-                    return ModVersionErrors.UnrecognizedModVersion;
+                    return ModVersionErrors.UnrecognizedSupportedGameVersion;
                 }
             }
+        } else if (strEql(node_property, "DataModule")) {
+            data_module_count.* += 1;
         }
     }
 
     for (node.children.items) |*child| {
-        try getModVersionRecursivelyNode(child, mod_version);
+        try getModVersionRecursivelyNode(child, mod_version, data_module_count);
     }
 }
 
@@ -1459,8 +1433,6 @@ fn addOrUpdateSupportedGameVersion(node: *Node, allocator: Allocator) !void {
                                 child.value = converter_game_version;
                             }
                         }
-
-                        break;
                     }
                 }
             }
