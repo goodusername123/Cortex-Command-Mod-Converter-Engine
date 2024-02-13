@@ -2,7 +2,7 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "Build zig",
+			"label": "Build",
 			"type": "shell",
 			"command": "zig",
 			"args": [
@@ -15,7 +15,7 @@
 			}
 		},
 		{
-			"label": "Build test zig",
+			"label": "Tests",
 			"type": "shell",
 			"command": "zig",
 			"args": [

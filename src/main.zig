@@ -424,16 +424,12 @@ fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, a
 }
 
 fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile(parentDir() ++ "/lua_rules.json", allocator);
+    const text = try readFile("rules/lua_rules.json", allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
     var lua_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return lua_rules;
-}
-
-inline fn parentDir() []const u8 {
-    return comptime std.fs.path.dirname(@src().file) orelse ".";
 }
 
 fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []const u8, allocator: Allocator) !void {
@@ -1142,7 +1138,7 @@ fn wavExtensionToFlac(node: *Node, allocator: Allocator) !void {
 }
 
 fn parseIniCopyOfRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile(parentDir() ++ "/ini_copy_of_rules.json", allocator);
+    const text = try readFile("rules/ini_copy_of_rules.json", allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1189,7 +1185,7 @@ fn applyIniValueReplacementRulesRecursivelyNode(node: *Node, comptime property: 
 }
 
 fn parseIniFilePathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile(parentDir() ++ "/ini_file_path_rules.json", allocator);
+    const text = try readFile("rules/ini_file_path_rules.json", allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1208,7 +1204,7 @@ fn applyIniFilePathRules(rules: std.json.ArrayHashMap([]const u8), file_tree: *I
 }
 
 fn parseIniScriptPathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile(parentDir() ++ "/ini_script_path_rules.json", allocator);
+    const text = try readFile("rules/ini_script_path_rules.json", allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1227,7 +1223,7 @@ fn applyIniScriptPathRules(rules: std.json.ArrayHashMap([]const u8), file_tree: 
 }
 
 fn parseIniPropertyRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile(parentDir() ++ "/ini_property_rules.json", allocator);
+    const text = try readFile("rules/ini_property_rules.json", allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1270,7 +1266,7 @@ fn applyIniPropertyRulesRecursivelyNode(node: *Node, old_property: []const u8, n
 }
 
 fn parseIniRules(allocator: Allocator) ![]Rule {
-    const text = try readFile(parentDir() ++ "/ini_rules.json", allocator);
+    const text = try readFile("rules/ini_rules.json", allocator);
     return try parseFromSliceLeaky([]Rule, allocator, text, .{});
 }
 
@@ -1310,7 +1306,7 @@ fn applyIniRulesRecursivelyNode(node: *Node, rule: *Rule) void {
 }
 
 fn parseIniSoundContainerRules(allocator: Allocator) ![][]const u8 {
-    const text = try readFile(parentDir() ++ "/ini_sound_container_rules.json", allocator);
+    const text = try readFile("rules/ini_sound_container_rules.json", allocator);
     return try parseFromSliceLeaky([][]const u8, allocator, text, .{});
 }
 

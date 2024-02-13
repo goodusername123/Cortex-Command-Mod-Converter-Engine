@@ -5,17 +5,17 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "zig",
+			"name": "Run",
 			"type": "cppvsdbg",
 			"request": "launch",
-			"program": "${workspaceFolder}/zig-out/bin/Cortex-Command-Mod-Converter-Engine",
+			"program": "./zig-out/bin/Cortex-Command-Mod-Converter-Engine",
 			"args": [
-				"I:/Programming/Cortex-Command-Mod.io-Updater/1_downloads/3170850/Stick.rte",
-				"I:/Programming/Cortex-Command-Community-Project/Mods/Stick.rte"
+				"I:/Programming/Cortex-Command-Mod.io-Updater/1_downloads/1008081/nrg.rte",
+				"I:/Programming/Cortex-Command-Mod.io-Updater/2_converted/1008081/nrg.rte"
 			],
 			"cwd": "${workspaceFolder}",
 			"console": "integratedTerminal",
-			"preLaunchTask": "Build zig"
+			"preLaunchTask": "Build"
 		}
 	]
 }
