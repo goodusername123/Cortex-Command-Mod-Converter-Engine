@@ -221,9 +221,11 @@ pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, al
     // Check the version, since people since Pre6 are able to start using magenta
     // as a regular color in their RGB pngs
     if (mod_version == ModVersion.BeforePre6) {
+        std.log.info("Replacing magenta in RGB .pngs with alpha...\n", .{});
         try replaceMagentaInRgbPngsWithAlpha(output_folder_path, allocator);
     }
 
+    std.log.info("Replacing Path with FilePath...\n", .{});
     try applyOnNodes(pathToFilePath, &file_tree);
 
     // It also HAS to be called before applyIniFilePathRules(),
