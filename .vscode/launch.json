@@ -8,7 +8,7 @@
 			"name": "Run",
 			"type": "cppvsdbg",
 			"request": "launch",
-			"program": "./zig-out/bin/Cortex-Command-Mod-Converter-Engine",
+			"program": "./Cortex-Command-Mod-Converter-Engine",
 			"args": [
 				"I:/Programming/Cortex-Command-Mod.io-Updater/1_downloads/1008081/nrg.rte",
 				"I:/Programming/Cortex-Command-Mod.io-Updater/2_converted/1008081/nrg.rte"

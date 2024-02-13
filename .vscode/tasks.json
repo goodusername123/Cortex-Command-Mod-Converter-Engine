@@ -7,6 +7,11 @@
 			"command": "zig",
 			"args": [
 				"build",
+				"-freference-trace",
+				"--prefix",
+				".",
+				"--prefix-exe-dir",
+				"."
 			],
 			"problemMatcher": [],
 			"group": {
