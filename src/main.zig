@@ -939,7 +939,7 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion, data_modu
                 }
                 if (strEql(value, "6.0.0")) {
                     mod_version.* = ModVersion.Pre6;
-                } else if (strEql(value, "Pre-Release 3.0") or strEql(value, "Pre-Release 4.0") or strEql(value, "Pre-Release 5.0") or strEql(value, "5.1.0")) {
+                } else if (strEql(value, "Pre-Release 3.0") or strEql(value, "Pre-Release 4.0") or strEql(value, "Pre-Release 5.0") or strEql(value, "Pre-Release 5.1") or strEql(value, "Pre-Release 5.2") or strEql(value, "5.1.0")) {
                     mod_version.* = ModVersion.BeforePre6;
                 } else {
                     return ModVersionErrors.UnrecognizedSupportedGameVersion;
