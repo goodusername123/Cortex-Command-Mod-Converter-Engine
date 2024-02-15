@@ -1,0 +1,15 @@
+.{
+    .name = "Cortex Command Mod Converter Engine",
+    .version = "1.0.0",
+
+    .dependencies = .{
+        .ffmpeg = .{
+            .url = "???", // TODO:
+            .hash = "", // TODO:
+        },
+        .zip = .{
+            .url = "???", // TODO:
+            .hash = "", // TODO:
+        },
+    },
+}
