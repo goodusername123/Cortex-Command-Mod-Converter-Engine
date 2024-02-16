@@ -1353,7 +1353,7 @@ fn updateIniFileTree(file_tree: *IniFolder, allocator: Allocator) !void {
 
 fn addGetsHitByMosWhenHeldToShields(node: *Node, allocator: Allocator) !void {
     if (node.property) |node_property| {
-        if (strEql(node_property, "AddDevice")) {
+        if (isInsaneProperty(node_property)) {
             if (node.value) |node_value| {
                 if (strEql(node_value, "HeldDevice")) {
                     var children = &node.children;
@@ -1391,9 +1391,14 @@ fn addGetsHitByMosWhenHeldToShields(node: *Node, allocator: Allocator) !void {
     }
 }
 
+/// "Insane", because the game accepts things like "AddAmmo = AHuman" and "AddActor = HeldDevice"
+fn isInsaneProperty(property: []const u8) bool {
+    return strEql(property, "AddEffect") or strEql(property, "AddAmmo") or strEql(property, "AddDevice") or strEql(property, "AddActor");
+}
+
 fn addGripStrength(node: *Node, allocator: Allocator) !void {
     if (node.property) |node_property| {
-        if (strEql(node_property, "AddActor") or strEql(node_property, "AddEffect")) {
+        if (isInsaneProperty(node_property)) {
             if (node.value) |node_value| {
                 if (strEql(node_value, "Arm")) {
                     var children = &node.children;
@@ -1535,7 +1540,7 @@ fn addEffectAemitterToAddEffectAejetpackRecursivelyFolder(folder: *IniFolder, fi
 
 fn addEffectAemitterToAddEffectAejetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, preset_name: []const u8) !void {
     if (node.property) |property| {
-        if (strEql(property, "AddEffect")) {
+        if (isInsaneProperty(property)) {
             if (node.value) |value| {
                 if (strEql(value, "AEmitter")) {
                     for (node.children.items) |*child| {
@@ -1581,7 +1586,7 @@ fn moveJetpackModifiers(folder: *IniFolder, file_tree: *IniFolder, allocator: Al
 /// where the loop is stopped if a CopyOf is encountered.
 fn moveJetpackModifiersRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (strEql(property, "AddActor") or strEql(property, "AddEffect")) {
+        if (isInsaneProperty(property)) {
             if (node.value) |value| {
                 if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
                     try appendJetpackModifiers(node);
@@ -1706,7 +1711,7 @@ fn copyJetpack(folder: *IniFolder, file_tree: *IniFolder, allocator: Allocator) 
 // The CopyOf has to be searched recursively, since a copied Jetpack may be in a CopyOf of a CopyOf.
 fn copyJetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (strEql(property, "AddActor") or strEql(property, "AddEffect")) {
+        if (isInsaneProperty(property)) {
             if (node.value) |value| {
                 if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
                     var seen_jetpack_modifier = false;
@@ -1773,7 +1778,7 @@ fn removeJetpackModifiersFromActors(folder: *IniFolder, file_tree: *IniFolder, a
 
 fn removeJetpackModifiersFromActorsRecursivelyNode(node: *Node, file_tree: *IniFolder, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (strEql(property, "AddActor") or strEql(property, "AddEffect")) {
+        if (isInsaneProperty(property)) {
             if (node.value) |value| {
                 if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
                     var i = node.children.items.len;
@@ -1820,7 +1825,7 @@ fn findJetpackRecursivelyFolder(folder: *IniFolder, file_tree: *IniFolder, prese
 
 fn findJetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, preset_name: []const u8) ?*Node {
     if (node.property) |property| {
-        if (strEql(property, "AddActor") or strEql(property, "AddEffect")) {
+        if (isInsaneProperty(property)) {
             if (node.value) |value| {
                 if (strEql(value, "ACrab") or strEql(value, "AHuman")) {
                     var found_searched_for_preset_name = false;
@@ -1873,7 +1878,7 @@ fn findJetpackRecursivelyNode(node: *Node, file_tree: *IniFolder, preset_name: [
 
 fn maxLengthToOffsets(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (strEql(property, "AddActor") or strEql(property, "AddEffect")) {
+        if (isInsaneProperty(property)) {
             if (node.value) |value| {
                 if (strEql(value, "Leg")) {
                     var children = &node.children;
@@ -1930,7 +1935,7 @@ fn maxLengthToOffsets(node: *Node, allocator: Allocator) !void {
 
 fn maxMassToMaxInventoryMass(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (strEql(property, "AddActor") or strEql(property, "AddEffect")) {
+        if (isInsaneProperty(property)) {
             for (node.children.items) |*child| {
                 if (child.property) |child_property| {
                     if (strEql(child_property, "MaxMass")) {
@@ -2006,7 +2011,7 @@ fn pieMenu(actor_name: []const u8, default_copy_of_name: []const u8, starting_di
 
 fn pieMenuRecursivelyNode(node: *Node, actor_name: []const u8, default_copy_of_name: []const u8, starting_direction_count_up: u32, starting_direction_count_down: u32, starting_direction_count_left: u32, starting_direction_count_right: u32, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (strEql(property, "AddActor") or strEql(property, "AddEffect")) {
+        if (isInsaneProperty(property)) {
             if (node.value) |value| {
                 if (strEql(value, actor_name)) {
                     var children = &node.children;
@@ -2159,7 +2164,7 @@ fn removeSlTerrainProperties(node: *Node, allocator: Allocator) !void {
 
 fn shovelFlashFix(node: *Node) !void {
     if (node.property) |property| {
-        if (strEql(property, "AddDevice")) {
+        if (isInsaneProperty(property)) {
             if (node.value) |value| {
                 if (strEql(value, "HDFirearm")) {
                     var changed_shovel_sprite = false;
