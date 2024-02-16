@@ -173,7 +173,6 @@
 	"Small Turret Stand Path Right": "Null Path",
 	"Muzzle Flash Techion Laser": "Muzzle Flash Blue",
 	"Remote Explosive Sound Activate": "Remote Explosive Shaped Blast",
-	"Null": "Null Bullet",
 	"Brain Gib A": "Brain Gib",
 	"Rocket Leg": "Rocket Leg A",
 	"Near Layer": "Default Front",
@@ -307,5 +306,8 @@
 	"Dent Metal Helmet": "Dent Metal Light",
 	"Wound Clothed Flesh Head": "Wound Flesh Entry",
 	"Wound Clothed Flesh Limb": "Wound Flesh Entry",
-	"Wound Clothed Flesh Torso": "Wound Flesh Entry"
+	"Wound Clothed Flesh Torso": "Wound Flesh Entry",
+	"Particle Ronin Shovel 1": "Particle Ronin Shovel",
+	"Particle Ronin Shovel 2": "Particle Ronin Shovel",
+	"Chest Plate Impact": "Chestplate Impact"
 }
