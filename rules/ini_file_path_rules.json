@@ -548,5 +548,8 @@
 	"Browncoats.rte/Devices/Tools/Blowtorch/Sounds/Start.flac": "Browncoats.rte/Devices/Tools/Blowtorch/Sounds/ReloadStart1.flac",
 	"Coalition.rte/Devices/Weapons/UberCannon/Sounds/BombletExplode1.flac": "Base.rte/Sounds/Explosions/Ballistic/ExplodeFlak1.flac",
 	"Coalition.rte/Devices/Weapons/UberCannon/Sounds/Explode1.flac": "Base.rte/Sounds/Explosions/Ballistic/ExplodeBassy1.flac",
-	"Coalition.rte/Devices/Weapons/UberCannon/Sounds/Explode2.flac": "Base.rte/Sounds/Explosions/Ballistic/ExplodeBassy2.flac"
+	"Coalition.rte/Devices/Weapons/UberCannon/Sounds/Explode2.flac": "Base.rte/Sounds/Explosions/Ballistic/ExplodeBassy2.flac",
+	"Base.rte/Sounds/Explosions/ShipExplosion1.flac": "Base.rte/Sounds/Explosions/Ballistic/ExplodeShip1.flac",
+	"Base.rte/Sounds/Explosions/ShipExplosion2.flac": "Base.rte/Sounds/Explosions/Ballistic/ExplodeShip2.flac",
+	"Base.rte/Sounds/Explosions/ShipExplosion3.flac": "Base.rte/Sounds/Explosions/Ballistic/ExplodeShip3.flac"
 }
