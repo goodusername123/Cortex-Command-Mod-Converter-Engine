@@ -1,5 +1,4 @@
 const std = @import("std");
-const ziplib = @cImport(@cInclude("zip.h"));
 
 const default_max_load_percentage = std.hash_map.default_max_load_percentage;
 const default_max_value_len = std.json.default_max_value_len;
@@ -195,8 +194,6 @@ pub fn main() !void {
     };
 
     try beautifyLua(output_folder_path, allocator);
-
-    // try zipMods(input_folder_path, output_folder_path, allocator);
 }
 
 /// For every mod directory in `input_folder_path`, it creates a copy of the mod directory in `output_folder_path` with the required changes to make it compatible with the latest version of the game.
@@ -2434,57 +2431,3 @@ pub fn beautifyLua(output_folder_path: []const u8, allocator: Allocator) !void {
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
     _ = result;
 }
-
-// TODO: Turn these // into ///, to turn it into documentation again
-// For every directory name in `input_folder_path`, it looks in `output_folder_path` for a directory with the same name.
-// If there is a directory with the same name, it creates a zip of that directory next to it.
-// pub fn zipMods(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
-//     var iterable_dir = try std.fs.openIterableDirAbsolute(input_folder_path, .{});
-//     defer iterable_dir.close();
-//     var dir_iterator = iterable_dir.iterate();
-
-//     while (try dir_iterator.next()) |entry| {
-//         if (entry.kind == std.fs.File.Kind.directory) {
-//             const mod_folder_path = try join(allocator, &.{ output_folder_path, entry.name });
-
-//             const needle = ".rte";
-//             const replacement = "-pre5.2-v1.0.zip";
-//             const name = try allocator.alloc(u8, replacementSize(u8, entry.name, needle, replacement));
-//             _ = replace(u8, entry.name, needle, replacement, name);
-
-//             const mod_zip_path = try allocator.dupeZ(u8, try join(allocator, &.{ output_folder_path, name }));
-
-//             var zip = ziplib.zip_open(mod_zip_path.ptr, ziplib.ZIP_DEFAULT_COMPRESSION_LEVEL, 'w') orelse return error.ZipOpen;
-
-//             try zipModRecursively(zip, mod_folder_path, entry.name);
-
-//             ziplib.zip_close(zip);
-//         }
-//     }
-// }
-
-// fn zipModRecursively(zip: *ziplib.zip_t, full_path: []const u8, sub_path: []const u8) !void {
-//     var child_full_path_buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
-//     var child_sub_path_buffer: [std.fs.MAX_PATH_BYTES]u8 = undefined;
-
-//     var iterable_dir = try std.fs.openIterableDirAbsolute(full_path, .{});
-//     defer iterable_dir.close();
-//     var dir_iterator = iterable_dir.iterate();
-
-//     while (try dir_iterator.next()) |entry| {
-//         const child_full_path = try std.fmt.bufPrintZ(&child_full_path_buffer, "{s}/{s}", .{ full_path, entry.name });
-//         const child_sub_path = try std.fmt.bufPrintZ(&child_sub_path_buffer, "{s}/{s}", .{ sub_path, entry.name });
-
-//         if (entry.kind == std.fs.File.Kind.file) {
-//             // TODO: Not sure whether these files are ever actually returned by Zig's dir iterator
-//             if (strEql(entry.name, ".") or strEql(entry.name, ".."))
-//                 continue;
-
-//             if (ziplib.zip_entry_open(zip, child_sub_path) < 0) return error.ZipEntryOpen;
-//             if (ziplib.zip_entry_fwrite(zip, child_full_path) < 0) return error.ZipEntryFwrite;
-//             if (ziplib.zip_entry_close(zip) < 0) return error.ZipEntryClose;
-//         } else if (entry.kind == std.fs.File.Kind.directory) {
-//             try zipModRecursively(zip, child_full_path, child_sub_path);
-//         }
-//     }
-// }

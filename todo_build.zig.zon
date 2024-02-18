@@ -7,9 +7,5 @@
             .url = "???", // TODO:
             .hash = "", // TODO:
         },
-        .zip = .{
-            .url = "???", // TODO:
-            .hash = "", // TODO:
-        },
     },
 }
