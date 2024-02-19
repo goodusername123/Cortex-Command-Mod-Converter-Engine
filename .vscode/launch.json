@@ -10,8 +10,8 @@
 			"request": "launch",
 			"program": "./Cortex-Command-Mod-Converter-Engine",
 			"args": [
-				"I:/Programming/Cortex-Command-Mod.io-Updater/1_downloads/1008081/nrg.rte",
-				"I:/Programming/Cortex-Command-Mod.io-Updater/2_converted/1008081/nrg.rte"
+				"I:/Programming/Cortex-Command-Mod.io-Updater/5_wip_coroutine_yield_bug/1009341/bos.rte",
+				"I:/Programming/Cortex-Command-Community-Project/Mods/bos.rte"
 			],
 			"cwd": "${workspaceFolder}",
 			"console": "integratedTerminal",

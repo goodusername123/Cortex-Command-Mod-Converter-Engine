@@ -163,31 +163,34 @@ pub fn main() !void {
         &diagnostics,
     ) catch |err| switch (err) {
         error.UnexpectedToken => {
-            const token = diagnostics.token orelse "null";
-            const file_path = diagnostics.file_path orelse "null";
-            const line = diagnostics.line orelse -1;
-            const column = diagnostics.column orelse -1;
-
             std.log.info("Error: Unexpected '{s}' at {s}:{}:{}\n", .{
-                token,
-                file_path,
-                line,
-                column,
+                diagnostics.token orelse "null",
+                diagnostics.file_path orelse "null",
+                diagnostics.line orelse -1,
+                diagnostics.column orelse -1,
             });
-
+            return err;
+        },
+        error.UnclosedMultiComment => {
+            std.log.info("Error: Unclosed multi-line comment in file {s}\n", .{
+                diagnostics.file_path orelse "null",
+            });
             return err;
         },
         error.TooManyTabs => {
-            const file_path = diagnostics.file_path orelse "null";
-            const line = diagnostics.line orelse -1;
-            const column = diagnostics.column orelse -1;
-
             std.log.info("Error: Too many tabs at {s}:{}:{}\n", .{
-                file_path,
-                line,
-                column,
+                diagnostics.file_path orelse "null",
+                diagnostics.line orelse -1,
+                diagnostics.column orelse -1,
             });
-
+            return err;
+        },
+        error.ExpectedADataModule => {
+            std.log.info("Error: Expected a DataModule\n", .{});
+            return err;
+        },
+        error.ContainsMoreThanOneDataModule => {
+            std.log.info("Error: The mod contains more than one DataModule\n", .{});
             return err;
         },
         else => |e| return e,
@@ -397,17 +400,13 @@ fn strEql(str1: []const u8, str2: []const u8) bool {
 }
 
 fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
-    // TODO: ffmpeg won't always be available, so include its source code and call that instead
-    // -y allows overwriting output files
-    const argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path, "-y" };
+    const argv = [_][]const u8{ getFfmpegPath(), "-i", input_file_path, output_file_path, "-y" };
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
     _ = result;
 }
 
 fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
-    // TODO: ffmpeg won't always be available, so include its source code and call that instead
-    // -y allows overwriting output files
-    const argv = [_][]const u8{ "ffmpeg", "-i", input_file_path, output_file_path, "-y" };
+    const argv = [_][]const u8{ getFfmpegPath(), "-i", input_file_path, output_file_path, "-y" };
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
     _ = result;
 
@@ -971,15 +970,11 @@ fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: A
                 // This file will have (255, 0, 255) replaced with (255, 0, 255, 0)
                 const tmp_alpha_file_path = try join(allocator, &.{ tmpdir_output_folder_path, "alpha.png" });
 
-                // TODO: ffmpeg won't always be available, so include its source code and call that instead
-                // This replaces magenta with transparency
-                // -y allows overwriting output files
-                //
                 // Note that "colorkey" its "similarity" value has a default, and minimum, of 0.01,
                 // which means that colors that are very close to (255, 0, 255) also turn transparent.
                 // This is fine however, since I checked that the CC palette doesn't contain other colors
                 // that are close enough to magenta to be turned transparent.
-                const argv_alpha = [_][]const u8{ "ffmpeg", "-i", output_file_path, "-vf", "colorkey=magenta", "-y", tmp_alpha_file_path };
+                const argv_alpha = [_][]const u8{ getFfmpegPath(), "-i", output_file_path, "-vf", "colorkey=magenta", "-y", tmp_alpha_file_path };
                 const result_alpha = try std.ChildProcess.exec(.{ .argv = &argv_alpha, .allocator = allocator });
                 _ = result_alpha;
 
@@ -987,7 +982,7 @@ fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: A
                 const tmp_zero_file_path = try join(allocator, &.{ tmpdir_output_folder_path, "zero.png" });
 
                 // This insanity is just asking ffmpeg to replace any (r=255, g=0, b=255, a=0) with (r=0, g=0, b=0, a=0)
-                const argv_zero = [_][]const u8{ "ffmpeg", "-i", tmp_alpha_file_path, "-vf", "geq=r='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,r(X,Y))':g='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,g(X,Y))':b='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,b(X,Y))':a='alpha(X,Y)'", "-y", tmp_zero_file_path };
+                const argv_zero = [_][]const u8{ getFfmpegPath(), "-i", tmp_alpha_file_path, "-vf", "geq=r='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,r(X,Y))':g='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,g(X,Y))':b='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,b(X,Y))':a='alpha(X,Y)'", "-y", tmp_zero_file_path };
                 const result_zero = try std.ChildProcess.exec(.{ .argv = &argv_zero, .allocator = allocator });
                 _ = result_zero;
 
@@ -2427,7 +2422,15 @@ fn testDirectoryFiles(test_folder_path: []const u8, expected_result_path: []cons
 pub fn beautifyLua(output_folder_path: []const u8, allocator: Allocator) !void {
     std.log.info("Beautifying Lua...\n", .{});
     // TODO: Do we want to compile this from source?
-    const argv = [_][]const u8{ "stylua", output_folder_path };
+    const argv = [_][]const u8{ getStyluaPath(), output_folder_path };
     const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
     _ = result;
+}
+
+inline fn getFfmpegPath() []const u8 {
+    return "dependency_executables/ffmpeg/windows/ffmpeg.exe";
+}
+
+inline fn getStyluaPath() []const u8 {
+    return "dependency_executables/stylua/windows/stylua.exe";
 }
