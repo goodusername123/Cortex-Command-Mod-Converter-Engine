@@ -53,5 +53,6 @@
 	"\"Turret\"": "\"Actors - Turret\"",
 	"\"Mecha\"": "\"Actors - Mecha\"",
 	"CreateMOSRotating(\"Coalition Remote Grenade Shot Explosion\")": "CreateMOSRotating(\"Grenade Launcher Grenade Explosion\")",
-	".IsBuyable": ".Buyable"
+	".IsBuyable": ".Buyable",
+	"rte.DefenderMOIDMax": "420420"
 }
