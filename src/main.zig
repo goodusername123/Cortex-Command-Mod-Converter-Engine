@@ -201,7 +201,10 @@ pub fn main() !void {
 
 /// For every mod directory in `input_folder_path`, it creates a copy of the mod directory in `output_folder_path` with the required changes to make it compatible with the latest version of the game.
 /// If `convert()` crashed, the `diagnostics` argument allows you to know why and where it did.
-pub fn convert(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+pub fn convert(input_folder_path_: []const u8, output_folder_path_: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+    const input_folder_path = try std.fs.realpathAlloc(allocator, input_folder_path_);
+    const output_folder_path = try std.fs.realpathAlloc(allocator, output_folder_path_);
+
     std.log.info("Making all output dirs...\n", .{});
     try makeOutputDirs(input_folder_path, output_folder_path, allocator);
 
@@ -455,8 +458,7 @@ fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []co
                 }
 
                 if (text_contains_any_key) {
-                    const cwd = std.fs.cwd();
-                    var file = try cwd.createFile(file_path, .{});
+                    var file = try std.fs.cwd().createFile(file_path, .{});
                     defer file.close();
                     try file.writeAll(text);
                 }
@@ -506,9 +508,7 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
 }
 
 fn readFile(input_path: []const u8, allocator: Allocator) ![]const u8 {
-    const cwd = std.fs.cwd();
-
-    var input_file = try cwd.openFile(input_path, .{});
+    var input_file = try std.fs.cwd().openFile(input_path, .{});
     defer input_file.close();
 
     var buf_reader = bufferedReader(input_file.reader());
@@ -998,8 +998,7 @@ fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: A
 
 // RGB, as opposed to indexed with a palette
 fn pngIsRgb(output_file_path: []const u8) !bool {
-    const cwd = std.fs.cwd();
-    const file = try cwd.openFile(output_file_path, .{});
+    const file = try std.fs.cwd().openFile(output_file_path, .{});
     defer file.close();
 
     const color_type_offset = 0x19;
@@ -2223,8 +2222,7 @@ fn writeIniFileTree(file_tree: *const IniFolder, output_folder_path: []const u8,
 }
 
 fn writeAst(ast: *const ArrayList(Node), output_path: []const u8) !void {
-    const cwd = std.fs.cwd();
-    const output_file = try cwd.createFile(output_path, .{});
+    const output_file = try std.fs.cwd().createFile(output_path, .{});
     defer output_file.close();
 
     var buffered = bufferedWriter(output_file.writer());
@@ -2341,8 +2339,7 @@ fn testDirectory(comptime directory_name: []const u8, is_invalid_test: bool) !vo
                 if (is_invalid_test) {
                     const error_path = try join(allocator, &.{ test_folder_path, "expected_error.txt" });
 
-                    const cwd = std.fs.cwd();
-                    const error_file = try cwd.openFile(error_path, .{});
+                    const error_file = try std.fs.cwd().openFile(error_path, .{});
                     defer error_file.close();
 
                     var error_buf_reader = bufferedReader(error_file.reader());
@@ -2384,8 +2381,7 @@ fn testDirectoryFiles(test_folder_path: []const u8, expected_result_path: []cons
         if (expected_result_entry.kind == std.fs.File.Kind.file) {
             const expected_file_path = try join(allocator, &.{ expected_result_path, expected_result_entry.path });
 
-            const cwd = std.fs.cwd();
-            const expected_file = try cwd.openFile(expected_file_path, .{});
+            const expected_file = try std.fs.cwd().openFile(expected_file_path, .{});
             defer expected_file.close();
 
             var expected_buf_reader = bufferedReader(expected_file.reader());
@@ -2394,7 +2390,7 @@ fn testDirectoryFiles(test_folder_path: []const u8, expected_result_path: []cons
             const expected_text = try crlfToLf(expected_text_crlf, allocator);
 
             const output_path = try join(allocator, &.{ tmpdir_output_folder_path, expected_result_entry.path });
-            const output_file = try cwd.openFile(output_path, .{});
+            const output_file = try std.fs.cwd().openFile(output_path, .{});
             defer output_file.close();
 
             var output_buf_reader = bufferedReader(output_file.reader());
