@@ -10,7 +10,7 @@
 			"request": "launch",
 			"program": "./Cortex-Command-Mod-Converter-Engine",
 			"args": [
-				"./Input",
+				"./input",
 				"I:/Programming/Cortex-Command-Community-Project/Mods"
 			],
 			"cwd": "${workspaceFolder}",

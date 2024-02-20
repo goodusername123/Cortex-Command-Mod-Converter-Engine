@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 
 const default_max_load_percentage = std.hash_map.default_max_load_percentage;
 const default_max_value_len = std.json.default_max_value_len;
@@ -162,6 +163,14 @@ pub fn main() !void {
         allocator,
         &diagnostics,
     ) catch |err| switch (err) {
+        error.InvalidInputPath => {
+            std.log.info("Error: Invalid input path", .{});
+            return err;
+        },
+        error.InvalidOutputPath => {
+            std.log.info("Error: Invalid output path", .{});
+            return err;
+        },
         error.UnexpectedToken => {
             std.log.info("Error: Unexpected '{s}' at {s}:{}:{}\n", .{
                 diagnostics.token orelse "null",
@@ -202,6 +211,11 @@ pub fn main() !void {
 /// For every mod directory in `input_folder_path`, it creates a copy of the mod directory in `output_folder_path` with the required changes to make it compatible with the latest version of the game.
 /// If `convert()` crashed, the `diagnostics` argument allows you to know why and where it did.
 pub fn convert(input_folder_path_: []const u8, output_folder_path_: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+    // Necessary solely because of .OBJECT_NAME_INVALID => unreachable in the std lib:
+    // https://github.com/ziglang/zig/issues/15607#issue-1698930560
+    if (!try isValidDirPath(input_folder_path_)) return error.InvalidInputPath;
+    if (!try isValidDirPath(output_folder_path_)) return error.InvalidOutputPath;
+
     const input_folder_path = try std.fs.realpathAlloc(allocator, input_folder_path_);
     const output_folder_path = try std.fs.realpathAlloc(allocator, output_folder_path_);
 
@@ -273,6 +287,55 @@ pub fn convert(input_folder_path_: []const u8, output_folder_path_: []const u8, 
 
     std.log.info("Writing INI file tree...\n", .{});
     try writeIniFileTree(&file_tree, output_folder_path, allocator);
+}
+
+fn isValidDirPath(path: []const u8) !bool {
+    if (builtin.os.tag != .windows) return error.OnlySupportingWindowsSowwy;
+
+    const d = std.fs.cwd();
+    const path_w_slice = try std.os.windows.sliceToPrefixedFileW(d.fd, path);
+    const path_w = path_w_slice.span().ptr;
+
+    const w = std.os.windows;
+    const access_mask = w.STANDARD_RIGHTS_READ | w.FILE_READ_ATTRIBUTES | w.FILE_READ_EA |
+        w.SYNCHRONIZE | w.FILE_TRAVERSE;
+
+    var result = std.fs.Dir{
+        .fd = undefined,
+    };
+    const path_len_bytes = @as(u16, @intCast(std.mem.sliceTo(path_w, 0).len * 2));
+    var nt_name = w.UNICODE_STRING{
+        .Length = path_len_bytes,
+        .MaximumLength = path_len_bytes,
+        .Buffer = @constCast(path_w),
+    };
+    var attr = w.OBJECT_ATTRIBUTES{
+        .Length = @sizeOf(w.OBJECT_ATTRIBUTES),
+        .RootDirectory = if (std.fs.path.isAbsoluteWindowsW(path_w)) null else d.fd,
+        .Attributes = 0, // Note we do not use OBJ_CASE_INSENSITIVE here.
+        .ObjectName = &nt_name,
+        .SecurityDescriptor = null,
+        .SecurityQualityOfService = null,
+    };
+
+    const no_follow = false;
+    const open_reparse_point: w.DWORD = if (no_follow) w.FILE_OPEN_REPARSE_POINT else 0x0;
+    var io: w.IO_STATUS_BLOCK = undefined;
+
+    const rc = w.ntdll.NtCreateFile(
+        &result.fd,
+        access_mask,
+        &attr,
+        &io,
+        null,
+        0,
+        w.FILE_SHARE_READ | w.FILE_SHARE_WRITE,
+        w.FILE_OPEN,
+        w.FILE_DIRECTORY_FILE | w.FILE_SYNCHRONOUS_IO_NONALERT | w.FILE_OPEN_FOR_BACKUP_INTENT | open_reparse_point,
+        null,
+        0,
+    );
+    return rc == .SUCCESS;
 }
 
 fn makeOutputDirs(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
