@@ -8,7 +8,7 @@
 			"name": "Run",
 			"type": "cppvsdbg",
 			"request": "launch",
-			"program": "./Cortex-Command-Mod-Converter-Engine",
+			"program": "${workspaceFolder}/Cortex-Command-Mod-Converter-Engine",
 			"args": [
 				"./input",
 				"I:/Programming/Cortex-Command-Community-Project/Mods"
