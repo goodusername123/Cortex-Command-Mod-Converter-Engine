@@ -1148,7 +1148,7 @@ fn bmpExtensionToPng(node: *Node, allocator: Allocator) !void {
 
 fn wavExtensionToFlac(node: *Node, allocator: Allocator) !void {
     if (node.property) |property| {
-        if (strEql(property, "FilePath")) {
+        if (strEql(property, "FilePath") or strEql(property, "AddSound")) {
             if (node.value) |path| {
                 if (endsWith(u8, path, ".wav")) {
                     // Create a copy of the entry name that is one character longer, so the "c" in .flac fits
