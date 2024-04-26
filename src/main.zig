@@ -23,7 +23,6 @@ const endsWith = std.mem.endsWith;
 const eql = std.mem.eql;
 const expectEqualStrings = std.testing.expectEqualStrings;
 const extension = std.fs.path.extension;
-const fabs = std.math.fabs;
 const fmtSliceEscapeUpper = std.fmt.fmtSliceEscapeUpper;
 const indexOfDiff = std.mem.indexOfDiff;
 const join = std.fs.path.join;
@@ -146,7 +145,7 @@ const UpdateIniFileTreeErrors = error{
 pub fn main() !void {
     var arena = ArenaAllocator.init(page_allocator);
     defer arena.deinit();
-    var allocator = arena.allocator();
+    const allocator = arena.allocator();
 
     var args = try std.process.argsWithAllocator(allocator);
     defer args.deinit();
@@ -344,7 +343,7 @@ fn makeOutputDirs(input_folder_path: []const u8, output_folder_path: []const u8,
         else => |e| return e,
     };
 
-    var iterable_dir = try std.fs.openIterableDirAbsolute(input_folder_path, .{});
+    var iterable_dir = try std.fs.openDirAbsolute(input_folder_path, .{ .iterate = true });
     defer iterable_dir.close();
     var dir_iterator = iterable_dir.iterate();
 
@@ -359,7 +358,7 @@ fn makeOutputDirs(input_folder_path: []const u8, output_folder_path: []const u8,
 
 /// Doesn't copy .ini files
 fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allocator: Allocator) !void {
-    var iterable_dir = try std.fs.openIterableDirAbsolute(input_folder_path, .{});
+    var iterable_dir = try std.fs.openDirAbsolute(input_folder_path, .{ .iterate = true });
     defer iterable_dir.close();
     var dir_iterator = iterable_dir.iterate();
 
@@ -386,8 +385,8 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     // TODO: Windows can be significantly faster if we use iterable_dir.dir.stat() manually here,
                     // if (and only if) directory mod times are updated when files change on Windows!
 
-                    const input_stat = try iterable_dir.dir.statFile(input_file_path);
-                    const output_stat = try iterable_dir.dir.statFile(output_file_path);
+                    const input_stat = try iterable_dir.statFile(input_file_path);
+                    const output_stat = try iterable_dir.statFile(output_file_path);
 
                     if (input_stat.mtime > output_stat.mtime) {
                         // TODO: Figure out whether a different function should be called in this case,
@@ -419,8 +418,8 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     // TODO: Windows can be significantly faster if we use iterable_dir.dir.stat() manually here,
                     // if (and only if) directory mod times are updated when files change on Windows!
 
-                    const input_stat = try iterable_dir.dir.statFile(input_file_path);
-                    const output_stat = try iterable_dir.dir.statFile(output_file_path);
+                    const input_stat = try iterable_dir.statFile(input_file_path);
+                    const output_stat = try iterable_dir.statFile(output_file_path);
 
                     if (input_stat.mtime > output_stat.mtime) {
                         // TODO: Figure out whether a different function should be called in this case,
@@ -442,8 +441,8 @@ fn copyFiles(input_folder_path: []const u8, output_folder_path: []const u8, allo
                     // TODO: Windows can be significantly faster if we use iterable_dir.dir.stat() manually here,
                     // if (and only if) directory mod times are updated when files change on Windows!
 
-                    const input_stat = try iterable_dir.dir.statFile(input_file_path);
-                    const output_stat = try iterable_dir.dir.statFile(output_file_path);
+                    const input_stat = try iterable_dir.statFile(input_file_path);
+                    const output_stat = try iterable_dir.statFile(output_file_path);
 
                     if (input_stat.mtime > output_stat.mtime) {
                         // TODO: Reverify that this is faster than the plain copyFileAbsolute()
@@ -467,13 +466,13 @@ fn strEql(str1: []const u8, str2: []const u8) bool {
 
 fn convertBmpToPng(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
     const argv = [_][]const u8{ getFfmpegPath(), "-i", input_file_path, output_file_path, "-y" };
-    const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
+    const result = try std.ChildProcess.run(.{ .argv = &argv, .allocator = allocator });
     _ = result;
 }
 
 fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, allocator: Allocator) !void {
     const argv = [_][]const u8{ getFfmpegPath(), "-i", input_file_path, output_file_path, "-y" };
-    const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
+    const result = try std.ChildProcess.run(.{ .argv = &argv, .allocator = allocator });
     _ = result;
 
     // var line_iter = std.mem.split(u8, result.stderr, "\n");
@@ -487,12 +486,12 @@ fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
-    var lua_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    const lua_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return lua_rules;
 }
 
 fn applyLuaRules(lua_rules: std.json.ArrayHashMap([]const u8), folder_path: []const u8, allocator: Allocator) !void {
-    var iterable_dir = try std.fs.openIterableDirAbsolute(folder_path, .{});
+    var iterable_dir = try std.fs.openDirAbsolute(folder_path, .{ .iterate = true });
     defer iterable_dir.close();
     var dir_iterator = iterable_dir.iterate();
 
@@ -539,7 +538,7 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
         .folders = ArrayList(IniFolder).init(allocator),
     };
 
-    var iterable_dir = try std.fs.openIterableDirAbsolute(folder_path, .{});
+    var iterable_dir = try std.fs.openDirAbsolute(folder_path, .{ .iterate = true });
     defer iterable_dir.close();
     var dir_iterator = iterable_dir.iterate();
 
@@ -553,16 +552,16 @@ fn getIniFileTree(folder_path: []const u8, allocator: Allocator, diagnostics: *D
                 var tokens = try getTokens(text, allocator);
 
                 // TODO: Should I stop passing the address of tokens and ast everywhere?
-                var ast = try getAstFromTokens(&tokens, allocator, diagnostics);
+                const ast = try getAstFromTokens(&tokens, allocator, diagnostics);
 
-                var file = IniFile{
+                const file = IniFile{
                     .name = try allocator.dupe(u8, entry.name),
                     .ast = ast,
                 };
                 try folder.files.append(file);
             }
         } else if (entry.kind == std.fs.File.Kind.directory) {
-            var child_folder = try getIniFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator, diagnostics);
+            const child_folder = try getIniFileTree(try join(allocator, &.{ folder_path, entry.name }), allocator, diagnostics);
             try folder.folders.append(child_folder);
         }
     }
@@ -586,7 +585,7 @@ fn readFile(input_path: []const u8, allocator: Allocator) ![]const u8 {
 
 fn crlfToLf(text: []const u8, allocator: Allocator) ![]const u8 {
     const replacement_size = replacementSize(u8, text, "\r\n", "\n");
-    var lf_text = try allocator.alloc(u8, replacement_size);
+    const lf_text = try allocator.alloc(u8, replacement_size);
     _ = replace(u8, text, "\r\n", "\n", lf_text);
     return lf_text;
 }
@@ -933,7 +932,7 @@ fn calculateLineAndColumnDiagnostics(tokens: *ArrayList(Token), token_index: usi
 
     var i: usize = 0;
     while (i < token_index) {
-        var token = tokens.items[i];
+        const token = tokens.items[i];
 
         if (token.type == .Newline) {
             diagnostics.line.? += 1;
@@ -1015,7 +1014,7 @@ fn getModVersionRecursivelyNode(node: *Node, mod_version: *ModVersion, data_modu
 }
 
 fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: Allocator) !void {
-    var iterable_dir = try std.fs.openIterableDirAbsolute(output_folder_path, .{});
+    var iterable_dir = try std.fs.openDirAbsolute(output_folder_path, .{ .iterate = true });
     defer iterable_dir.close();
     var dir_iterator = iterable_dir.iterate();
 
@@ -1038,7 +1037,7 @@ fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: A
                 // This is fine however, since I checked that the CC palette doesn't contain other colors
                 // that are close enough to magenta to be turned transparent.
                 const argv_alpha = [_][]const u8{ getFfmpegPath(), "-i", output_file_path, "-vf", "colorkey=magenta", "-y", tmp_alpha_file_path };
-                const result_alpha = try std.ChildProcess.exec(.{ .argv = &argv_alpha, .allocator = allocator });
+                const result_alpha = try std.ChildProcess.run(.{ .argv = &argv_alpha, .allocator = allocator });
                 _ = result_alpha;
 
                 // This file will have (r=255, g=0, b=255, a=0) replaced with (r=0, g=0, b=0, a=0), as CC requires all RGB to be 0 when alpha is 0
@@ -1046,7 +1045,7 @@ fn replaceMagentaInRgbPngsWithAlpha(output_folder_path: []const u8, allocator: A
 
                 // This insanity is just asking ffmpeg to replace any (r=255, g=0, b=255, a=0) with (r=0, g=0, b=0, a=0)
                 const argv_zero = [_][]const u8{ getFfmpegPath(), "-i", tmp_alpha_file_path, "-vf", "geq=r='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,r(X,Y))':g='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,g(X,Y))':b='if(eq(r(X,Y),255)*eq(g(X,Y),0)*eq(b(X,Y),255),0,b(X,Y))':a='alpha(X,Y)'", "-y", tmp_zero_file_path };
-                const result_zero = try std.ChildProcess.exec(.{ .argv = &argv_zero, .allocator = allocator });
+                const result_zero = try std.ChildProcess.run(.{ .argv = &argv_zero, .allocator = allocator });
                 _ = result_zero;
 
                 // Overwrite the old png with the new one that has transparency
@@ -1172,7 +1171,7 @@ fn parseIniCopyOfRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) 
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
-    var rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    const rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return rules;
 }
 
@@ -1219,7 +1218,7 @@ fn parseIniFilePathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
-    var rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    const rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return rules;
 }
 
@@ -1238,7 +1237,7 @@ fn parseIniScriptPathRules(allocator: Allocator) !std.json.ArrayHashMap([]const 
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
-    var rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    const rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return rules;
 }
 
@@ -1257,7 +1256,7 @@ fn parseIniPropertyRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
-    var ini_property_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
+    const ini_property_rules = try std.json.ArrayHashMap([]const u8).jsonParse(allocator, &scanner, .{ .allocate = .alloc_if_needed, .max_value_len = default_max_value_len });
     return ini_property_rules;
 }
 
@@ -2027,7 +2026,7 @@ fn maxThrottleRangeToPositiveThrottleMultiplier(node: *Node, allocator: Allocato
             node.property = "PositiveThrottleMultiplier";
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
-                const new_value = fabs(1 + fabs(old_value));
+                const new_value = @abs(1 + @abs(old_value));
                 node.value = try allocPrint(allocator, "{d}", .{new_value});
             } else {
                 return UpdateIniFileTreeErrors.ExpectedValue;
@@ -2042,7 +2041,7 @@ fn minThrottleRangeToNegativeThrottleMultiplier(node: *Node, allocator: Allocato
             node.property = "NegativeThrottleMultiplier";
             if (node.value) |v| {
                 const old_value = try parseFloat(f32, v);
-                const new_value = fabs(1 - fabs(old_value));
+                const new_value = @abs(1 - @abs(old_value));
                 node.value = try allocPrint(allocator, "{d}", .{new_value});
             } else {
                 return UpdateIniFileTreeErrors.ExpectedValue;
@@ -2373,7 +2372,7 @@ test "updated" {
 }
 
 fn testDirectory(comptime directory_name: []const u8, is_invalid_test: bool) !void {
-    var iterable_tests = try std.fs.cwd().openIterableDir("tests/" ++ directory_name, .{});
+    var iterable_tests = try std.fs.cwd().openDir("tests/" ++ directory_name, .{ .iterate = true });
     defer iterable_tests.close();
 
     var arena = ArenaAllocator.init(page_allocator);
@@ -2434,7 +2433,7 @@ fn testDirectory(comptime directory_name: []const u8, is_invalid_test: bool) !vo
 }
 
 fn testDirectoryFiles(test_folder_path: []const u8, expected_result_path: []const u8, tmpdir_output_folder_path: []const u8, allocator: Allocator) !void {
-    var iterable_expected_result = try std.fs.cwd().openIterableDir(expected_result_path, .{});
+    var iterable_expected_result = try std.fs.cwd().openDir(expected_result_path, .{ .iterate = true });
     defer iterable_expected_result.close();
 
     var expected_result_walker = try iterable_expected_result.walk(allocator);
@@ -2482,7 +2481,7 @@ pub fn beautifyLua(output_folder_path: []const u8, allocator: Allocator) !void {
     std.log.info("Beautifying Lua...\n", .{});
     // TODO: Do we want to compile this from source?
     const argv = [_][]const u8{ getStyluaPath(), output_folder_path };
-    const result = try std.ChildProcess.exec(.{ .argv = &argv, .allocator = allocator });
+    const result = try std.ChildProcess.run(.{ .argv = &argv, .allocator = allocator });
     _ = result;
 }
 
