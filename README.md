@@ -6,7 +6,7 @@ The [Cortex Command Legacy Mod Converter](https://github.com/cortex-command-comm
 
 ## Usage
 
-1. Download Zig version 0.12.0 from [here](https://ziglang.org/download/#release-0.12.0).
+1. Download Zig version 0.12.0 from [here](https://ziglang.org/download/#release-0.12.0)
 2. Clone this repository somewhere
 3. Open the cloned directory in [Visual Studio Code](https://code.visualstudio.com/) (which is absolutely not the same thing as Visual Studio!)
 4. Hold `Ctrl+Shift+B` to get a selection of the available tasks (coming from `.vscode/tasks.json`), and select the `Tests` task. A terminal should pop up in VS Code that shows that all tests pass.
