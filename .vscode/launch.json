@@ -11,7 +11,8 @@
 			"program": "${workspaceFolder}/Cortex-Command-Mod-Converter-Engine",
 			"args": [
 				"./input",
-				"./output"
+				"./output",
+				"./rules"
 			],
 			"cwd": "${workspaceFolder}",
 			"console": "integratedTerminal",

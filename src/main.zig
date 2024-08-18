@@ -154,11 +154,13 @@ pub fn main() !void {
     _ = program_name;
     const input_folder_path = args.next() orelse return error.ExpectedInputFolderPath;
     const output_folder_path = args.next() orelse return error.ExpectedOutputFolderPath;
+    const rules_folder_path = args.next() orelse return error.ExpectedRulesFolderPath;
 
     var diagnostics: Diagnostics = .{};
     convert(
         input_folder_path,
         output_folder_path,
+        rules_folder_path,
         allocator,
         &diagnostics,
     ) catch |err| switch (err) {
@@ -209,14 +211,16 @@ pub fn main() !void {
 
 /// For every mod directory in `input_folder_path`, it creates a copy of the mod directory in `output_folder_path` with the required changes to make it compatible with the latest version of the game.
 /// If `convert()` crashed, the `diagnostics` argument allows you to know why and where it did.
-pub fn convert(input_folder_path_: []const u8, output_folder_path_: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
+pub fn convert(input_folder_path_: []const u8, output_folder_path_: []const u8, rules_folder_path_: []const u8, allocator: Allocator, diagnostics: *Diagnostics) !void {
     // Necessary solely because of .OBJECT_NAME_INVALID => unreachable in the std lib:
     // https://github.com/ziglang/zig/issues/15607#issue-1698930560
     if (!try isValidDirPath(input_folder_path_)) return error.InvalidInputPath;
     if (!try isValidDirPath(output_folder_path_)) return error.InvalidOutputPath;
+    if (!try isValidDirPath(rules_folder_path_)) return error.InvalidOutputPath;
 
     const input_folder_path = try std.fs.realpathAlloc(allocator, input_folder_path_);
     const output_folder_path = try std.fs.realpathAlloc(allocator, output_folder_path_);
+    const rules_folder_path = try std.fs.realpathAlloc(allocator, rules_folder_path_);
 
     std.log.info("Making all output dirs...\n", .{});
     try makeOutputDirs(input_folder_path, output_folder_path, allocator);
@@ -224,7 +228,7 @@ pub fn convert(input_folder_path_: []const u8, output_folder_path_: []const u8, 
     std.log.info("Copying files...\n", .{});
     try copyFiles(input_folder_path, output_folder_path, allocator);
 
-    const lua_rules = try parseLuaRules(allocator);
+    const lua_rules = try parseLuaRules(rules_folder_path, allocator);
     std.log.info("Applying Lua rules...\n", .{});
     try applyLuaRules(lua_rules, output_folder_path, allocator);
 
@@ -257,27 +261,27 @@ pub fn convert(input_folder_path_: []const u8, output_folder_path_: []const u8, 
     std.log.info("Wav extension to flac...\n", .{});
     try applyOnNodesAlloc(wavExtensionToFlac, &file_tree, allocator);
 
-    const ini_copy_of_rules = try parseIniCopyOfRules(allocator);
+    const ini_copy_of_rules = try parseIniCopyOfRules(rules_folder_path, allocator);
     std.log.info("Applying INI CopyOf rules...\n", .{});
     applyIniCopyOfRules(ini_copy_of_rules, &file_tree);
 
-    const ini_file_path_rules = try parseIniFilePathRules(allocator);
+    const ini_file_path_rules = try parseIniFilePathRules(rules_folder_path, allocator);
     std.log.info("Applying INI FilePath rules...\n", .{});
     applyIniFilePathRules(ini_file_path_rules, &file_tree);
 
-    const ini_script_path_rules = try parseIniScriptPathRules(allocator);
+    const ini_script_path_rules = try parseIniScriptPathRules(rules_folder_path, allocator);
     std.log.info("Applying INI ScriptPath rules...\n", .{});
     applyIniScriptPathRules(ini_script_path_rules, &file_tree);
 
-    const ini_property_rules = try parseIniPropertyRules(allocator);
+    const ini_property_rules = try parseIniPropertyRules(rules_folder_path, allocator);
     std.log.info("Applying INI property rules...\n", .{});
     applyIniPropertyRules(ini_property_rules, &file_tree);
 
-    const ini_rules = try parseIniRules(allocator);
+    const ini_rules = try parseIniRules(rules_folder_path, allocator);
     std.log.info("Applying INI rules...\n", .{});
     applyIniRules(ini_rules, &file_tree);
 
-    const ini_sound_container_rules = try parseIniSoundContainerRules(allocator);
+    const ini_sound_container_rules = try parseIniSoundContainerRules(rules_folder_path, allocator);
     std.log.info("Applying INI SoundContainer rules...\n", .{});
     applyIniSoundContainerRules(ini_sound_container_rules, &file_tree);
 
@@ -481,8 +485,9 @@ fn convertWavToFlac(input_file_path: []const u8, output_file_path: []const u8, a
     // }
 }
 
-fn parseLuaRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile("rules/lua_rules.json", allocator);
+fn parseLuaRules(rules_folder_path: []const u8, allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const lua_rules_path = try join(allocator, &.{ rules_folder_path, "lua_rules.json" });
+    const text = try readFile(lua_rules_path, allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1166,8 +1171,9 @@ fn wavExtensionToFlac(node: *Node, allocator: Allocator) !void {
     }
 }
 
-fn parseIniCopyOfRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile("rules/ini_copy_of_rules.json", allocator);
+fn parseIniCopyOfRules(rules_folder_path: []const u8, allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const ini_copy_of_rules_path = try join(allocator, &.{ rules_folder_path, "ini_copy_of_rules.json" });
+    const text = try readFile(ini_copy_of_rules_path, allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1213,8 +1219,9 @@ fn applyIniValueReplacementRulesRecursivelyNode(node: *Node, comptime property: 
     }
 }
 
-fn parseIniFilePathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile("rules/ini_file_path_rules.json", allocator);
+fn parseIniFilePathRules(rules_folder_path: []const u8, allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const ini_file_path_rules_path = try join(allocator, &.{ rules_folder_path, "ini_file_path_rules.json" });
+    const text = try readFile(ini_file_path_rules_path, allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1232,8 +1239,9 @@ fn applyIniFilePathRules(rules: std.json.ArrayHashMap([]const u8), file_tree: *I
     }
 }
 
-fn parseIniScriptPathRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile("rules/ini_script_path_rules.json", allocator);
+fn parseIniScriptPathRules(rules_folder_path: []const u8, allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const ini_script_path_rules_path = try join(allocator, &.{ rules_folder_path, "ini_script_path_rules.json" });
+    const text = try readFile(ini_script_path_rules_path, allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1251,8 +1259,9 @@ fn applyIniScriptPathRules(rules: std.json.ArrayHashMap([]const u8), file_tree: 
     }
 }
 
-fn parseIniPropertyRules(allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
-    const text = try readFile("rules/ini_property_rules.json", allocator);
+fn parseIniPropertyRules(rules_folder_path: []const u8, allocator: Allocator) !std.json.ArrayHashMap([]const u8) {
+    const ini_property_rules_path = try join(allocator, &.{ rules_folder_path, "ini_property_rules.json" });
+    const text = try readFile(ini_property_rules_path, allocator);
 
     var scanner = Scanner.initCompleteInput(allocator, text);
 
@@ -1294,8 +1303,9 @@ fn applyIniPropertyRulesRecursivelyNode(node: *Node, old_property: []const u8, n
     }
 }
 
-fn parseIniRules(allocator: Allocator) ![]Rule {
-    const text = try readFile("rules/ini_rules.json", allocator);
+fn parseIniRules(rules_folder_path: []const u8, allocator: Allocator) ![]Rule {
+    const ini_rules_path = try join(allocator, &.{ rules_folder_path, "ini_rules.json" });
+    const text = try readFile(ini_rules_path, allocator);
     return try parseFromSliceLeaky([]Rule, allocator, text, .{});
 }
 
@@ -1334,8 +1344,9 @@ fn applyIniRulesRecursivelyNode(node: *Node, rule: *Rule) void {
     }
 }
 
-fn parseIniSoundContainerRules(allocator: Allocator) ![][]const u8 {
-    const text = try readFile("rules/ini_sound_container_rules.json", allocator);
+fn parseIniSoundContainerRules(rules_folder_path: []const u8, allocator: Allocator) ![][]const u8 {
+    const ini_sound_container_rules_path = try join(allocator, &.{ rules_folder_path, "ini_sound_container_rules.json" });
+    const text = try readFile(ini_sound_container_rules_path, allocator);
     return try parseFromSliceLeaky([][]const u8, allocator, text, .{});
 }
 
@@ -2396,8 +2407,10 @@ fn testDirectory(comptime directory_name: []const u8, is_invalid_test: bool) !vo
             var tmpdir_output_folder_path_buffer: [MAX_PATH_BYTES]u8 = undefined;
             const tmpdir_output_folder_path = try tmpdir_output_folder.dir.realpath(".", &tmpdir_output_folder_path_buffer);
 
+            const rules_folder_path = "./rules";
+
             var diagnostics: Diagnostics = .{};
-            convert(input_folder_path, tmpdir_output_folder_path, allocator, &diagnostics) catch |err| {
+            convert(input_folder_path, tmpdir_output_folder_path, rules_folder_path, allocator, &diagnostics) catch |err| {
                 if (is_invalid_test) {
                     const error_path = try join(allocator, &.{ test_folder_path, "expected_error.txt" });
 
