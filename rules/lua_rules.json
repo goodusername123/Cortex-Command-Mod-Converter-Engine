@@ -33,6 +33,7 @@
 	"FrameMan:Draw(": "PrimitiveMan:Draw(",
 	":IsPlaying(": ":IsBeingPlayed(",
 	"math.mod(": "math.fmod(",
+	"string.gfind(": "string.gmatch(",
 	":ReloadFirearm(": ":ReloadFirearms(",
 	":KillAllActors(": ":KillAllEnemyActors(",
 	".TotalWoundCount": ".WoundCount",
